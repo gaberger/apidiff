@@ -17,8 +17,8 @@ async function runDiscoveryAgent(base44, integration) {
 
   await base44.agents.addMessage(conversation, { role: "user", content: prompt });
 
-  // Poll for agent response (max 60s)
-  for (let i = 0; i < 30; i++) {
+  // Poll for agent response (max 30s per integration to stay under function timeout)
+  for (let i = 0; i < 15; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     const conv = await base44.agents.getConversation(conversation.id);
     const messages = conv.messages || [];
@@ -50,36 +50,42 @@ Deno.serve(async (req) => {
   const integrations = await base44.asServiceRole.entities.Integration.list();
   const results = [];
 
-  for (const integration of integrations) {
-    if (!integration.base_url) continue;
+  // Process max 2 integrations per run to stay within execution time limits
+  const toProcess = integrations.filter(i => i.base_url).slice(0, 2);
 
+  for (const integration of toProcess) {
     console.log(`Discovering versions for: ${integration.name}`);
-    const discovered = await runDiscoveryAgent(base44.asServiceRole, integration);
-    if (!discovered?.pairs?.length) {
-      results.push({ name: integration.name, status: "no_results" });
-      continue;
-    }
+    try {
+      const discovered = await runDiscoveryAgent(base44.asServiceRole, integration);
+      if (!discovered?.pairs?.length) {
+        results.push({ name: integration.name, status: "no_results" });
+        continue;
+      }
 
-    // Merge new pairs — avoid duplicates by v1_url+v2_url
-    const existing = new Set(
-      (integration.comparisons || []).map((c) => `${c.v1_url}|${c.v2_url}`)
-    );
-    const newPairs = discovered.pairs.filter(
-      (p) => !existing.has(`${p.v1_url}|${p.v2_url}`)
-    );
+      // Merge new pairs — avoid duplicates by v1_url+v2_url
+      const existing = new Set(
+        (integration.comparisons || []).map((c) => `${c.v1_url}|${c.v2_url}`)
+      );
+      const newPairs = discovered.pairs.filter(
+        (p) => !existing.has(`${p.v1_url}|${p.v2_url}`)
+      );
 
-    // Merge individual versions too
-    const existingVersionUrls = new Set((integration.versions || []).map(v => v.url));
-    const newVersions = (discovered.versions || []).filter(v => !existingVersionUrls.has(v.url));
+      // Merge individual versions too
+      const existingVersionUrls = new Set((integration.versions || []).map(v => v.url));
+      const newVersions = (discovered.versions || []).filter(v => !existingVersionUrls.has(v.url));
 
-    if (newPairs.length > 0 || newVersions.length > 0) {
-      const updateData = {};
-      if (newPairs.length > 0) updateData.comparisons = [...(integration.comparisons || []), ...newPairs];
-      if (newVersions.length > 0) updateData.versions = [...(integration.versions || []), ...newVersions];
-      await base44.asServiceRole.entities.Integration.update(integration.id, updateData);
-      results.push({ name: integration.name, status: "updated", added_pairs: newPairs.length, added_versions: newVersions.length });
-    } else {
-      results.push({ name: integration.name, status: "no_new" });
+      if (newPairs.length > 0 || newVersions.length > 0) {
+        const updateData = {};
+        if (newPairs.length > 0) updateData.comparisons = [...(integration.comparisons || []), ...newPairs];
+        if (newVersions.length > 0) updateData.versions = [...(integration.versions || []), ...newVersions];
+        await base44.asServiceRole.entities.Integration.update(integration.id, updateData);
+        results.push({ name: integration.name, status: "updated", added_pairs: newPairs.length, added_versions: newVersions.length });
+      } else {
+        results.push({ name: integration.name, status: "no_new" });
+      }
+    } catch (e) {
+      console.log(`[${integration.name}] Error: ${e.message}`);
+      results.push({ name: integration.name, status: "error", error: e.message });
     }
   }
 
