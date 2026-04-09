@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeft, Settings, Loader2
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { motion, AnimatePresence } from "framer-motion";
+import VersionPicker from "./VersionPicker";
 
 function ProviderIcon({ path, color }) {
   return (
@@ -46,11 +47,9 @@ export default function ProviderSidebar({
       icon: null,
       dynamic: true,
       logo_url: d.logo_url || null,
-      versions: (d.comparisons || []).map((c) => ({
+      versions: d.versions || [],
+      comparisons: (d.comparisons || []).map((c) => ({
         label: c.label,
-        from: c.v1_url ? "v1" : "—",
-        to: c.v2_url ? "v2" : "—",
-        breaking: 0,
         v1_url: c.v1_url,
         v2_url: c.v2_url,
       })),
@@ -61,24 +60,20 @@ export default function ProviderSidebar({
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
-  async function handleVersionClick(provider, version) {
-    const key = `${provider.id}-${version.label}`;
+  async function handleComparisonClick(provider, comp) {
+    const key = `${provider.id}-${comp.label}`;
     setActiveKey(key);
-    const label = `${provider.name} ${version.label} (${version.from} \u2192 ${version.to})`;
+    const label = `${provider.name}: ${comp.label}`;
 
-    if (version.v1_url || version.v2_url) {
-      setLoadingKey(key);
-      try {
-        const [r1, r2] = await Promise.all([
-          version.v1_url ? base44.functions.invoke('proxyFetch', { url: version.v1_url }).then(r => r.data.document) : Promise.resolve(version.v1),
-          version.v2_url ? base44.functions.invoke('proxyFetch', { url: version.v2_url }).then(r => r.data.document) : Promise.resolve(version.v2),
-        ]);
-        onSelectComparison(r1, r2, label);
-      } finally {
-        setLoadingKey(null);
-      }
-    } else {
-      onSelectComparison(version.v1, version.v2, label);
+    setLoadingKey(key);
+    try {
+      const [r1, r2] = await Promise.all([
+        comp.v1_url ? base44.functions.invoke('proxyFetch', { url: comp.v1_url }).then(r => r.data.document) : Promise.resolve(null),
+        comp.v2_url ? base44.functions.invoke('proxyFetch', { url: comp.v2_url }).then(r => r.data.document) : Promise.resolve(null),
+      ]);
+      onSelectComparison(r1, r2, label);
+    } finally {
+      setLoadingKey(null);
     }
   }
 
@@ -154,45 +149,53 @@ export default function ProviderSidebar({
               <AnimatePresence initial={false}>
                 {isExpanded && !collapsed && (
                   <motion.div
-                    key="versions"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2, ease: "easeInOut" }}
-                    className="overflow-hidden"
+                   key="versions"
+                   initial={{ height: 0, opacity: 0 }}
+                   animate={{ height: "auto", opacity: 1 }}
+                   exit={{ height: 0, opacity: 0 }}
+                   transition={{ duration: 0.2, ease: "easeInOut" }}
+                   className="overflow-hidden"
                   >
-                    {provider.versions.map((version) => {
-                      const key = `${provider.id}-${version.label}`;
-                      const isActive = activeKey === key;
+                   {/* Version picker for any-to-any comparison */}
+                   {provider.versions.length > 0 && (
+                     <VersionPicker
+                       provider={provider}
+                       onSelectComparison={onSelectComparison}
+                     />
+                   )}
 
-                      return (
-                        <button
-                          key={version.label}
-                          onClick={() => handleVersionClick(provider, version)}
-                          className={`
-                            flex w-full items-center gap-2 px-4 pl-9 py-1.5 text-left text-xs transition-colors
-                            ${
-                              isActive
-                                ? "bg-indigo-50 text-indigo-700 font-semibold border-r-2 border-indigo-500"
-                                : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
-                            }
-                          `}
-                        >
-                          <span className="flex-1 truncate">
-                            {version.from}{" "}
-                            <span className="text-stone-400">&rarr;</span>{" "}
-                            {version.to}
-                          </span>
-                          {loadingKey === `${provider.id}-${version.label}` ? (
-                            <Loader2 className="w-3 h-3 animate-spin text-stone-400" />
-                          ) : version.breaking > 0 ? (
-                            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-100 text-red-600 text-[10px] font-bold px-1">
-                              {version.breaking}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
+                   {/* Pre-built comparisons */}
+                   {provider.comparisons.length > 0 && (
+                     <div className="px-3 pl-6 pb-1">
+                       <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1">
+                         Saved comparisons
+                       </div>
+                     </div>
+                   )}
+                   {provider.comparisons.map((comp) => {
+                     const key = `${provider.id}-${comp.label}`;
+                     const isActive = activeKey === key;
+
+                     return (
+                       <button
+                         key={comp.label}
+                         onClick={() => handleComparisonClick(provider, comp)}
+                         className={`
+                           flex w-full items-center gap-2 px-4 pl-9 py-1.5 text-left text-xs transition-colors
+                           ${
+                             isActive
+                               ? "bg-indigo-50 text-indigo-700 font-semibold border-r-2 border-indigo-500"
+                               : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+                           }
+                         `}
+                       >
+                         <span className="flex-1 truncate">{comp.label}</span>
+                         {loadingKey === key && (
+                           <Loader2 className="w-3 h-3 animate-spin text-stone-400" />
+                         )}
+                       </button>
+                     );
+                   })}
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -68,14 +68,18 @@ Deno.serve(async (req) => {
       (p) => !existing.has(`${p.v1_url}|${p.v2_url}`)
     );
 
-    if (newPairs.length > 0) {
-      const updatedComparisons = [...(integration.comparisons || []), ...newPairs];
-      await base44.asServiceRole.entities.Integration.update(integration.id, {
-        comparisons: updatedComparisons,
-      });
-      results.push({ name: integration.name, status: "updated", added: newPairs.length });
+    // Merge individual versions too
+    const existingVersionUrls = new Set((integration.versions || []).map(v => v.url));
+    const newVersions = (discovered.versions || []).filter(v => !existingVersionUrls.has(v.url));
+
+    if (newPairs.length > 0 || newVersions.length > 0) {
+      const updateData = {};
+      if (newPairs.length > 0) updateData.comparisons = [...(integration.comparisons || []), ...newPairs];
+      if (newVersions.length > 0) updateData.versions = [...(integration.versions || []), ...newVersions];
+      await base44.asServiceRole.entities.Integration.update(integration.id, updateData);
+      results.push({ name: integration.name, status: "updated", added_pairs: newPairs.length, added_versions: newVersions.length });
     } else {
-      results.push({ name: integration.name, status: "no_new_pairs" });
+      results.push({ name: integration.name, status: "no_new" });
     }
   }
 

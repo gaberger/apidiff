@@ -19,6 +19,21 @@
       "type": "string",
       "description": "Optional changelog URL for version extraction"
     },
+    "versions": {
+      "type": "array",
+      "description": "All discovered individual spec versions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "comparisons": {
       "type": "array",
       "items": {

@@ -75,13 +75,18 @@ export default function Settings() {
     );
   }
 
-  function addDiscoveredComparisons(id, pairs) {
+  function addDiscoveredComparisons(id, pairs, discoveredVersions) {
     setIntegrations((prev) =>
-      prev.map((i) =>
-        i.id === id
-          ? { ...i, comparisons: [...(i.comparisons || []), ...pairs] }
-          : i
-      )
+      prev.map((i) => {
+        if (i.id !== id) return i;
+        const updated = { ...i, comparisons: [...(i.comparisons || []), ...pairs] };
+        if (discoveredVersions?.length > 0) {
+          const existingUrls = new Set((i.versions || []).map(v => v.url));
+          const newVersions = discoveredVersions.filter(v => !existingUrls.has(v.url));
+          updated.versions = [...(i.versions || []), ...newVersions];
+        }
+        return updated;
+      })
     );
   }
 
@@ -148,7 +153,7 @@ export default function Settings() {
             onFieldChange={(f, v) => updateField(integration.id, f, v)}
             onComparisonChange={(idx, f, v) => updateComparison(integration.id, idx, f, v)}
             onAddComparison={() => addComparison(integration.id)}
-            onAddDiscoveredComparisons={(pairs) => addDiscoveredComparisons(integration.id, pairs)}
+            onAddDiscoveredComparisons={(pairs, versions) => addDiscoveredComparisons(integration.id, pairs, versions)}
             onRemoveComparison={(idx) => removeComparison(integration.id, idx)}
             saving={saving === integration.id}
           />
@@ -170,11 +175,16 @@ export default function Settings() {
                 comparisons: [...prev.comparisons, emptyComparison()],
               }))
             }
-            onAddDiscoveredComparisons={(pairs) =>
-              setNewIntegration((prev) => ({
-                ...prev,
-                comparisons: [...prev.comparisons, ...pairs],
-              }))
+            onAddDiscoveredComparisons={(pairs, discoveredVersions) =>
+              setNewIntegration((prev) => {
+                const updated = { ...prev, comparisons: [...prev.comparisons, ...pairs] };
+                if (discoveredVersions?.length > 0) {
+                  const existingUrls = new Set((prev.versions || []).map(v => v.url));
+                  const newVersions = discoveredVersions.filter(v => !existingUrls.has(v.url));
+                  updated.versions = [...(prev.versions || []), ...newVersions];
+                }
+                return updated;
+              })
             }
             saving={saving === "new"}
             isNew

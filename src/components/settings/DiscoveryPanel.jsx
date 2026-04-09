@@ -89,7 +89,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
 
   function handleAdd() {
     const pairs = (results?.pairs || []).filter((_, i) => selected.has(i));
-    onAddComparisons(pairs);
+    onAddComparisons(pairs, results?.versions || []);
     setResults(null);
     setBaseUrl("");
     setChangelogUrl("");
@@ -202,6 +202,11 @@ export default function DiscoveryPanel({ onAddComparisons }) {
                   </label>
                 ))}
               </div>
+              {results.versions?.length > 0 && (
+                <p className="text-[11px] text-stone-500 mt-2">
+                  {results.versions.length} individual version{results.versions.length !== 1 ? 's' : ''} will also be saved for any-to-any comparison.
+                </p>
+              )}
               <Button
                 size="sm"
                 onClick={handleAdd}
