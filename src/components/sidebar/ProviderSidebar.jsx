@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeft, Settings, Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ---------------------------------------------------------------------------
-// Static provider data (mirrors INTEGRATIONS from legacy index.html)
+// Static fallback provider data
 // ---------------------------------------------------------------------------
 
-const PROVIDERS = [
+const STATIC_PROVIDERS = [
   {
     id: "stripe",
     name: "Stripe",
@@ -20,16 +22,8 @@ const PROVIDERS = [
         from: "2019-05-16",
         to: "2022-08-01",
         breaking: 3,
-        v1: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2019-05-16"},"paths":{"/v1/customers":{"get":{"summary":"List customers","responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Customer"}}}}}}}},"components":{"schemas":{"Customer":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["customer"]},"billing":{"type":"string","enum":["charge_automatically","send_invoice"]},"account_balance":{"type":"integer","description":"Current balance in cents"},"sources":{"$ref":"#/components/schemas/SourceList"},"email":{"type":"string"},"name":{"type":"string"}},"required":["id","object","billing"]},"SourceList":{"type":"object","properties":{"object":{"type":"string","enum":["list"]},"data":{"type":"array","items":{"$ref":"#/components/schemas/Source"}},"has_more":{"type":"boolean"},"url":{"type":"string"}}}}}},
-        v2: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2022-08-01"},"paths":{"/v1/customers":{"get":{"summary":"List customers","responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Customer"}}}}}}}},"components":{"schemas":{"Customer":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["customer"]},"collection_method":{"type":"string","enum":["charge_automatically","send_invoice"]},"balance":{"type":"integer","description":"Current balance in cents"},"payment_methods":{"$ref":"#/components/schemas/PaymentMethodList"},"email":{"type":"string"},"name":{"type":"string"},"invoice_settings":{"$ref":"#/components/schemas/InvoiceSettings"}},"required":["id","object","collection_method"]},"PaymentMethodList":{"type":"object","properties":{"object":{"type":"string","enum":["list"]},"data":{"type":"array","items":{"$ref":"#/components/schemas/PaymentMethod"}},"has_more":{"type":"boolean"},"url":{"type":"string"}}},"InvoiceSettings":{"type":"object","properties":{"default_payment_method":{"type":"string","nullable":true},"footer":{"type":"string","nullable":true}}}}}},
-      },
-      {
-        label: "Charge schema",
-        from: "2019-05-16",
-        to: "2022-08-01",
-        breaking: 2,
-        v1: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2019-05-16"},"paths":{"/v1/charges":{"post":{"summary":"Create a charge","requestBody":{"content":{"application/json":{"schema":{"type":"object","properties":{"amount":{"type":"integer"},"currency":{"type":"string"},"source":{"type":"string","description":"Source token or card ID"}},"required":["amount","currency","source"]}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Charge"}}}}}}}},"components":{"schemas":{"Charge":{"type":"object","properties":{"id":{"type":"string"},"amount":{"type":"integer"},"currency":{"type":"string"},"source":{"$ref":"#/components/schemas/Card"},"status":{"type":"string","enum":["succeeded","pending","failed"]},"refunded":{"type":"boolean"}},"required":["id","amount","currency","source"]},"Card":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["card"]},"brand":{"type":"string"},"last4":{"type":"string"}}}}}},
-        v2: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2022-08-01"},"paths":{"/v1/charges":{"post":{"summary":"Create a charge","requestBody":{"content":{"application/json":{"schema":{"type":"object","properties":{"amount":{"type":"integer"},"currency":{"type":"string"},"payment_method":{"type":"string","description":"PaymentMethod ID"}},"required":["amount","currency","payment_method"]}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Charge"}}}}}}}},"components":{"schemas":{"Charge":{"type":"object","properties":{"id":{"type":"string"},"amount":{"type":"integer"},"currency":{"type":"string"},"payment_method":{"$ref":"#/components/schemas/PaymentMethod"},"status":{"type":"string","enum":["succeeded","pending","failed"]},"refunded":{"type":"boolean"},"payment_intent":{"type":"string"}},"required":["id","amount","currency","payment_method"]},"PaymentMethod":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["payment_method"]},"type":{"type":"string"},"card":{"type":"object","properties":{"brand":{"type":"string"},"last4":{"type":"string"}}}}}}}},
+        v1: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2019-05-16"},"paths":{"/v1/customers":{"get":{"summary":"List customers","responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Customer"}}}}}}}},"components":{"schemas":{"Customer":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["customer"]},"billing":{"type":"string","enum":["charge_automatically","send_invoice"]},"account_balance":{"type":"integer"},"email":{"type":"string"},"name":{"type":"string"}},"required":["id","object","billing"]}}}},
+        v2: {"openapi":"3.0.0","info":{"title":"Stripe API","version":"2022-08-01"},"paths":{"/v1/customers":{"get":{"summary":"List customers","responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Customer"}}}}}}}},"components":{"schemas":{"Customer":{"type":"object","properties":{"id":{"type":"string"},"object":{"type":"string","enum":["customer"]},"collection_method":{"type":"string","enum":["charge_automatically","send_invoice"]},"balance":{"type":"integer"},"email":{"type":"string"},"name":{"type":"string"}},"required":["id","object","collection_method"]}}}},
       },
     ],
   },
@@ -44,8 +38,8 @@ const PROVIDERS = [
         from: "2010-04-01",
         to: "2024-03-01",
         breaking: 2,
-        v1: {"openapi":"3.0.0","info":{"title":"Twilio Messaging","version":"2010-04-01"},"paths":{"/2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json":{"get":{"summary":"Fetch a message","parameters":[{"name":"Sid","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Message"}}}}}}}},"components":{"schemas":{"Message":{"type":"object","properties":{"sid":{"type":"string"},"account_sid":{"type":"string"},"from":{"type":"string"},"to":{"type":"string"},"body":{"type":"string"},"status":{"type":"string","enum":["queued","sending","sent","delivered","failed"]},"price":{"type":"string","description":"Price as string e.g. -0.0075"},"price_unit":{"type":"string"},"num_segments":{"type":"string"}},"required":["sid","account_sid"]}}}},
-        v2: {"openapi":"3.0.0","info":{"title":"Twilio Messaging","version":"2024-03-01"},"paths":{"/v2/Accounts/{AccountSid}/Messages/{MessageSid}.json":{"get":{"summary":"Fetch a message","parameters":[{"name":"MessageSid","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Message"}}}}}}}},"components":{"schemas":{"Message":{"type":"object","properties":{"message_sid":{"type":"string"},"account_sid":{"type":"string"},"from":{"type":"string"},"to":{"type":"string"},"body":{"type":"string"},"status":{"type":"string","enum":["queued","sending","sent","delivered","failed"]},"price":{"type":"object","properties":{"amount":{"type":"number"},"currency":{"type":"string"}}},"num_segments":{"type":"integer"},"subresource_uris":{"type":"object","properties":{"media":{"type":"string"}}}},"required":["message_sid","account_sid"]}}}},
+        v1: {"openapi":"3.0.0","info":{"title":"Twilio Messaging","version":"2010-04-01"},"paths":{"/2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json":{"get":{"summary":"Fetch a message","parameters":[{"name":"Sid","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Message"}}}}}}}},"components":{"schemas":{"Message":{"type":"object","properties":{"sid":{"type":"string"},"body":{"type":"string"},"status":{"type":"string"},"price":{"type":"string"}},"required":["sid"]}}}},
+        v2: {"openapi":"3.0.0","info":{"title":"Twilio Messaging","version":"2024-03-01"},"paths":{"/v2/Accounts/{AccountSid}/Messages/{MessageSid}.json":{"get":{"summary":"Fetch a message","parameters":[{"name":"MessageSid","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Message"}}}}}}}},"components":{"schemas":{"Message":{"type":"object","properties":{"message_sid":{"type":"string"},"body":{"type":"string"},"status":{"type":"string"},"price":{"type":"object","properties":{"amount":{"type":"number"},"currency":{"type":"string"}}}},"required":["message_sid"]}}}},
       },
     ],
   },
@@ -60,16 +54,12 @@ const PROVIDERS = [
         from: "2022-11-28",
         to: "2024-11-14",
         breaking: 1,
-        v1: {"openapi":"3.1.0","info":{"title":"GitHub REST API","version":"2022-11-28"},"paths":{"/users/{username}":{"get":{"summary":"Get a user","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}}}}}},"components":{"schemas":{"PublicUser":{"type":"object","properties":{"login":{"type":"string"},"id":{"type":"integer"},"gravatar_id":{"type":"string"},"url":{"type":"string","format":"uri"},"type":{"type":"string","enum":["User","Organization"]},"site_admin":{"type":"boolean"},"name":{"type":"string","nullable":true},"company":{"type":"string","nullable":true},"email":{"type":"string","nullable":true},"bio":{"type":"string","nullable":true},"public_repos":{"type":"integer"},"followers":{"type":"integer"},"following":{"type":"integer"},"created_at":{"type":"string","format":"date-time"}},"required":["login","id","gravatar_id","url","type"]}}}},
-        v2: {"openapi":"3.1.0","info":{"title":"GitHub REST API","version":"2024-11-14"},"paths":{"/users/{username}":{"get":{"summary":"Get a user","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}}}}}},"components":{"schemas":{"PublicUser":{"type":"object","properties":{"login":{"type":"string"},"id":{"type":"integer"},"node_id":{"type":"string"},"url":{"type":"string","format":"uri"},"type":{"type":"string","enum":["User","Organization"]},"site_admin":{"type":"boolean"},"name":{"type":"string","nullable":true},"company":{"type":"string","nullable":true},"email":{"type":"string","nullable":true},"bio":{"type":"string","nullable":true},"public_repos":{"type":"integer"},"followers":{"type":"integer"},"following":{"type":"integer"},"created_at":{"type":"string","format":"date-time"},"twitter_username":{"type":"string","nullable":true}},"required":["login","id","node_id","url","type"]}}}},
+        v1: {"openapi":"3.1.0","info":{"title":"GitHub REST API","version":"2022-11-28"},"paths":{"/users/{username}":{"get":{"summary":"Get a user","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}}}}}},"components":{"schemas":{"PublicUser":{"type":"object","properties":{"login":{"type":"string"},"id":{"type":"integer"},"gravatar_id":{"type":"string"},"url":{"type":"string"},"type":{"type":"string"},"public_repos":{"type":"integer"},"followers":{"type":"integer"}},"required":["login","id"]}}}},
+        v2: {"openapi":"3.1.0","info":{"title":"GitHub REST API","version":"2024-11-14"},"paths":{"/users/{username}":{"get":{"summary":"Get a user","parameters":[{"name":"username","in":"path","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PublicUser"}}}}}}}},"components":{"schemas":{"PublicUser":{"type":"object","properties":{"login":{"type":"string"},"id":{"type":"integer"},"node_id":{"type":"string"},"url":{"type":"string"},"type":{"type":"string"},"public_repos":{"type":"integer"},"followers":{"type":"integer"},"twitter_username":{"type":"string"}},"required":["login","id","node_id"]}}}},
       },
     ],
   },
 ];
-
-// ---------------------------------------------------------------------------
-// ProviderIcon -- renders the brand SVG path inside a 24x24 viewBox
-// ---------------------------------------------------------------------------
 
 function ProviderIcon({ path, color }) {
   return (
@@ -90,16 +80,57 @@ export default function ProviderSidebar({
 }) {
   const [expandedId, setExpandedId] = useState(null);
   const [activeKey, setActiveKey] = useState(null);
+  const [dynamicProviders, setDynamicProviders] = useState([]);
+  const [loadingKey, setLoadingKey] = useState(null);
+
+  useEffect(() => {
+    base44.entities.Integration.list().then((data) => {
+      setDynamicProviders(data);
+    }).catch(() => {});
+  }, []);
+
+  const allProviders = [
+    ...STATIC_PROVIDERS,
+    ...dynamicProviders.map((d) => ({
+      id: d.id,
+      name: d.name,
+      color: d.color || "#888",
+      icon: null,
+      dynamic: true,
+      versions: (d.comparisons || []).map((c) => ({
+        label: c.label,
+        from: c.v1_url ? "v1" : "—",
+        to: c.v2_url ? "v2" : "—",
+        breaking: 0,
+        v1_url: c.v1_url,
+        v2_url: c.v2_url,
+      })),
+    })),
+  ];
 
   function toggleProvider(id) {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
-  function handleVersionClick(provider, version) {
+  async function handleVersionClick(provider, version) {
     const key = `${provider.id}-${version.label}`;
     setActiveKey(key);
     const label = `${provider.name} ${version.label} (${version.from} \u2192 ${version.to})`;
-    onSelectComparison(version.v1, version.v2, label);
+
+    if (version.v1_url || version.v2_url) {
+      setLoadingKey(key);
+      try {
+        const [r1, r2] = await Promise.all([
+          version.v1_url ? base44.functions.invoke('proxyFetch', { url: version.v1_url }).then(r => r.data.document) : Promise.resolve(version.v1),
+          version.v2_url ? base44.functions.invoke('proxyFetch', { url: version.v2_url }).then(r => r.data.document) : Promise.resolve(version.v2),
+        ]);
+        onSelectComparison(r1, r2, label);
+      } finally {
+        setLoadingKey(null);
+      }
+    } else {
+      onSelectComparison(version.v1, version.v2, label);
+    }
   }
 
   return (
@@ -137,7 +168,7 @@ export default function ProviderSidebar({
           </p>
         )}
 
-        {PROVIDERS.map((provider) => {
+        {allProviders.map((provider) => {
           const isExpanded = expandedId === provider.id;
 
           return (
@@ -151,7 +182,11 @@ export default function ProviderSidebar({
                 }}
                 title={collapsed ? provider.name : undefined}
               >
-                <ProviderIcon path={provider.icon} color={provider.color} />
+                {provider.icon ? (
+                  <ProviderIcon path={provider.icon} color={provider.color} />
+                ) : (
+                  <div className="w-[18px] h-[18px] rounded-full flex-shrink-0" style={{ background: provider.color }} />
+                )}
                 {!collapsed && (
                   <>
                     <span className="flex-1 truncate">{provider.name}</span>
@@ -197,11 +232,13 @@ export default function ProviderSidebar({
                             <span className="text-stone-400">&rarr;</span>{" "}
                             {version.to}
                           </span>
-                          {version.breaking > 0 && (
+                          {loadingKey === `${provider.id}-${version.label}` ? (
+                            <Loader2 className="w-3 h-3 animate-spin text-stone-400" />
+                          ) : version.breaking > 0 ? (
                             <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-100 text-red-600 text-[10px] font-bold px-1">
                               {version.breaking}
                             </span>
-                          )}
+                          ) : null}
                         </button>
                       );
                     })}
@@ -211,6 +248,18 @@ export default function ProviderSidebar({
             </div>
           );
         })}
+        {/* Settings link */}
+        {!collapsed && (
+          <div className="border-t border-stone-200 mt-auto">
+            <Link
+              to="/settings"
+              className="flex items-center gap-2 px-3 py-2.5 text-xs text-stone-500 hover:bg-stone-200/70 hover:text-stone-700 transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Manage integrations
+            </Link>
+          </div>
+        )}
       </div>
     </motion.aside>
   );
