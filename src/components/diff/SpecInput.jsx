@@ -252,18 +252,29 @@ export default function SpecInput({
     setError("");
     setIsFetching(true);
 
+    const tryFetch = async (fetchUrl) => {
+      const r = await fetch(fetchUrl, { headers: { "Accept": "application/json" } });
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+      const text = await r.text();
+      if (!text.trim()) throw new Error("Empty response from server");
+      return JSON.parse(text);
+    };
+
     try {
-      const r = await fetch("/api/fetch-spec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const data = await r.json();
-      if (data.error) {
-        setError(data.error);
-        return;
+      let parsed;
+      try {
+        // Try direct fetch first
+        parsed = await tryFetch(url);
+      } catch (directErr) {
+        // Fall back to CORS proxy
+        const proxied = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
+        try {
+          parsed = await tryFetch(proxied);
+        } catch {
+          throw directErr; // surface the original error
+        }
       }
-      onChange(JSON.stringify(data.document, null, 2));
+      onChange(JSON.stringify(parsed, null, 2));
     } catch (ex) {
       setError("Fetch failed: " + ex.message);
     } finally {
