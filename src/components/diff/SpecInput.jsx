@@ -152,9 +152,9 @@ export default function SpecInput({
     return lines.map((line, i) => {
       const diffInfo = diffHighlightMap?.get(i);
       const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
-      const flashClass = activeHighlight === i ? "bg-amber-200 ring-1 ring-amber-400 transition-colors duration-700" : "";
+      const flashClass = activeHighlight === i ? "bg-amber-200 ring-1 ring-amber-400" : "";
       return (
-        <div key={i} className={`${bgClass} ${flashClass}`}>
+        <div key={i} className={`block min-w-full ${bgClass} ${flashClass}`}>
           {colorizeJsonLine(line)}
         </div>
       );
