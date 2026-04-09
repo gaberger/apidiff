@@ -123,6 +123,15 @@ export default function SpecInput({
   const [fetchUrl, setFetchUrl] = useState("");
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState("");
+  const [activeHighlight, setActiveHighlight] = useState(null);
+
+  // Auto-clear highlight flash after 1.5s
+  useEffect(() => {
+    if (highlightLine == null) return;
+    setActiveHighlight(highlightLine);
+    const t = setTimeout(() => setActiveHighlight(null), 1500);
+    return () => clearTimeout(t);
+  }, [highlightLine]);
 
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
@@ -143,7 +152,7 @@ export default function SpecInput({
     return lines.map((line, i) => {
       const diffInfo = diffHighlightMap?.get(i);
       const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
-      const flashClass = highlightLine === i ? "bg-amber-200 ring-1 ring-amber-400 transition-colors" : "";
+      const flashClass = activeHighlight === i ? "bg-amber-200 ring-1 ring-amber-400 transition-colors duration-700" : "";
       return (
         <div key={i} className={`${bgClass} ${flashClass}`}>
           {colorizeJsonLine(line)}
