@@ -219,10 +219,14 @@ function IntegrationCard({
         onClick={onToggle}
         style={{ borderLeft: `3px solid ${integration.color || "#888"}` }}
       >
-        <div
-          className="w-4 h-4 rounded-full border border-stone-200 flex-shrink-0"
-          style={{ background: integration.color || "#888" }}
-        />
+        {integration.logo_url ? (
+          <img src={integration.logo_url} alt={integration.name} className="w-[18px] h-[18px] object-contain rounded flex-shrink-0" />
+        ) : (
+          <div
+            className="w-4 h-4 rounded-full border border-stone-200 flex-shrink-0"
+            style={{ background: integration.color || "#888" }}
+          />
+        )}
         <span className="flex-1 text-sm font-medium text-stone-700">
           {integration.name || <span className="text-stone-400 italic">New Integration</span>}
         </span>
