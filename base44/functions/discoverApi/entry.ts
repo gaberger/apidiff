@@ -1,141 +1,92 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 
-// Common OpenAPI spec path patterns to probe
-const SPEC_PATHS = [
-  'openapi.json', 'swagger.json', 'api-docs.json',
-  'openapi.yaml', 'swagger.yaml', 'api.json',
-  '.well-known/openapi.json',
-];
+const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN");
+const GH_HEADERS = {
+  'Accept': 'application/vnd.github+json',
+  'User-Agent': 'apidiff-discovery/1.0',
+  ...(GITHUB_TOKEN ? { 'Authorization': `Bearer ${GITHUB_TOKEN}` } : {}),
+};
 
-// Version patterns to detect in URLs/filenames
-const VERSION_RE = /v?(\d+)[\._\-]?(\d*)[\._\-]?(\d*)/i;
+// Exact filenames we treat as specs
+const EXACT_SPEC_NAMES = ['openapi.json', 'swagger.json', 'api-docs.json', 'openapi.yaml', 'swagger.yaml'];
+// Pattern: files whose names contain version-like segments, e.g. spec3.json, spec3.beta.json, v2.yaml
+const VERSIONED_FILE_RE = /^(spec|api|openapi|swagger)[\d._-].*\.(json|yaml)$/i;
 
-async function tryFetch(url) {
-  try {
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json, */*', 'User-Agent': 'apidiff-discovery/1.0' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!res.ok) return null;
-    const text = await res.text();
-    if (!text.trim()) return null;
-    try { return { json: JSON.parse(text), text }; }
-    catch { return { json: null, text }; }
-  } catch { return null; }
+async function ghGet(url) {
+  const res = await fetch(url, { headers: GH_HEADERS, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) { console.log(`GH ${res.status}: ${url}`); return null; }
+  return res.json();
 }
 
-// Try to resolve GitHub repo into raw file listing
-async function probeGitHub(url) {
-  // e.g. https://github.com/owner/repo/tree/main/path or https://raw.githubusercontent.com/...
-  const githubRaw = url.match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.*)/);
-  const githubTree = url.match(/github\.com\/([^/]+)\/([^/]+)\/?(?:tree\/([^/]+)\/?(.*?))?$/);
+function parseGitHubUrl(url) {
+  let m = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)(\/.*)?$/);
+  if (m) return { owner: m[1], repo: m[2], branch: m[3], path: (m[4] || '').replace(/^\//, '') };
+  m = url.match(/github\.com\/([^/]+)\/([^/?#\s]+)/);
+  if (m) return { owner: m[1], repo: m[2], branch: 'main', path: '' };
+  return null;
+}
 
-  let owner, repo, branch, path;
-  if (githubRaw) {
-    [, owner, repo, branch, path] = githubRaw;
-    path = path.replace(/[^/]*$/, ''); // strip filename, keep dir
-  } else if (githubTree) {
-    [, owner, repo, branch, path] = githubTree;
-    branch = branch || 'main';
-    path = path || '';
-  } else return null;
-
-  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch || 'main'}`;
-  const res = await fetch(apiUrl, {
-    headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'apidiff-discovery/1.0' },
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!res.ok) return null;
-  const files = await res.json();
-  if (!Array.isArray(files)) return null;
-
-  // Group JSON files by version pattern
-  const specFiles = files.filter(f =>
-    f.type === 'file' && (f.name.endsWith('.json') || f.name.endsWith('.yaml'))
-  );
-
-  const versions = specFiles
-    .map(f => {
-      const match = f.name.match(VERSION_RE);
-      return match ? { version: match[0], label: f.name.replace(/\.(json|yaml)$/, ''), url: f.download_url } : null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-
-  // Also check subdirectories as version folders
-  const versionDirs = files.filter(f => f.type === 'dir' && VERSION_RE.test(f.name));
-  for (const dir of versionDirs.slice(0, 5)) {
-    const dirRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${dir.path}?ref=${branch || 'main'}`, {
-      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'apidiff-discovery/1.0' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!dirRes.ok) continue;
-    const dirFiles = await dirRes.json();
-    if (!Array.isArray(dirFiles)) continue;
-    const spec = dirFiles.find(f => SPEC_PATHS.some(p => f.name === p || f.name.includes('openapi') || f.name.includes('swagger')));
-    if (spec) versions.push({ version: dir.name, label: dir.name, url: spec.download_url });
+async function listDir(owner, repo, path, branch) {
+  const items = await ghGet(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`);
+  if (items) return { items, branch };
+  if (branch === 'main') {
+    const fallback = await ghGet(`https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=master`);
+    if (fallback) return { items: fallback, branch: 'master' };
   }
-
-  return versions.length > 0 ? versions : null;
+  return { items: null, branch };
 }
 
-// Probe a changelog page for version mentions
-async function parseChangelog(url) {
-  const result = await tryFetch(url);
-  if (!result) return [];
-  const { text } = result;
-  // Find version-like strings e.g. ## v2.1, # 2024-01-01, ## [1.2.3]
-  const found = new Set();
-  const patterns = [
-    /##\s+\[?(v?\d+\.\d+[\.\d]*)\]?/g,
-    /^#+\s+version\s+(v?\d+[\.\d]+)/gim,
-    /released?\s+(v?\d+[\.\d]+)/gi,
-    /\bv(\d+\.\d+[\.\d]*)\b/g,
-  ];
-  for (const re of patterns) {
-    let m;
-    while ((m = re.exec(text)) !== null) found.add(m[1]);
-    if (found.size > 20) break;
-  }
-  return [...found].slice(0, 20);
-}
+async function findSpecs(owner, repo, path, branch, depth = 0) {
+  if (depth > 2) return [];
+  const { items, branch: b } = await listDir(owner, repo, path, branch);
+  if (!Array.isArray(items)) return [];
 
-// Probe common spec paths at a base URL
-async function probeBaseUrl(base) {
-  const normalized = base.replace(/\/+$/, '');
-  const discovered = [];
+  const results = [];
 
-  // Try direct spec paths
-  for (const path of SPEC_PATHS) {
-    const url = `${normalized}/${path}`;
-    const result = await tryFetch(url);
-    if (result?.json && (result.json.openapi || result.json.swagger)) {
-      const version = result.json.info?.version || 'latest';
-      discovered.push({ label: `${path} (${version})`, url, version });
-      break;
+  for (const f of items) {
+    if (f.type !== 'file') continue;
+    const name = f.name.toLowerCase();
+    if (EXACT_SPEC_NAMES.includes(name) || VERSIONED_FILE_RE.test(name)) {
+      // Use filename (without ext) as label
+      const label = f.name.replace(/\.(json|yaml)$/i, '');
+      results.push({ label, url: f.download_url, version: label });
     }
   }
 
-  // Try versioned paths: v1, v2, v3...
-  const versionPrefixes = ['v1', 'v2', 'v3', 'v4', '1', '2', '3'];
-  for (const v of versionPrefixes) {
-    for (const specPath of ['openapi.json', 'swagger.json', 'api-docs.json']) {
-      const url = `${normalized}/${v}/${specPath}`;
-      const result = await tryFetch(url);
-      if (result?.json && (result.json.openapi || result.json.swagger)) {
-        discovered.push({ label: v, url, version: v });
-        break;
+  // Versioned subdirs: v1, v2, 2023-01-01, 2024, etc.
+  const versionDirs = items.filter(f => f.type === 'dir' && /^(v?\d|\d{4}-\d{2})/.test(f.name));
+  for (const dir of versionDirs.slice(0, 10)) {
+    const sub = await findSpecs(owner, repo, dir.path, b, depth + 1);
+    if (sub.length > 0) {
+      results.push(...sub.map(s => ({ ...s, label: dir.name, version: dir.name })));
+    } else {
+      for (const specName of EXACT_SPEC_NAMES) {
+        const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${b}/${dir.path}/${specName}`;
+        const res = await fetch(rawUrl, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) { results.push({ label: dir.name, url: rawUrl, version: dir.name }); break; }
       }
     }
-    // Also try base/v1.json style
-    const flatUrl = `${normalized}/${v}.json`;
-    const flatResult = await tryFetch(flatUrl);
-    if (flatResult?.json && (flatResult.json.openapi || flatResult.json.swagger)) {
-      discovered.push({ label: v, url: flatUrl, version: v });
-    }
   }
 
-  return discovered;
+  return results;
+}
+
+async function parseChangelog(url) {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'apidiff-discovery/1.0', 'Accept': 'text/html,text/plain,*/*' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const text = await res.text();
+    const found = new Set();
+    for (const re of [/##\s+\[?(v?\d+\.\d+[\.\d]*)\]?/g, /\bv(\d+\.\d+[\.\d]*)\b/g]) {
+      let m;
+      while ((m = re.exec(text)) !== null) found.add(m[1]);
+      if (found.size > 20) break;
+    }
+    return [...found].slice(0, 20);
+  } catch { return []; }
 }
 
 Deno.serve(async (req) => {
@@ -146,31 +97,35 @@ Deno.serve(async (req) => {
   const { base_url, changelog_url } = await req.json();
   if (!base_url) return Response.json({ error: 'base_url is required' }, { status: 400 });
 
+  console.log(`Discovering: ${base_url}`);
   const results = { versions: [], changelog_versions: [], pairs: [] };
 
-  // Try GitHub-specific discovery
-  const ghVersions = await probeGitHub(base_url);
-  if (ghVersions) {
-    results.versions = ghVersions;
+  const gh = parseGitHubUrl(base_url);
+  if (gh) {
+    console.log(`GitHub: ${gh.owner}/${gh.repo} branch="${gh.branch}" path="${gh.path}"`);
+    const specs = await findSpecs(gh.owner, gh.repo, gh.path, gh.branch);
+    const seen = new Set();
+    for (const s of specs) {
+      if (!seen.has(s.url)) { seen.add(s.url); results.versions.push(s); }
+    }
+    console.log(`Found ${results.versions.length} spec(s): ${results.versions.map(v => v.label).join(', ')}`);
   } else {
-    // Fallback: probe common paths
-    results.versions = await probeBaseUrl(base_url);
+    console.log(`Not a GitHub URL`);
   }
 
-  // Parse changelog if provided
   if (changelog_url) {
     results.changelog_versions = await parseChangelog(changelog_url);
+    console.log(`Changelog versions: ${results.changelog_versions.join(', ')}`);
   }
 
-  // Build adjacent-version comparison pairs from discovered versions
   const sorted = [...results.versions].sort((a, b) =>
     a.label.localeCompare(b.label, undefined, { numeric: true })
   );
   for (let i = 0; i < sorted.length - 1; i++) {
     results.pairs.push({
-      label: `${sorted[i].label} → ${sorted[i + 1].label}`,
+      label: `${sorted[i].label} → ${sorted[i+1].label}`,
       v1_url: sorted[i].url,
-      v2_url: sorted[i + 1].url,
+      v2_url: sorted[i+1].url,
     });
   }
 
