@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus, ExternalLink, GitBranch, BookOpen, Bot } from "lucide-react";
@@ -7,13 +7,12 @@ export default function DiscoveryPanel({ onAddComparisons }) {
   const [baseUrl, setBaseUrl] = useState("");
   const [changelogUrl, setChangelogUrl] = useState("");
   const [running, setRunning] = useState(false);
-  const [statusMsg, setStatusMsg] = useState("");
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(new Set());
-  const pollRef = useRef(null);
+  const [source, setSource] = useState(null);
 
-  useEffect(() => () => clearInterval(pollRef.current), []);
+
 
   async function handleDiscover() {
     if (!baseUrl.trim()) return;
@@ -21,61 +20,24 @@ export default function DiscoveryPanel({ onAddComparisons }) {
     setResults(null);
     setError(null);
     setSelected(new Set());
-    setStatusMsg("Starting AI discovery…");
+    setSource(null);
 
     try {
-      const prompt = [
-        `Find all versioned OpenAPI spec files for this API: ${baseUrl.trim()}`,
-        changelogUrl.trim() ? `Changelog URL: ${changelogUrl.trim()}` : "",
-        "Return ONLY valid JSON with keys: versions (array of {label,url,version}), changelog_versions (array of strings), pairs (array of {label,v1_url,v2_url}).",
-      ].filter(Boolean).join("\n");
-
-      // Create a conversation with the agent
-      const conversation = await base44.agents.createConversation({
-        agent_name: "api_discovery",
-        metadata: { name: `Discover: ${baseUrl.trim()}` },
+      const res = await base44.functions.invoke('discoverApi', {
+        base_url: baseUrl.trim(),
+        changelog_url: changelogUrl.trim() || undefined,
       });
-
-      await base44.agents.addMessage(conversation, { role: "user", content: prompt });
-
-      setStatusMsg("AI is searching for versioned specs…");
-
-      // Poll for completion
-      await new Promise((resolve, reject) => {
-        pollRef.current = setInterval(async () => {
-          try {
-            const conv = await base44.agents.getConversation(conversation.id);
-            const messages = conv.messages || [];
-            const last = messages[messages.length - 1];
-            if (last?.role === "assistant" && last.content) {
-              clearInterval(pollRef.current);
-              try {
-                // Strip markdown fences if present
-                const clean = last.content.replace(/```(?:json)?/g, "").trim();
-                const parsed = JSON.parse(clean);
-                setResults(parsed);
-              } catch {
-                setError("Agent returned an unexpected response. Try rephrasing the URL.");
-              }
-              resolve();
-            }
-          } catch (e) {
-            clearInterval(pollRef.current);
-            reject(e);
-          }
-        }, 2000);
-
-        // Timeout after 60s
-        setTimeout(() => {
-          clearInterval(pollRef.current);
-          reject(new Error("Discovery timed out. Please try again."));
-        }, 60000);
-      });
+      const data = res.data;
+      if (data.versions?.length > 0 || data.pairs?.length > 0) {
+        setResults(data);
+        setSource(data.source);
+      } else {
+        setError("No specs found. Try a different URL or provider name.");
+      }
     } catch (e) {
-      setError(e.message);
+      setError(e.response?.data?.error || e.message);
     } finally {
       setRunning(false);
-      setStatusMsg("");
     }
   }
 
@@ -138,11 +100,14 @@ export default function DiscoveryPanel({ onAddComparisons }) {
         className="h-8 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
       >
         {running ? (
-          <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />{statusMsg || "Discovering…"}</>
+          <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Discovering…</>
         ) : (
-          <><Search className="w-3.5 h-3.5 mr-1.5" />Discover with AI</>
+          <><Search className="w-3.5 h-3.5 mr-1.5" />Discover Specs</>
         )}
       </Button>
+      {source && (
+        <span className="text-[10px] text-stone-400 ml-2">source: {source}</span>
+      )}
 
       {error && (
         <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{error}</p>
