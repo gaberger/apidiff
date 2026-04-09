@@ -113,7 +113,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleDiscover()}
-            placeholder="https://github.com/stripe/openapi  or  https://api.example.com"
+            placeholder="Stripe, Twilio, GitHub API… or paste a URL"
             className="w-full px-2.5 py-1.5 text-xs font-mono border border-stone-200 rounded-md bg-white focus:outline-none focus:border-amber-400"
           />
         </div>
