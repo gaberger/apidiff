@@ -110,6 +110,19 @@ async function webSearchDiscover(base44, query, changelogUrl) {
     },
   });
 
+  // Convert GitHub blob URLs to raw download URLs
+  function toRawUrl(url) {
+    if (!url) return url;
+    return url
+      .replace('https://github.com/', 'https://raw.githubusercontent.com/')
+      .replace('/blob/', '/');
+  }
+
+  if (result) {
+    result.versions = (result.versions || []).map(v => ({ ...v, url: toRawUrl(v.url) }));
+    result.pairs = (result.pairs || []).map(p => ({ ...p, v1_url: toRawUrl(p.v1_url), v2_url: toRawUrl(p.v2_url) }));
+  }
+
   return result || { versions: [], changelog_versions: [], pairs: [] };
 }
 
