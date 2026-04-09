@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp } from "lucide-react";
+import DiscoveryPanel from "@/components/settings/DiscoveryPanel";
 
 function emptyComparison() {
   return { label: "", v1_url: "", v2_url: "" };
@@ -74,6 +75,16 @@ export default function Settings() {
     );
   }
 
+  function addDiscoveredComparisons(id, pairs) {
+    setIntegrations((prev) =>
+      prev.map((i) =>
+        i.id === id
+          ? { ...i, comparisons: [...(i.comparisons || []), ...pairs] }
+          : i
+      )
+    );
+  }
+
   function removeComparison(id, idx) {
     setIntegrations((prev) =>
       prev.map((i) =>
@@ -137,6 +148,7 @@ export default function Settings() {
             onFieldChange={(f, v) => updateField(integration.id, f, v)}
             onComparisonChange={(idx, f, v) => updateComparison(integration.id, idx, f, v)}
             onAddComparison={() => addComparison(integration.id)}
+            onAddDiscoveredComparisons={(pairs) => addDiscoveredComparisons(integration.id, pairs)}
             onRemoveComparison={(idx) => removeComparison(integration.id, idx)}
             saving={saving === integration.id}
           />
@@ -158,10 +170,10 @@ export default function Settings() {
                 comparisons: [...prev.comparisons, emptyComparison()],
               }))
             }
-            onRemoveComparison={(idx) =>
+            onAddDiscoveredComparisons={(pairs) =>
               setNewIntegration((prev) => ({
                 ...prev,
-                comparisons: prev.comparisons.filter((_, ci) => ci !== idx),
+                comparisons: [...prev.comparisons, ...pairs],
               }))
             }
             saving={saving === "new"}
@@ -188,10 +200,17 @@ function IntegrationCard({
   onFieldChange,
   onComparisonChange,
   onAddComparison,
+  onAddDiscoveredComparisons,
   onRemoveComparison,
   saving,
   isNew,
 }) {
+  const [showDiscovery, setShowDiscovery] = useState(false);
+
+  function handleDiscoveredPairs(pairs) {
+    onAddDiscoveredComparisons(pairs);
+    setShowDiscovery(false);
+  }
   return (
     <div className="border border-stone-200 rounded-lg bg-white overflow-hidden">
       {/* Card header */}
@@ -244,9 +263,24 @@ function IntegrationCard({
 
           {/* Comparisons */}
           <div>
-            <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-2">
-              Version Comparisons
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+                Version Comparisons
+              </label>
+              <button
+                onClick={() => setShowDiscovery((v) => !v)}
+                className="text-[11px] text-amber-700 hover:text-amber-800 font-semibold underline underline-offset-2"
+              >
+                {showDiscovery ? "Hide discovery" : "Discover versions…"}
+              </button>
+            </div>
+
+            {showDiscovery && (
+              <div className="mb-3">
+                <DiscoveryPanel onAddComparisons={handleDiscoveredPairs} />
+              </div>
+            )}
+
             <div className="space-y-3">
               {(integration.comparisons || []).map((comp, idx) => (
                 <div key={idx} className="border border-stone-200 rounded-md p-3 bg-stone-50 space-y-2">
