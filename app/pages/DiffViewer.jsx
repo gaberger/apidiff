@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { GitCompareArrows, Loader2, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -7,89 +6,60 @@ import SpecInput from "../components/diff/SpecInput";
 import DiffSummary from "../components/diff/DiffSummary";
 import DiffResults from "../components/diff/DiffResults";
 import EmptyState from "../components/diff/EmptyState";
+import { fetchDiff, parseSpecFile } from "@/api/apidiff-client";
+
+const BREAKING_TYPES = ["removed", "type-change", "renamed", "moved"];
 
 export default function DiffViewer() {
   const [before, setBefore] = useState("");
   const [after, setAfter] = useState("");
-  const [result, setResult] = useState(null);
+  const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleCompare = async () => {
     if (!before.trim() || !after.trim()) return;
     setLoading(true);
-    setResult(null);
+    setResults(null);
+    setError(null);
 
-    const res = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are an API specification diff analyzer. Compare the two API specs below and produce a structured diff.
+    try {
+      // Parse specs — try JSON first, fall back to YAML via server
+      let oldSpec, newSpec;
+      try {
+        oldSpec = JSON.parse(before.trim());
+      } catch {
+        const parsed = await parseSpecFile(before.trim(), "old.yaml");
+        oldSpec = parsed.document;
+      }
+      try {
+        newSpec = JSON.parse(after.trim());
+      } catch {
+        const parsed = await parseSpecFile(after.trim(), "new.yaml");
+        newSpec = parsed.document;
+      }
 
-BEFORE SPEC:
-\`\`\`
-${before.trim()}
-\`\`\`
-
-AFTER SPEC:
-\`\`\`
-${after.trim()}
-\`\`\`
-
-Analyze every endpoint, parameter, schema, response, and security change. For each change, determine if it was ADDED, REMOVED, or MODIFIED.
-
-For modified items, include detailed before/after values for each changed field.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          title: { type: "string", description: "Brief title of the diff, e.g. 'v1.0 → v1.1 API Changes'" },
-          summary: {
-            type: "object",
-            properties: {
-              added: { type: "number" },
-              removed: { type: "number" },
-              modified: { type: "number" },
-              breaking: { type: "number", description: "Count of breaking changes" }
-            }
-          },
-          changes: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                type: { type: "string", enum: ["added", "removed", "modified"] },
-                category: { type: "string", description: "e.g. endpoint, schema, parameter, response, security" },
-                method: { type: "string", description: "HTTP method if applicable (GET, POST, etc.)" },
-                path: { type: "string", description: "Endpoint path or schema name" },
-                name: { type: "string", description: "Readable name or description of the change" },
-                breaking: { type: "boolean", description: "Whether this is a breaking change" },
-                details: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      field: { type: "string" },
-                      before: { type: "string" },
-                      after: { type: "string" },
-                      description: { type: "string" }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      model: "claude_sonnet_4_6"
-    });
-
-    setResult(res);
-    setLoading(false);
+      const diffResults = await fetchDiff(oldSpec, newSpec);
+      setResults(diffResults);
+    } catch (e) {
+      setError(e.message || "Comparison failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
     setBefore("");
     setAfter("");
-    setResult(null);
+    setResults(null);
+    setError(null);
   };
 
   const canCompare = before.trim() && after.trim() && !loading;
+
+  const breakingCount = results
+    ? results.filter((r) => BREAKING_TYPES.includes(r.type)).length
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,13 +72,13 @@ For modified items, include detailed before/after values for each changed field.
                 <GitCompareArrows className="w-4 h-4 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-foreground tracking-tight">API Spec Diff</h1>
-                <p className="text-[11px] text-muted-foreground -mt-0.5">Visual comparison tool</p>
+                <h1 className="text-sm font-bold text-foreground tracking-tight">apidiff</h1>
+                <p className="text-[11px] text-muted-foreground -mt-0.5">API migration toolkit</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              {result && (
+              {results && (
                 <Button variant="ghost" size="sm" onClick={handleReset} className="h-8 text-xs">
                   <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
                   Reset
@@ -123,7 +93,7 @@ For modified items, include detailed before/after values for each changed field.
                 {loading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    Analyzing...
+                    Comparing...
                   </>
                 ) : (
                   <>
@@ -156,6 +126,17 @@ For modified items, include detailed before/after values for each changed field.
           />
         </div>
 
+        {/* Error */}
+        {error && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30 p-4 mb-6"
+          >
+            <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          </motion.div>
+        )}
+
         {/* Results */}
         <AnimatePresence mode="wait">
           {loading && (
@@ -171,12 +152,11 @@ For modified items, include detailed before/after values for each changed field.
                   <Loader2 className="w-7 h-7 text-muted-foreground animate-spin" />
                 </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-5">Analyzing spec differences...</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">This may take a moment for large specs</p>
+              <p className="text-sm text-muted-foreground mt-5">Comparing specs...</p>
             </motion.div>
           )}
 
-          {!loading && result && (
+          {!loading && results && (
             <motion.div
               key="results"
               initial={{ opacity: 0, y: 16 }}
@@ -184,23 +164,23 @@ For modified items, include detailed before/after values for each changed field.
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
-              {result.title && (
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold text-foreground">{result.title}</h2>
-                  {result.summary?.breaking > 0 && (
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-diff-removed-bg text-diff-removed">
-                      {result.summary.breaking} breaking
-                    </span>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-bold text-foreground">
+                  {results.filter((r) => r.type !== "unchanged").length} changes detected
+                </h2>
+                {breakingCount > 0 && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-diff-removed-bg text-diff-removed">
+                    {breakingCount} breaking
+                  </span>
+                )}
+              </div>
 
-              <DiffSummary summary={result.summary || {}} />
-              <DiffResults changes={result.changes || []} />
+              <DiffSummary results={results} />
+              <DiffResults results={results} />
             </motion.div>
           )}
 
-          {!loading && !result && (
+          {!loading && !results && !error && (
             <EmptyState key="empty" />
           )}
         </AnimatePresence>

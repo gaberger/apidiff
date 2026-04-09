@@ -70,22 +70,8 @@ export class WebAdapter implements WebServerPort {
       return this.handleProviderSpec(specMatch[1], url.searchParams.get("version") || "");
     }
 
-    if (url.pathname === "/" || url.pathname === "/index.html") {
-      return this.serveHtml();
-    }
-
-    // Serve static JS assets (e.g., shiki-bundle.js)
-    if (url.pathname.endsWith(".js") && !url.pathname.includes("..")) {
-      const filePath = new URL(`./static${url.pathname}`, import.meta.url).pathname;
-      const file = Bun.file(filePath);
-      if (await file.exists()) {
-        return new Response(file, {
-          headers: { "Content-Type": "application/javascript", "Cache-Control": "public, max-age=86400" },
-        });
-      }
-    }
-
-    return new Response("Not Found", { status: 404 });
+    // Serve Vite-built frontend assets
+    return this.serveStatic(url.pathname);
   }
 
   private async handleDiff(req: Request): Promise<Response> {
@@ -230,16 +216,43 @@ export class WebAdapter implements WebServerPort {
     }
   }
 
-  private async serveHtml(): Promise<Response> {
-    const htmlPath = new URL("./static/index.html", import.meta.url).pathname;
-    const content = await Bun.file(htmlPath).text();
-    return new Response(content, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-      },
-    });
+  private static readonly FRONTEND_DIR = "dist/frontend";
+  private static readonly MIME_TYPES: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".json": "application/json",
+    ".woff2": "font/woff2",
+  };
+
+  private async serveStatic(pathname: string): Promise<Response> {
+    const safePath = pathname.includes("..") ? "/" : pathname;
+    const filePath = safePath === "/" || safePath === "/index.html"
+      ? `${WebAdapter.FRONTEND_DIR}/index.html`
+      : `${WebAdapter.FRONTEND_DIR}${safePath}`;
+
+    const file = Bun.file(filePath);
+    if (await file.exists()) {
+      const ext = safePath.substring(safePath.lastIndexOf("."));
+      const contentType = WebAdapter.MIME_TYPES[ext] || "application/octet-stream";
+      const cacheControl = safePath === "/" || safePath.endsWith(".html")
+        ? "no-cache, no-store, must-revalidate"
+        : "public, max-age=31536000, immutable";
+      return new Response(file, { headers: { "Content-Type": contentType, "Cache-Control": cacheControl } });
+    }
+
+    // SPA fallback — serve index.html for unmatched routes
+    const indexFile = Bun.file(`${WebAdapter.FRONTEND_DIR}/index.html`);
+    if (await indexFile.exists()) {
+      return new Response(indexFile, {
+        headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache" },
+      });
+    }
+
+    return new Response("Not Found — run 'vite build' first", { status: 404 });
   }
 }
 

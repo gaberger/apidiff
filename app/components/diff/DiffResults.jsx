@@ -3,19 +3,26 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DiffItem from "./DiffItem";
 import { motion } from "framer-motion";
 
+const BREAKING_TYPES = ["removed", "type-change", "renamed", "moved"];
+
 const filters = [
   { value: "all", label: "All" },
+  { value: "breaking", label: "Breaking" },
   { value: "added", label: "Added" },
-  { value: "removed", label: "Removed" },
-  { value: "modified", label: "Modified" },
+  { value: "changed", label: "Changed" },
 ];
 
-export default function DiffResults({ changes }) {
-  const [filter, setFilter] = useState("all");
+function filterResults(results, filter) {
+  const nonUnchanged = results.filter((r) => r.type !== "unchanged");
+  if (filter === "all") return nonUnchanged;
+  if (filter === "breaking") return nonUnchanged.filter((r) => BREAKING_TYPES.includes(r.type));
+  if (filter === "changed") return nonUnchanged.filter((r) => ["changed", "renamed", "moved", "type-change"].includes(r.type));
+  return nonUnchanged.filter((r) => r.type === filter);
+}
 
-  const filtered = filter === "all"
-    ? changes
-    : changes.filter((c) => c.type === filter);
+export default function DiffResults({ results }) {
+  const [filter, setFilter] = useState("all");
+  const filtered = filterResults(results, filter);
 
   return (
     <div>
@@ -28,7 +35,7 @@ export default function DiffResults({ changes }) {
                 {f.label}
                 {f.value !== "all" && (
                   <span className="ml-1.5 text-muted-foreground">
-                    {changes.filter((c) => c.type === f.value).length}
+                    {filterResults(results, f.value).length}
                   </span>
                 )}
               </TabsTrigger>
@@ -47,8 +54,8 @@ export default function DiffResults({ changes }) {
             No {filter === "all" ? "" : filter} changes found
           </motion.div>
         ) : (
-          filtered.map((item, i) => (
-            <DiffItem key={`${item.type}-${item.path || item.name}-${i}`} item={item} />
+          filtered.map((result, i) => (
+            <DiffItem key={`${result.type}-${result.path}-${i}`} result={result} />
           ))
         )}
       </div>
