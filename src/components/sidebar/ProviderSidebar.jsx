@@ -35,15 +35,14 @@ export default function ProviderSidebar({
   }, []);
 
   const allProviders = dynamicProviders.map((d) => {
-    const data = d.data || d;
     return {
       id: d.id,
-      name: data.name,
-      color: data.color || "#888",
+      name: d.name,
+      color: d.color || "#888",
       icon: null,
       dynamic: true,
-      logo_url: data.logo_url || null,
-      versions: (data.comparisons || []).map((c) => ({
+      logo_url: d.logo_url || null,
+      versions: (d.comparisons || []).map((c) => ({
         label: c.label,
         from: c.v1_url ? "v1" : "—",
         to: c.v2_url ? "v2" : "—",
