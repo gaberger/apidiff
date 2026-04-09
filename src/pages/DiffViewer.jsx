@@ -8,8 +8,8 @@ import EmptyState from "@/components/diff/EmptyState";
 import ProviderSidebar from "@/components/sidebar/ProviderSidebar";
 import MigrationGuide from "@/components/guide/MigrationGuide";
 import { useSyncedScroll } from "@/hooks/use-synced-scroll";
-import { computeDiff } from "@domain/diff-algorithm";
-import { buildGuide } from "@domain/guide-builder";
+import { computeDiff } from "@/lib/domain/diff-algorithm.js";
+import { buildGuide } from "@/lib/domain/guide-builder.js";
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 
 export default function DiffViewer() {
