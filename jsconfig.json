@@ -2,7 +2,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./app/*"],
+      "@/*": ["./src/*"],
       "@domain/*": ["./src/core/domain/*"]
     },
     "jsx": "react-jsx",
@@ -17,6 +17,6 @@
     "resolveJsonModule": true,
     "types": []
   },
-  "include": ["app/**/*.js", "app/**/*.jsx"],
-  "exclude": ["node_modules", "dist", "app/components/ui"]
+  "include": ["src/**/*.js", "src/**/*.jsx"],
+  "exclude": ["node_modules", "dist", "src/components/ui"]
 }

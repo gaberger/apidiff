@@ -1,3 +1,11 @@
-// Base44 entry point — delegates to app/main.jsx
-// Base44 expects /src/main.jsx as the Vite entry point
-import "../app/main.jsx";
+import { Buffer } from 'buffer'
+globalThis.Buffer = Buffer
+
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from '@/App.jsx'
+import '@/index.css'
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <App />
+)
