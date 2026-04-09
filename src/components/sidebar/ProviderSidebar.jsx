@@ -34,14 +34,16 @@ export default function ProviderSidebar({
     }).catch(() => {});
   }, []);
 
-  const allProviders = dynamicProviders.map((d) => ({
+  const allProviders = dynamicProviders.map((d) => {
+    const data = d.data || d;
+    return {
       id: d.id,
-      name: d.name,
-      color: d.color || "#888",
+      name: data.name,
+      color: data.color || "#888",
       icon: null,
       dynamic: true,
-      logo_url: d.logo_url || null,
-      versions: (d.comparisons || []).map((c) => ({
+      logo_url: data.logo_url || null,
+      versions: (data.comparisons || []).map((c) => ({
         label: c.label,
         from: c.v1_url ? "v1" : "—",
         to: c.v2_url ? "v2" : "—",
@@ -49,7 +51,8 @@ export default function ProviderSidebar({
         v1_url: c.v1_url,
         v2_url: c.v2_url,
       })),
-    }));
+    };
+  });
 
   function toggleProvider(id) {
     setExpandedId((prev) => (prev === id ? null : id));
