@@ -129,12 +129,12 @@ export default function ProviderSidebar({
                 title={collapsed ? provider.name : undefined}
               >
                 {provider.icon ? (
-                  <ProviderIcon path={provider.icon} color={provider.color} />
-                ) : provider.logo_url ? (
-                  <img src={provider.logo_url} alt={provider.name} className="w-[18px] h-[18px] object-contain rounded flex-shrink-0" />
-                ) : (
-                  <div className="w-[18px] h-[18px] rounded-full flex-shrink-0" style={{ background: provider.color }} />
-                )}
+                   <ProviderIcon path={provider.icon} color={provider.color} />
+                 ) : provider.logo_url && provider.logo_url.trim() ? (
+                   <img src={provider.logo_url} alt={provider.name} className="w-[18px] h-[18px] object-contain rounded flex-shrink-0" />
+                 ) : (
+                   <div className="w-[18px] h-[18px] rounded-full flex-shrink-0" style={{ background: provider.color }} />
+                 )}
                 {!collapsed && (
                   <>
                     <span className="flex-1 truncate">{provider.name}</span>
