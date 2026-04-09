@@ -29,8 +29,12 @@ export default function ProviderSidebar({
   const [loadingKey, setLoadingKey] = useState(null);
 
   useEffect(() => {
-    base44.entities.Integration.list().then((data) => {
-      setDynamicProviders(data);
+    base44.entities.Integration.list().then((items) => {
+      // Normalize: SDK may return {id, data: {...}} or flat {id, name, ...}
+      setDynamicProviders(items.map(item => {
+        const d = item.data || item;
+        return { id: item.id, ...d };
+      }));
     }).catch(() => {});
   }, []);
 
