@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, X, Globe, Loader2 } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 
 /**
@@ -252,31 +253,13 @@ export default function SpecInput({
     setError("");
     setIsFetching(true);
 
-    const tryFetch = async (fetchUrl) => {
-      const r = await fetch(fetchUrl, { headers: { "Accept": "application/json" } });
-      if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
-      const text = await r.text();
-      if (!text.trim()) throw new Error("Empty response from server");
-      return JSON.parse(text);
-    };
-
     try {
-      let parsed;
-      try {
-        // Try direct fetch first
-        parsed = await tryFetch(url);
-      } catch (directErr) {
-        // Fall back to CORS proxy
-        const proxied = `https://corsproxy.io/?url=${encodeURIComponent(url)}`;
-        try {
-          parsed = await tryFetch(proxied);
-        } catch {
-          throw directErr; // surface the original error
-        }
-      }
-      onChange(JSON.stringify(parsed, null, 2));
+      const res = await base44.functions.invoke('proxyFetch', { url });
+      const data = res.data;
+      if (data.error) throw new Error(data.error);
+      onChange(JSON.stringify(data.document, null, 2));
     } catch (ex) {
-      setError("Fetch failed: " + ex.message);
+      setError("Fetch failed: " + (ex.response?.data?.error || ex.message));
     } finally {
       setIsFetching(false);
     }
