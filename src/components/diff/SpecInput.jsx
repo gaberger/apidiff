@@ -125,12 +125,10 @@ export default function SpecInput({
   const [error, setError] = useState("");
   const [activeHighlight, setActiveHighlight] = useState(null);
 
-  // Auto-clear highlight flash after 1.5s
+  // Track active highlight line (no timeout — stays until new click)
   useEffect(() => {
     if (highlightLine == null) return;
     setActiveHighlight(highlightLine);
-    const t = setTimeout(() => setActiveHighlight(null), 1500);
-    return () => clearTimeout(t);
   }, [highlightLine]);
 
   // Diff-aware line highlighting
@@ -152,9 +150,8 @@ export default function SpecInput({
     return lines.map((line, i) => {
       const diffInfo = diffHighlightMap?.get(i);
       const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
-      const isFlash = activeHighlight === i;
       return (
-        <div key={i} className={`block min-w-full ${bgClass}`} style={isFlash ? {backgroundColor: "#fde68a", display: "block"} : {}}>
+        <div key={i} className={`block min-w-full ${bgClass}`}>
           {colorizeJsonLine(line)}
         </div>
       );
@@ -375,6 +372,19 @@ export default function SpecInput({
           {/* Editor area: textarea visible for input, pre overlay for syntax colors */}
           <div className="flex-1 relative">
             {/* Syntax-highlighted + diff-colored pre (behind textarea) */}
+            {/* Highlight bar — full-width absolute overlay at the active line */}
+            {activeHighlight != null && (
+              <div
+                className="absolute left-0 right-0 pointer-events-none z-10"
+                style={{
+                  top: `calc(0.75rem + ${activeHighlight} * 1.6em)`,
+                  height: "1.6em",
+                  backgroundColor: "rgba(251, 191, 36, 0.45)",
+                  borderTop: "1px solid rgba(245, 158, 11, 0.6)",
+                  borderBottom: "1px solid rgba(245, 158, 11, 0.6)",
+                }}
+              />
+            )}
             <pre
               ref={preRef}
               className="absolute inset-0 py-3 px-3 font-mono text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0"
