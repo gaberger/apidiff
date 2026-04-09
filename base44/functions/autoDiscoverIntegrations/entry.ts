@@ -90,38 +90,9 @@ async function discoverForIntegration(base44, integration) {
     return { versions, pairs };
   }
 
-  // Non-GitHub URL: use LLM with web search
-  console.log(`[${name}] LLM web search discovery for: ${base_url}`);
-  const prompt = [
-    `Find all publicly available versioned OpenAPI/Swagger spec files for: "${base_url}"`,
-    changelog_url ? `Changelog URL: ${changelog_url}` : '',
-    `Return ONLY JSON: {"versions":[{"label":"v1","url":"https://...","version":"v1"}],"pairs":[{"label":"v1 → v2","v1_url":"https://...","v2_url":"https://..."}]}`,
-    `Only include URLs that are direct download links to real spec files.`,
-  ].filter(Boolean).join('\n');
-
-  const result = await base44.integrations.Core.InvokeLLM({
-    prompt,
-    add_context_from_internet: true,
-    model: 'gemini_3_flash',
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        versions: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, url: { type: 'string' }, version: { type: 'string' } } } },
-        pairs: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, v1_url: { type: 'string' }, v2_url: { type: 'string' } } } },
-      },
-    },
-  });
-
-  // Fix GitHub blob URLs to raw
-  function toRawUrl(url) {
-    if (!url) return url;
-    return url.replace('https://github.com/', 'https://raw.githubusercontent.com/').replace('/blob/', '/');
-  }
-  if (result) {
-    result.versions = (result.versions || []).map(v => ({ ...v, url: toRawUrl(v.url) }));
-    result.pairs = (result.pairs || []).map(p => ({ ...p, v1_url: toRawUrl(p.v1_url), v2_url: toRawUrl(p.v2_url) }));
-  }
-  return result || null;
+  // Non-GitHub URL: use LLM with web search (skip to avoid long timeouts)
+  console.log(`[${name}] Skipping non-GitHub URL (LLM discovery not supported in scheduled mode)`);
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -132,21 +103,17 @@ Deno.serve(async (req) => {
   }
 
   const integrations = await base44.asServiceRole.entities.Integration.list();
-  const results = [];
+  const toProcess = integrations.filter(i => i.base_url);
+  const skipped = integrations.filter(i => !i.base_url).map(i => ({ name: i.name, status: 'skipped' }));
 
-  for (const integration of integrations) {
-    if (!integration.base_url) {
-      results.push({ name: integration.name, status: 'skipped' });
-      continue;
-    }
-
-    try {
+  // Process all integrations in parallel for speed
+  const settled = await Promise.allSettled(
+    toProcess.map(async (integration) => {
       console.log(`Discovering: ${integration.name}`);
       const discovered = await discoverForIntegration(base44.asServiceRole, integration);
 
       if (!discovered?.versions?.length && !discovered?.pairs?.length) {
-        results.push({ name: integration.name, status: 'no_results' });
-        continue;
+        return { name: integration.name, status: 'no_results' };
       }
 
       const existing = new Set((integration.comparisons || []).map(c => `${c.v1_url}|${c.v2_url}`));
@@ -160,15 +127,20 @@ Deno.serve(async (req) => {
         if (newPairs.length > 0) updateData.comparisons = [...(integration.comparisons || []), ...newPairs];
         if (newVersions.length > 0) updateData.versions = [...(integration.versions || []), ...newVersions];
         await base44.asServiceRole.entities.Integration.update(integration.id, updateData);
-        results.push({ name: integration.name, status: 'updated', added_pairs: newPairs.length, added_versions: newVersions.length });
-      } else {
-        results.push({ name: integration.name, status: 'up_to_date' });
+        return { name: integration.name, status: 'updated', added_pairs: newPairs.length, added_versions: newVersions.length };
       }
-    } catch (e) {
-      console.log(`[${integration.name}] Error: ${e.message}`);
-      results.push({ name: integration.name, status: 'error', error: e.message });
-    }
-  }
+      return { name: integration.name, status: 'up_to_date' };
+    })
+  );
+
+  const results = [
+    ...skipped,
+    ...settled.map((s, i) => {
+      if (s.status === 'fulfilled') return s.value;
+      console.log(`[${toProcess[i].name}] Error: ${s.reason?.message}`);
+      return { name: toProcess[i].name, status: 'error', error: s.reason?.message };
+    }),
+  ];
 
   console.log('Discovery complete:', JSON.stringify(results));
   return Response.json({ results });
