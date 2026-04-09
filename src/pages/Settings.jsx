@@ -261,6 +261,29 @@ function IntegrationCard({
             </div>
           </div>
 
+          {/* Discovery URLs */}
+          <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">Auto-Discovery (runs daily)</p>
+            <div>
+              <label className="block text-[11px] text-stone-500 mb-1">API / GitHub Base URL</label>
+              <input
+                value={integration.base_url || ""}
+                onChange={(e) => onFieldChange("base_url", e.target.value)}
+                className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                placeholder="https://github.com/stripe/openapi"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-stone-500 mb-1">Changelog URL (optional)</label>
+              <input
+                value={integration.changelog_url || ""}
+                onChange={(e) => onFieldChange("changelog_url", e.target.value)}
+                className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                placeholder="https://stripe.com/docs/upgrades"
+              />
+            </div>
+          </div>
+
           {/* Comparisons */}
           <div>
             <div className="flex items-center justify-between mb-2">

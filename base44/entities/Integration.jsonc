@@ -11,6 +11,14 @@
     "logo_url": {
       "type": "string"
     },
+    "base_url": {
+      "type": "string",
+      "description": "Base URL or GitHub repo URL for spec discovery"
+    },
+    "changelog_url": {
+      "type": "string",
+      "description": "Optional changelog URL for version extraction"
+    },
     "comparisons": {
       "type": "array",
       "items": {
