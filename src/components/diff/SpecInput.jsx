@@ -150,8 +150,11 @@ export default function SpecInput({
     return lines.map((line, i) => {
       const diffInfo = diffHighlightMap?.get(i);
       const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
+      const highlightStyle = activeHighlight === i
+        ? { backgroundColor: "rgba(251,191,36,0.5)", borderTop: "1px solid rgba(245,158,11,0.7)", borderBottom: "1px solid rgba(245,158,11,0.7)", display: "block", minWidth: "100%" }
+        : { display: "block", minWidth: "100%" };
       return (
-        <div key={i} className={`block min-w-full ${bgClass}`}>
+        <div key={i} className={bgClass} style={highlightStyle}>
           {colorizeJsonLine(line)}
         </div>
       );
@@ -372,25 +375,12 @@ export default function SpecInput({
           {/* Editor area: textarea visible for input, pre overlay for syntax colors */}
           <div className="flex-1 relative">
             {/* Syntax-highlighted + diff-colored pre (behind textarea) */}
-            {/* Highlight bar — full-width absolute overlay at the active line */}
-            {activeHighlight != null && (
-              <div
-                className="absolute left-0 right-0 pointer-events-none z-10"
-                style={{
-                  top: `calc(0.75rem + ${activeHighlight} * 1.6em)`,
-                  height: "1.6em",
-                  backgroundColor: "rgba(251, 191, 36, 0.45)",
-                  borderTop: "1px solid rgba(245, 158, 11, 0.6)",
-                  borderBottom: "1px solid rgba(245, 158, 11, 0.6)",
-                }}
-              />
-            )}
             <pre
               ref={preRef}
               className="absolute inset-0 py-3 px-3 font-mono text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0"
               aria-hidden="true"
             >
-              {highlightedLines}
+              <div style={{minWidth: "max-content"}}>{highlightedLines}</div>
             </pre>
 
             {/* Textarea on top — transparent text, visible caret */}
