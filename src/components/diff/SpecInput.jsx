@@ -159,7 +159,7 @@ export default function SpecInput({
         </div>
       );
     });
-  }, [value, diffHighlightMap, highlightLine]);
+  }, [value, diffHighlightMap, activeHighlight]);
 
   // Drag counter to handle nested drag events
   const dragCounter = useRef(0);
