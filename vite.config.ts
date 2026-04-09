@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import path from "path";
 
 export default defineConfig({
+  logLevel: "error",
   plugins: [
     base44({
       legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === "true",
@@ -28,8 +29,5 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-  },
-  build: {
-    outDir: "dist/frontend",
   },
 });
