@@ -8,6 +8,9 @@
     "color": {
       "type": "string"
     },
+    "logo_url": {
+      "type": "string"
+    },
     "comparisons": {
       "type": "array",
       "items": {

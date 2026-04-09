@@ -97,6 +97,7 @@ export default function ProviderSidebar({
       color: d.color || "#888",
       icon: null,
       dynamic: true,
+      logo_url: d.logo_url || null,
       versions: (d.comparisons || []).map((c) => ({
         label: c.label,
         from: c.v1_url ? "v1" : "—",
@@ -184,6 +185,8 @@ export default function ProviderSidebar({
               >
                 {provider.icon ? (
                   <ProviderIcon path={provider.icon} color={provider.color} />
+                ) : provider.logo_url ? (
+                  <img src={provider.logo_url} alt={provider.name} className="w-[18px] h-[18px] object-contain rounded flex-shrink-0" />
                 ) : (
                   <div className="w-[18px] h-[18px] rounded-full flex-shrink-0" style={{ background: provider.color }} />
                 )}
