@@ -72,57 +72,29 @@ async function findSpecs(owner, repo, path, branch, depth = 0) {
   return results;
 }
 
-async function discoverViaWebSearch(base44, query) {
-  const prompt = [
-    `Find all publicly available versioned OpenAPI/Swagger spec files for: "${query}"`,
-    `Return ONLY valid JSON (no markdown) with this structure:`,
-    `{"versions":[{"label":"v1","url":"https://...","version":"v1"}],"changelog_versions":[],"pairs":[{"label":"v1 → v2","v1_url":"https://...","v2_url":"https://..."}]}`,
-    `Only include direct download links to real OpenAPI/Swagger JSON or YAML files.`,
-  ].join('\n');
-
-  const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-    prompt,
-    add_context_from_internet: true,
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        versions: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, url: { type: 'string' }, version: { type: 'string' } } } },
-        changelog_versions: { type: 'array', items: { type: 'string' } },
-        pairs: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, v1_url: { type: 'string' }, v2_url: { type: 'string' } } } },
-      },
-    },
-  });
-
-  if (result) {
-    result.versions = (result.versions || []).map(v => ({ ...v, url: toRawUrl(v.url) }));
-    result.pairs = (result.pairs || []).map(p => ({ ...p, v1_url: toRawUrl(p.v1_url), v2_url: toRawUrl(p.v2_url) }));
-  }
-  return result || { versions: [], changelog_versions: [], pairs: [] };
-}
+// Web search removed — hallucinates fake URLs. GitHub direct only.
 
 async function discoverForIntegration(base44, integration) {
-  const { base_url, changelog_url, name } = integration;
+  const { base_url } = integration;
   if (!base_url) return null;
 
   const gh = parseGitHubUrl(base_url);
-  if (gh) {
-    const specs = await findSpecs(gh.owner, gh.repo, gh.path, gh.branch);
-    const seen = new Set();
-    const versions = [];
-    for (const s of specs) {
-      if (!seen.has(s.url)) { seen.add(s.url); versions.push(s); }
-    }
-    if (versions.length === 0) return discoverViaWebSearch(base44, base_url);
+  if (!gh) return null; // only GitHub repos supported for auto-sync
 
-    const sorted = [...versions].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
-    const pairs = [];
-    for (let i = 0; i < sorted.length - 1; i++) {
-      pairs.push({ label: `${sorted[i].label} → ${sorted[i+1].label}`, v1_url: sorted[i].url, v2_url: sorted[i+1].url });
-    }
-    return { versions, pairs };
+  const specs = await findSpecs(gh.owner, gh.repo, gh.path, gh.branch);
+  const seen = new Set();
+  const versions = [];
+  for (const s of specs) {
+    if (!seen.has(s.url)) { seen.add(s.url); versions.push(s); }
   }
+  if (versions.length === 0) return null;
 
-  return discoverViaWebSearch(base44, base_url);
+  const sorted = [...versions].sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  const pairs = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    pairs.push({ label: `${sorted[i].label} → ${sorted[i+1].label}`, v1_url: sorted[i].url, v2_url: sorted[i+1].url });
+  }
+  return { versions, pairs };
 }
 
 Deno.serve(async (req) => {
