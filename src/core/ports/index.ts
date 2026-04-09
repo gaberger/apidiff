@@ -10,6 +10,12 @@ import type {
   ResolvedSpec,
 } from "../domain/types.js";
 
+import type {
+  DiscoveredVersion,
+  DiscoveryResult,
+  SpecSource,
+} from "../domain/discovery-types.js";
+
 /** Fetches an OpenAPI spec from a URL or file path, returns local file path */
 export interface SchemaFetchPort {
   fetch(urlOrPath: string, label: string): Promise<string>;
@@ -49,4 +55,15 @@ export interface WebServerPort {
 export interface SpecInputPort {
   fromUrl(url: string): Promise<ResolvedSpec>;
   fromFile(content: string, filename: string): Promise<ResolvedSpec>;
+}
+
+/** Discovers versioned OpenAPI specs from a specific source */
+export interface ApiDiscoveryPort {
+  discover(source: SpecSource): Promise<DiscoveredVersion[]>;
+  readonly sourceKind: SpecSource["kind"];
+}
+
+/** Parses changelog pages for version identifiers */
+export interface ChangelogParserPort {
+  parse(url: string): Promise<string[]>;
 }
