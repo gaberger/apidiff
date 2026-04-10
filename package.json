@@ -5,10 +5,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"bun run src/web.ts\" \"vite\"",
+    "sync:lib": "bun scripts/sync-lib-domain.js",
+    "dev": "bun run sync:lib && concurrently \"bun run src/web.ts\" \"vite\"",
     "dev:api": "bun run src/web.ts",
     "dev:ui": "vite",
-    "build": "vite build",
+    "build": "bun run sync:lib && vite build",
     "build:cli": "bun build src/cli.ts --outdir dist --target bun",
     "start:cli": "bun run src/cli.ts",
     "start:web": "bun run src/web.ts",
