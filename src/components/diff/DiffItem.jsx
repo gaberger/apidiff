@@ -32,7 +32,7 @@ function splitCommonPrefix(oldPath, newPath) {
 /** Renders a path as breadcrumb-style segments */
 function PathBreadcrumb({ segs, highlightFrom = segs.length - 1, side, onPathClick }) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-x-0.5 font-mono text-xs leading-relaxed">
+    <span className="inline-flex flex-wrap items-center gap-x-0.5 font-mono text-[10px] sm:text-xs leading-relaxed">
       {segs.map((seg, i) => {
         const partialPath = segs.slice(0, i + 1).join(".");
         const isDiff = i >= highlightFrom;

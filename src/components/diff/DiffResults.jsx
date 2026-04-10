@@ -41,8 +41,8 @@ export default function DiffResults({ results, activeFilter, onFilterChange, onP
           No {activeFilter === "all" ? "" : activeFilter + " "}changes found
         </div>
       ) : (
-        <div className="border border-stone-200 rounded-lg overflow-hidden bg-white">
-          <table className="w-full text-left table-fixed">
+        <div className="border border-stone-200 rounded-lg overflow-hidden bg-white overflow-x-auto">
+          <table className="w-full text-left table-fixed min-w-[500px]">
             <colgroup>
               <col className="w-[50%]" />
               <col className="w-[100px]" />

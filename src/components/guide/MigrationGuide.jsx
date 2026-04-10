@@ -53,7 +53,7 @@ function TimelineDot({ status }) {
 
 function Timeline({ steps }) {
   return (
-    <div className="relative flex items-start justify-between mb-6">
+    <div className="relative flex items-start justify-between mb-6 overflow-x-auto pb-2">
       {/* Connecting line */}
       <div className="absolute top-2 left-0 right-0 h-0.5 bg-stone-200" />
 
@@ -132,7 +132,7 @@ function CodeExamples({ examples }) {
 
       {/* Code blocks */}
       {current && (
-        <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
           <div>
             <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1">
               Before
@@ -304,9 +304,9 @@ export default function MigrationGuide({ guide, onClose }) {
         transition={{ duration: 0.3 }}
       >
         {/* ── Header ── */}
-        <div className="flex items-start justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-stone-800">
+            <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-stone-800">
               {guide.title}
             </h2>
             <p className="text-sm text-stone-500 mt-1">

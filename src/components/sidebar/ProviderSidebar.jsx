@@ -79,7 +79,9 @@ export default function ProviderSidebar({
 
   return (
     <motion.aside
-      className="flex flex-col border-r border-stone-200 bg-stone-100 overflow-hidden"
+      className={`flex flex-col border-r border-stone-200 bg-stone-100 overflow-hidden ${
+        collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl'
+      }`}
       animate={{ width: collapsed ? 48 : 260 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >

@@ -20,8 +20,8 @@ export default function DiffViewer() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [error, setError] = useState(null);
 
-  // UI state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // UI state — sidebar collapsed by default on mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -225,14 +225,14 @@ export default function DiffViewer() {
     <div className="min-h-screen bg-stone-50 flex flex-col">
       {/* Header */}
       <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
-        <div className="px-4 sm:px-6 lg:px-8">
+        <div className="px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-tight">
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-sm font-bold tracking-tight whitespace-nowrap">
                 <span className="text-stone-800">api</span>
                 <span className="text-amber-600">diff</span>
               </h1>
-              <nav className="ml-6 flex items-center gap-1">
+              <nav className="ml-2 sm:ml-6 flex items-center gap-1">
                 <button
                   onClick={() => setActiveTab("compare")}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
@@ -258,7 +258,7 @@ export default function DiffViewer() {
               </nav>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Scroll lock toggle */}
               <button
                 onClick={toggleScrollLock}
@@ -288,7 +288,7 @@ export default function DiffViewer() {
                 size="sm"
                 onClick={handleCompare}
                 disabled={!canCompare || resolving}
-                className="h-8 px-4 text-xs font-semibold"
+                className="h-8 px-2 sm:px-4 text-xs font-semibold"
               >
                 {resolving ? (
                   <>
@@ -315,7 +315,7 @@ export default function DiffViewer() {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+        <main className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
           <AnimatePresence mode="wait">
             {/* ═══ COMPARE TAB ═══ */}
             {activeTab === "compare" && (
@@ -339,7 +339,7 @@ export default function DiffViewer() {
                 )}
 
                 {/* Input panels */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
                   <SpecInput
                     label="Original Spec"
                     value={before}
@@ -380,7 +380,7 @@ export default function DiffViewer() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-6"
                   >
-                    <h2 className="text-lg font-bold text-stone-800">
+                    <h2 className="text-base sm:text-lg font-bold text-stone-800">
                       {results.filter((r) => r.type !== "unchanged").length} changes detected
                     </h2>
 
@@ -392,11 +392,11 @@ export default function DiffViewer() {
                     />
 
                     {/* Guide generation form */}
-                    <div className="border border-stone-200 rounded-lg bg-white p-4">
+                    <div className="border border-stone-200 rounded-lg bg-white p-3 sm:p-4">
                       <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
                         Generate Migration Guide
                       </h3>
-                      <div className="flex items-end gap-3 flex-wrap">
+                      <div className="flex items-end gap-2 sm:gap-3 flex-wrap">
                         <div>
                           <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Base</label>
                           <input
