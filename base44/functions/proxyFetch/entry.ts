@@ -4,10 +4,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
-  const { url } = await req.json();
-  if (!url || typeof url !== 'string') {
+  const { url: rawUrl } = await req.json();
+  if (!rawUrl || typeof rawUrl !== 'string') {
     return Response.json({ error: 'url is required' }, { status: 400 });
   }
+
+  // Convert GitHub blob URLs to raw URLs
+  const url = rawUrl
+    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
+    .replace('/blob/', '/');
 
   const res = await fetch(url, {
     headers: {
