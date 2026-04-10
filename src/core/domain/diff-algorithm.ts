@@ -3,6 +3,7 @@
 
 import type { DiffResult, FlatMap } from "./types.js";
 import { flatten, leafName, describeType } from "./flatten.js";
+import { matchScore, FUZZY_THRESHOLD } from "./levenshtein.js";
 
 function parentPath(path: string): string {
   const idx = path.lastIndexOf(".");
@@ -118,6 +119,7 @@ export function diffFlatMaps(fa: FlatMap, fb: FlatMap): DiffResult[] {
       // Require same parent path OR both are top-level keys
       const renamePool = fbOnlyByValue.get(ser);
       let renamedTo: string | null = null;
+      let fuzzyConfidence: number | null = null;
       if (renamePool) {
         const keyParent = parentPath(key);
         for (const fbKey of renamePool) {
@@ -130,13 +132,32 @@ export function diffFlatMaps(fa: FlatMap, fb: FlatMap): DiffResult[] {
         }
       }
 
+      // Fuzzy rename fallback — fires only when exact-match index misses
+      if (!renamedTo) {
+        let bestScore = -1;
+        let bestKey: string | null = null;
+        for (const fbKey of Object.keys(fb)) {
+          if (fbKey in fa || processed.has(fbKey)) continue;
+          if (leafName(fbKey) === leaf) continue; // same leaf = move, not rename
+          const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
+          if (score >= FUZZY_THRESHOLD && score > bestScore) {
+            bestScore = score;
+            bestKey = fbKey;
+          }
+        }
+        if (bestKey !== null) {
+          renamedTo = bestKey;
+          fuzzyConfidence = Math.round(bestScore * 100) / 100;
+        }
+      }
+
       if (renamedTo) {
         const shared = sharedAncestorDepth(key, renamedTo);
         const maxDepth = Math.max(key.split(".").length, renamedTo.split(".").length);
         const confidence = maxDepth > 0 ? shared / maxDepth : 1;
         // Sibling renames (same parent) get high confidence
         const isSibling = parentPath(key) === parentPath(renamedTo);
-        const finalConfidence = isSibling ? Math.max(confidence, 0.9) : confidence;
+        const finalConfidence = fuzzyConfidence ?? (isSibling ? Math.max(confidence, 0.9) : confidence);
         results.push({ type: "renamed", path: key, newPath: renamedTo, old: fa[key], new: fb[renamedTo], confidence: Math.round(finalConfidence * 100) / 100 });
         processed.add(renamedTo);
       } else {
@@ -154,6 +175,22 @@ export function diffFlatMaps(fa: FlatMap, fb: FlatMap): DiffResult[] {
             // Longer paths: always require meaningful shared ancestry
             if (isRelated(key, fbKey)) { movedTo = fbKey; break; }
           }
+        }
+
+        // Fuzzy move fallback — same leaf name, similar value
+        if (!movedTo) {
+          let bestScore = -1;
+          let bestKey: string | null = null;
+          for (const fbKey of Object.keys(fb)) {
+            if (fbKey in fa || processed.has(fbKey)) continue;
+            if (leafName(fbKey) !== leaf) continue; // must share leaf name for a move
+            const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
+            if (score >= FUZZY_THRESHOLD && score > bestScore) {
+              bestScore = score;
+              bestKey = fbKey;
+            }
+          }
+          if (bestKey !== null) movedTo = bestKey;
         }
 
         if (movedTo) {

@@ -1,0 +1,127 @@
+{
+  "feature": "fuzzy-rename-detection",
+  "description": "Extend rename/move detection to match fields that were renamed AND changed simultaneously, using Levenshtein path similarity and value similarity scoring",
+  "specs": [
+    {
+      "id": "S01",
+      "category": "HappyPath",
+      "description": "Exact rename (same value, different leaf name) continues to work — backward compatibility",
+      "given": "Field 'billing' with value 'auto' in old spec; field 'collection_method' with value 'auto' in new spec",
+      "when": "computeDiff(old, new) is called",
+      "then": "Returns a single DiffResult of type 'renamed' with path='billing', newPath='collection_method', confidence >= 0.9",
+      "negative_spec": false,
+      "domain_conventions": {
+        "threshold": "Exact value match sets valueSimilarity=1.0, boosting combined score above threshold",
+        "backward_compat": "Exact-match path (serialize equality index) must still be tried first before fuzzy"
+      }
+    },
+    {
+      "id": "S02",
+      "category": "HappyPath",
+      "description": "Rename with value change is detected when combined score >= 0.65",
+      "given": "Field 'account_balance' with value 0 in old spec; field 'balance' with value 0.00 in new spec (same numeric quantity, different representation)",
+      "when": "computeDiff(old, new) is called",
+      "then": "Returns a single DiffResult of type 'renamed' (not removed+added), with confidence in [0.65, 1.0)",
+      "negative_spec": false,
+      "domain_conventions": {
+        "scoring": "pathSimilarity('account_balance','balance')≈0.54; valueSimilarity(0, 0.00)=1.0 (same number); combined=0.6*0.54+0.4*1.0=0.724 >= 0.65"
+      }
+    },
+    {
+      "id": "S03",
+      "category": "HappyPath",
+      "description": "camelCase/snake_case variant rename is detected",
+      "given": "Field 'user.name' with value 'Alice' in old spec; field 'user.displayName' with value 'alice' in new spec",
+      "when": "computeDiff(old, new) is called",
+      "then": "Returns DiffResult of type 'renamed' with confidence in [0.65, 1.0)",
+      "negative_spec": false,
+      "domain_conventions": {
+        "scoring": "pathSimilarity('name','displayName')≈0.57 (leaf names); valueSimilarity('Alice','alice')≈0.83 (1-levenshtein/5); combined≈0.67 >= 0.65"
+      }
+    },
+    {
+      "id": "S04",
+      "category": "HappyPath",
+      "description": "Best-match wins when multiple candidates exist above threshold",
+      "given": "Old spec has field 'price'; new spec has two candidates: 'pricing' (pathSim=0.83) and 'cost' (pathSim=0.40), both with identical values",
+      "when": "computeDiff(old, new) is called",
+      "then": "Returns DiffResult of type 'renamed' with newPath='pricing' (highest score), not 'cost'",
+      "negative_spec": false,
+      "domain_conventions": {
+        "algorithm": "Iterate all fb-only candidates, track best score; select winner only after full scan — not first-match"
+      }
+    },
+    {
+      "id": "S05",
+      "category": "ErrorHandling",
+      "description": "Fields with completely different names AND different values are NOT matched as renames",
+      "given": "Old spec has field 'billing' with value 'auto'; new spec has field 'collection_method' with value 'manual' — path similarity 0.12, value similarity 0.0",
+      "when": "computeDiff(old, new) is called",
+      "then": "Returns two separate DiffResults: type='removed' for 'billing' and type='added' for 'collection_method' — combined score 0.072 is below 0.65 threshold",
+      "negative_spec": true,
+      "domain_conventions": {
+        "threshold": "Below-threshold candidates must fall through to removed+added, not produce low-confidence rename entries"
+      }
+    },
+    {
+      "id": "S06",
+      "category": "EdgeCase",
+      "description": "levenshtein(a, b) returns 0 for identical strings and max(len(a),len(b)) for completely disjoint strings",
+      "given": "Pure function inputs: levenshtein('rename','rename') and levenshtein('abc','xyz')",
+      "when": "levenshtein function is called directly",
+      "then": "levenshtein('rename','rename')=0; levenshtein('abc','xyz')=3 (each char substituted)",
+      "negative_spec": false,
+      "domain_conventions": {
+        "algorithm": "Standard Wagner-Fischer dynamic programming; O(n*m) time, O(min(n,m)) space"
+      }
+    },
+    {
+      "id": "S07",
+      "category": "EdgeCase",
+      "description": "pathSimilarity returns 1.0 for empty strings (both empty = identical)",
+      "given": "pathSimilarity('', '') called",
+      "when": "pathSimilarity function is called",
+      "then": "Returns 1.0 (identical, not division-by-zero)",
+      "negative_spec": false,
+      "domain_conventions": {
+        "guard": "maxLen === 0 guard must return 1.0 before division"
+      }
+    },
+    {
+      "id": "S08",
+      "category": "EdgeCase",
+      "description": "valueSimilarity returns 0.0 for different types (no cross-type fuzzy matching)",
+      "given": "valueSimilarity('-0.0075', { amount: -0.0075 }) — string vs object",
+      "when": "valueSimilarity is called",
+      "then": "Returns 0.0 (different types short-circuit to no similarity)",
+      "negative_spec": true,
+      "domain_conventions": {
+        "reason": "Cross-type fuzzy matching would produce unreliable scores; type-mismatch means structurally different fields"
+      }
+    },
+    {
+      "id": "S09",
+      "category": "HappyPath",
+      "description": "matchScore weights path similarity 60% and value similarity 40%",
+      "given": "matchScore called with pathSimilarity=0.8 and valueSimilarity=0.5",
+      "when": "matchScore(oldPath, newPath, oldVal, newVal) is called",
+      "then": "Returns 0.6*0.8 + 0.4*0.5 = 0.68",
+      "negative_spec": false,
+      "domain_conventions": {
+        "weights": "Path similarity weighted higher because field name is the primary identity; value change alone should not drive a rename match"
+      }
+    },
+    {
+      "id": "S10",
+      "category": "Integration",
+      "description": "Fuzzy rename detection integrates with existing confidence field on DiffResult",
+      "given": "A rename detected via fuzzy matching with matchScore=0.72",
+      "when": "diffFlatMaps returns the result",
+      "then": "DiffResult.confidence = 0.72 (rounded to 2dp); type = 'renamed'; existing exact-match renames retain confidence >= 0.9",
+      "negative_spec": false,
+      "domain_conventions": {
+        "field": "confidence field already defined in DiffResult interface — no type changes needed"
+      }
+    }
+  ]
+}

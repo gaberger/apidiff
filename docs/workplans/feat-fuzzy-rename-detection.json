@@ -1,0 +1,101 @@
+{
+  "id": "feat-fuzzy-rename-detection",
+  "title": "Feature: Fuzzy Rename/Move Detection via Levenshtein Distance (ADR-011)",
+  "specs": "docs/specs/fuzzy-rename-detection.json",
+  "adr": "ADR-011",
+  "created": "2026-04-10",
+  "status": "planned",
+  "topology": "pipeline",
+  "budget": "~12000 tokens",
+  "prior_work": {
+    "done": [
+      "src/core/domain/types.ts — DiffResult.confidence field already defined (line 24)",
+      "src/core/domain/diff-algorithm.ts — serialize(), leafName(), parentPath(), isRelated() helpers already present",
+      "src/core/domain/flatten.ts — leafName() exported, used by diff-algorithm"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Create levenshtein.ts pure functions",
+      "description": "Create src/core/domain/levenshtein.ts with four pure functions: levenshtein(a,b), pathSimilarity(oldPath,newPath), valueSimilarity(a,b), matchScore(oldPath,newPath,oldVal,newVal). Export FUZZY_THRESHOLD=0.65 constant. No imports outside domain/. Use Wagner-Fischer DP for levenshtein. pathSimilarity compares leaf names only (use existing leafName() — import from flatten.js). valueSimilarity: identical→1.0, both string→levenshtein-based, both number→relative distance (1-|a-b|/max(|a|,|b|)), both object→Jaccard on keys, different types→0.0. matchScore = 0.6*pathSimilarity + 0.4*valueSimilarity.",
+      "layer": "domain",
+      "adapter": "none",
+      "port": "none",
+      "dependencies": [],
+      "tier": 0,
+      "specs": ["S06", "S07", "S08", "S09"],
+      "worktree_branch": "feat/fuzzy-rename/levenshtein",
+      "done_condition": "File compiles with tsc --noEmit; levenshtein('rename','rename')===0; levenshtein('abc','xyz')===3; pathSimilarity('','')===1; valueSimilarity('a',1)===0; matchScore produces 0.6*path+0.4*value",
+      "tasks": [],
+      "status": "pending"
+    },
+    {
+      "id": "step-2",
+      "name": "Integrate fuzzy fallback in diff-algorithm",
+      "description": "Update src/core/domain/diff-algorithm.ts to integrate fuzzy fallback in diffFlatMaps(). When exact-match rename lookup (fbOnlyByValue index) finds no match, scan fb-only keys using matchScore() and FUZZY_THRESHOLD from levenshtein.ts. Track bestMatch (highest score above threshold) — do NOT return first-match. Set confidence=Math.round(bestMatch.score*100)/100 on the pushed DiffResult. Similarly add fuzzy fallback in the move-detection block: when exact leaf+value index misses, scan fb-only keys for same-leaf fuzzy value match above threshold. Import levenshtein.ts via './levenshtein.js'.",
+      "layer": "domain",
+      "adapter": "none",
+      "port": "none",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "specs": ["S01", "S02", "S03", "S04", "S05", "S10"],
+      "worktree_branch": "feat/fuzzy-rename/algorithm",
+      "done_condition": "tsc --noEmit passes; existing computeDiff behavior unchanged for exact matches (S01); account_balance→balance with value change produces 'renamed' not 'removed'+'added' (S02); below-threshold pair produces 'removed'+'added' (S05); best-match wins over first-match (S04)",
+      "tasks": [],
+      "status": "pending"
+    },
+    {
+      "id": "step-3",
+      "name": "Write unit tests for levenshtein and fuzzy rename",
+      "description": "Write unit tests in src/core/domain/levenshtein.test.ts covering all 10 specs: levenshtein edge cases (identical, disjoint, empty), pathSimilarity zero-guard, valueSimilarity type-mismatch returns 0, matchScore weighting, and integration scenarios calling computeDiff with rename+value-change pairs. Use Bun's built-in test runner (import { test, expect } from 'bun:test'). Do not import from outside src/core/domain/.",
+      "layer": "domain",
+      "adapter": "none",
+      "port": "none",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "specs": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10"],
+      "worktree_branch": "feat/fuzzy-rename/tests",
+      "done_condition": "bun test src/core/domain/levenshtein.test.ts passes all cases; coverage includes all 4 exported functions and the fuzzy-rename integration path in computeDiff",
+      "tasks": [],
+      "status": "pending"
+    }
+  ],
+  "dependencies": {
+    "npm": [],
+    "cargo": []
+  },
+  "mergeOrder": [
+    "step-1 (levenshtein.ts) → step-2 (diff-algorithm patch) → step-3 (tests)",
+    "All three are sequential — each builds on the previous"
+  ],
+  "riskRegister": [
+    {
+      "risk": "Fuzzy matching increases false-positive renames (unrelated fields incorrectly paired)",
+      "impact": "medium",
+      "mitigation": "Threshold 0.65 was validated against real API pairs in ADR-011. Tests include S05 (below-threshold pair) to catch regression. Confidence field in UI will expose match quality."
+    },
+    {
+      "risk": "Performance regression — fuzzy scan is O(n*m * k) vs O(1) index lookup",
+      "impact": "low",
+      "mitigation": "Fuzzy path only runs when exact-match index misses. API field names are 5-30 chars; levenshtein is negligible vs HTTP latency. Add note if O(n^2) behavior appears on very large schemas (>1000 keys)."
+    },
+    {
+      "risk": "Existing tests that assert 'removed'+'added' for rename+value-change pairs may now fail",
+      "impact": "medium",
+      "mitigation": "No existing test suite found — but run hex analyze and bun test after step-2 to catch regressions before step-3."
+    },
+    {
+      "risk": "Circular import if levenshtein.ts imports from diff-algorithm.ts",
+      "impact": "high",
+      "mitigation": "levenshtein.ts must ONLY import from flatten.ts (for leafName). diff-algorithm.ts imports levenshtein.ts — one-way dependency. ADR-011 rule in adr-rules.toml enforces levenshtein stays in domain."
+    }
+  ],
+  "successCriteria": [
+    "hex analyze reports 0 boundary violations after all steps merged",
+    "computeDiff({account_balance:0},{balance:0.00}) returns [{type:'renamed',path:'account_balance',newPath:'balance',confidence:0.72}]",
+    "computeDiff({billing:'auto'},{collection_method:'manual'}) returns [{type:'removed',...},{type:'added',...}] (below threshold)",
+    "All 10 behavioral specs pass as bun tests",
+    "tsc --noEmit exits 0 on full project"
+  ]
+}
