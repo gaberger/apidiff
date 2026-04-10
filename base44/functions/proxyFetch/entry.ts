@@ -25,6 +25,15 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Empty response from server' }, { status: 502 });
   }
 
-  const parsed = JSON.parse(text);
-  return Response.json({ document: parsed });
+  try {
+    const parsed = JSON.parse(text);
+    return Response.json({ document: parsed });
+  } catch {
+    // Not JSON — could be YAML or HTML error page
+    if (text.trimStart().startsWith('<!') || text.trimStart().startsWith('<html')) {
+      return Response.json({ error: 'URL returned an HTML page, not a JSON/YAML spec' }, { status: 502 });
+    }
+    // Likely YAML — return as raw text for the frontend to handle
+    return Response.json({ document: text, format: 'yaml' });
+  }
 });
