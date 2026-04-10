@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import SpecInput from "@/components/diff/SpecInput";
 import DiffResults from "@/components/diff/DiffResults";
 import EmptyState from "@/components/diff/EmptyState";
-import ProviderSidebar from "@/components/sidebar/ProviderSidebar";
+import IntegrationList from "@/components/sidebar/IntegrationList";
+import IntegrationHeader from "@/components/diff/IntegrationHeader";
 import MigrationGuide from "@/components/guide/MigrationGuide";
 import { useSyncedScroll } from "@/hooks/use-synced-scroll";
 import { computeDiff } from "@/lib/domain/diff-algorithm.js";
@@ -20,8 +21,9 @@ export default function DiffViewer() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [error, setError] = useState(null);
 
-  // UI state — sidebar collapsed by default on mobile
+  // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
+  const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -118,17 +120,19 @@ export default function DiffViewer() {
     }
   };
 
-  const handleSelectComparison = async (v1, v2, label) => {
-    setBefore(JSON.stringify(v1, null, 2));
-    setAfter(JSON.stringify(v2, null, 2));
+  const handleLoadSpecs = async (v1, v2, label) => {
+    const v1Str = typeof v1 === 'string' ? v1 : JSON.stringify(v1, null, 2);
+    const v2Str = typeof v2 === 'string' ? v2 : JSON.stringify(v2, null, 2);
+    setBefore(v1Str);
+    setAfter(v2Str);
     setResults(null);
     setGuide(null);
     setError(null);
     setActiveFilter("all");
     setActiveTab("compare");
     try {
-      let oldSpec = structuredClone(v1);
-      let newSpec = structuredClone(v2);
+      let oldSpec = typeof v1 === 'string' ? JSON.parse(v1) : structuredClone(v1);
+      let newSpec = typeof v2 === 'string' ? JSON.parse(v2) : structuredClone(v2);
       const hasRefs = (obj) => JSON.stringify(obj).includes('"$ref"');
       if (hasRefs(oldSpec) || hasRefs(newSpec)) {
         setResolving(true);
@@ -309,8 +313,9 @@ export default function DiffViewer() {
 
       {/* Sidebar + Main */}
       <div className="flex flex-1 overflow-hidden">
-        <ProviderSidebar
-          onSelectComparison={handleSelectComparison}
+        <IntegrationList
+          selected={selectedIntegration}
+          onSelect={setSelectedIntegration}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
@@ -336,6 +341,15 @@ export default function DiffViewer() {
                       . Editors show expanded content.
                     </span>
                   </div>
+                )}
+
+                {/* Integration header with version picker */}
+                {selectedIntegration && (
+                  <IntegrationHeader
+                    integration={selectedIntegration}
+                    onLoadSpecs={handleLoadSpecs}
+                    onClear={() => setSelectedIntegration(null)}
+                  />
                 )}
 
                 {/* Input panels */}
