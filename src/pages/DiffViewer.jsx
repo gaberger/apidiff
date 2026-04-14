@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon, HelpCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts.js";
+import ShortcutsHelp from "@/components/diff/ShortcutsHelp.jsx";
 import { motion, AnimatePresence } from "framer-motion";
 import SpecInput from "@/components/diff/SpecInput";
 import DiffResults from "@/components/diff/DiffResults";
@@ -72,6 +74,7 @@ export default function DiffViewer() {
 
   const [resolving, setResolving] = useState(false);
   const [refsResolved, setRefsResolved] = useState(null); // { old: number, new: number } | null
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const handleCompare = async () => {
     if (!before.trim() || !after.trim()) return;
@@ -301,16 +304,22 @@ export default function DiffViewer() {
 
   const canCompare = before.trim() && after.trim();
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canCompare && !resolving) {
-        e.preventDefault();
-        handleCompare();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [canCompare, resolving, before, after]);
+  const focusEditor = (ref) => {
+    const el = ref?.current;
+    if (!el) return;
+    // Editor ref may be a container with an internal textarea/contentEditable,
+    // or a focusable element itself. Prefer the focusable child if present.
+    const inner = el.querySelector?.("textarea, [contenteditable='true']");
+    (inner || el).focus?.();
+  };
+
+  useKeyboardShortcuts({
+    "mod+enter": () => { if (canCompare && !resolving) handleCompare(); },
+    "mod+k": () => focusEditor(leftEditorRef),
+    "mod+shift+k": () => focusEditor(rightEditorRef),
+    "escape": () => { if (helpOpen) setHelpOpen(false); else setError(null); },
+    "?": () => setHelpOpen(true),
+  });
 
   const shortcutHint = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform) ? "⌘↵" : "Ctrl+↵";
 
@@ -373,6 +382,16 @@ export default function DiffViewer() {
                 {theme === "dark"
                   ? <Sun className="w-3.5 h-3.5" />
                   : <Moon className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* Keyboard shortcuts help */}
+              <button
+                onClick={() => setHelpOpen(true)}
+                aria-label="Keyboard shortcuts"
+                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard"
+                title="Keyboard shortcuts (?)"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
               </button>
 
               {/* Scroll lock toggle */}
@@ -615,6 +634,7 @@ export default function DiffViewer() {
           </AnimatePresence>
         </main>
       </div>
+      <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }
