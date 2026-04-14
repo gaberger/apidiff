@@ -1,0 +1,41 @@
+{
+  "id": "wp-cleanup-stale-worktrees",
+  "title": "Cleanup: triage 7 stale hex worktrees (feat-managed-agents-autonomy/t0.1..t0.6 + feat-workplan-file-scaffolding/t1.1)",
+  "adr": "",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~8000 tokens",
+  "prior_work": {
+    "done": [
+      "Swarm evaluation on 2026-04-14 identified 7 untracked worktree directories under repo root, all pointing at branches last updated ~4 days ago at commit cb8350c.",
+      "No workplan file matches the feat-managed-agents-autonomy or feat-workplan-file-scaffolding names — these branches have no corresponding plan/spec."
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "For each of the 7 branches (feat/feat-managed-agents-autonomy/t0.{1..6}, feat/feat-workplan-file-scaffolding/t1.1) run `git log main..<branch> --oneline` to determine if any commits exist that are not already on main. Record findings in this workplan's notes.",
+      "layer": "investigation",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "per-branch commit delta recorded; classify each as EMPTY (no unique commits) or HAS-WORK (commits not on main)"
+    },
+    {
+      "id": "step-2",
+      "description": "For EMPTY branches: run `hex worktree remove <path>` then `git branch -D <branch>`. For HAS-WORK branches: enqueue a `hex worktree merge` workplan to integrate, OR rename the branch to `archive/<name>` if the work is not wanted. NEVER use raw `git checkout` to pull files — rule G4 (ADR-2604131630) forbids it because it silently drops code.",
+      "layer": "cleanup",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "git worktree list shows only the main checkout; git branch -a shows no feat-managed-agents-autonomy/* or feat-workplan-file-scaffolding/* branches outside archive/"
+    }
+  ],
+  "notes": [
+    "Hard rule: never `rm -rf` a worktree directory — use `hex worktree remove` or `git worktree remove` which cleans the worktree registry as well.",
+    "If any branch has unmerged work, the default choice is PRESERVE (rename to archive/) not DELETE. The cost of a dangling archive branch is ~0; the cost of lost code is high."
+  ]
+}
