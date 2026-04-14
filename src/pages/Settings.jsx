@@ -1,9 +1,39 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp } from "lucide-react";
 import DiscoveryPanel from "@/components/settings/DiscoveryPanel";
+import { PROVIDER_REGISTRY } from "@/lib/domain/provider-registry.js";
+
+const REGISTRY_COLORS = {
+  stripe: "#635BFF", twilio: "#F22F46", github: "#181717", azure: "#0078D4",
+  "google-cloud": "#4285F4", openai: "#10A37F", "forward-networks": "#00A69C",
+  cloudflare: "#F6821F", sendgrid: "#1A82E2", paypal: "#0070BA",
+  okta: "#007DC1", slack: "#4A154B", discord: "#5865F2",
+};
+
+// Synthesize a base44-shaped integration from a curated registry entry so it
+// renders in the Settings list. Only kind:'url' entries have explicit version
+// URLs available without a runtime discovery call.
+function registryEntryToIntegration(p) {
+  if (p.specSource.kind !== "url") return null;
+  return {
+    id: `registry:${p.slug}`,
+    name: p.name,
+    slug: p.slug,
+    category: p.category,
+    color: REGISTRY_COLORS[p.slug] || "#78716c",
+    logo_url: "",
+    versions: p.specSource.specUrls.map((u) => ({ label: u.label, url: u.url })),
+    comparisons: [],
+    __source: "registry",
+  };
+}
+
+function isRegistryId(id) {
+  return typeof id === "string" && id.startsWith("registry:");
+}
 
 function emptyComparison() {
   return { label: "", v1_url: "", v2_url: "" };
@@ -19,6 +49,25 @@ export default function Settings() {
   const [saving, setSaving] = useState(null);
   const [expanded, setExpanded] = useState({});
   const [newIntegration, setNewIntegration] = useState(null);
+
+  // Merge base44 integrations with synthesized kind:'url' registry entries so
+  // curated providers (Forward Networks, OpenAI, ...) appear in Settings even
+  // before they've been saved. base44 records always win by slug.
+  const mergedIntegrations = useMemo(() => {
+    const bySlug = new Map();
+    for (const integ of integrations) {
+      const slug = (integ.slug || integ.name || "").toLowerCase();
+      if (slug) bySlug.set(slug, integ);
+    }
+    const merged = [...integrations];
+    for (const p of PROVIDER_REGISTRY) {
+      const slug = p.slug.toLowerCase();
+      if (bySlug.has(slug)) continue;
+      const synthesized = registryEntryToIntegration(p);
+      if (synthesized) merged.push(synthesized);
+    }
+    return merged;
+  }, [integrations]);
 
   useEffect(() => {
     base44.entities.Integration.list().then((items) => {
@@ -43,18 +92,32 @@ export default function Settings() {
 
   async function saveIntegration(integration) {
     setSaving(integration.id || "new");
-    if (integration.id) {
+    // Registry-synthesized entries don't exist in base44 yet — first Save clones
+    // them to a real base44 entity (strip the `registry:` id + the marker).
+    if (!integration.id || isRegistryId(integration.id)) {
+      const { id: _ignored, __source: _src, ...payload } = integration;
+      const created = await base44.entities.Integration.create(payload);
+      setIntegrations((prev) => {
+        // If the registry-sourced record was edited in-place, replace its synthetic
+        // row; otherwise append. mergedIntegrations will dedupe by slug anyway.
+        const withoutRegistry = prev.filter((i) => !(i.slug && i.slug === payload.slug && isRegistryId(i.id)));
+        return [...withoutRegistry, created];
+      });
+      if (!integration.id) setNewIntegration(null);
+    } else {
       const updated = await base44.entities.Integration.update(integration.id, integration);
       setIntegrations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
-    } else {
-      const created = await base44.entities.Integration.create(integration);
-      setIntegrations((prev) => [...prev, created]);
-      setNewIntegration(null);
     }
     setSaving(null);
   }
 
   async function deleteIntegration(id) {
+    // Registry-sourced entries aren't persisted — just drop from local state;
+    // they'll re-synthesize from PROVIDER_REGISTRY on next mount anyway.
+    if (isRegistryId(id)) {
+      setIntegrations((prev) => prev.filter((i) => i.id !== id));
+      return;
+    }
     await base44.entities.Integration.delete(id);
     setIntegrations((prev) => prev.filter((i) => i.id !== id));
   }
@@ -152,7 +215,7 @@ export default function Settings() {
         )}
 
         {/* Existing integrations */}
-        {integrations.map((integration) => (
+        {mergedIntegrations.map((integration) => (
           <IntegrationCard
             key={integration.id}
             integration={integration}
@@ -201,7 +264,7 @@ export default function Settings() {
           />
         )}
 
-        {!loading && integrations.length === 0 && !newIntegration && (
+        {!loading && mergedIntegrations.length === 0 && !newIntegration && (
           <div className="text-center py-16 text-stone-400 text-sm">
             No integrations yet. Click "Add Integration" to create one.
           </div>
