@@ -176,12 +176,14 @@ function computeDiff(a, b) {
   const fb = flatten(b);
   return diffFlatMaps(fa, fb);
 }
+var FUZZY_SIZE_LIMIT = 5000;
 function diffFlatMaps(fa, fb) {
   const results = [];
   const aKeys = Object.keys(fa);
   const bKeys = Object.keys(fb);
   const allKeys = new Set([...aKeys, ...bKeys]);
   const processed = new Set;
+  const fuzzyEnabled = bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
   const fbOnlyByValue = new Map;
   const fbOnlyByLeafValue = new Map;
   for (const fbKey of bKeys) {
@@ -248,13 +250,15 @@ function diffFlatMaps(fa, fb) {
           }
         }
       }
-      if (!renamedTo) {
+      if (!renamedTo && fuzzyEnabled) {
         let bestScore = -1;
         let bestKey = null;
-        for (const fbKey of Object.keys(fb)) {
+        for (const fbKey of bKeys) {
           if (fbKey in fa || processed.has(fbKey))
             continue;
           if (leafName(fbKey) === leaf)
+            continue;
+          if (!isRelated(key, fbKey))
             continue;
           const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
           if (score >= FUZZY_THRESHOLD && score > bestScore) {

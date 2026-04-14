@@ -59,12 +59,19 @@ export function computeDiff(a: unknown, b: unknown): DiffResult[] {
   return diffFlatMaps(fa, fb);
 }
 
+// Upper bound on fb size before fuzzy-rename fallback is skipped. Fuzzy matching
+// is O(removes × bKeys × pathLen²) due to Levenshtein — on Twilio-scale specs
+// (~30k paths) it freezes the UI. Exact rename/move detection still runs for
+// any size; this just disables the similarity fallback when pools are huge.
+const FUZZY_SIZE_LIMIT = 5000;
+
 export function diffFlatMaps(fa: FlatMap, fb: FlatMap): DiffResult[] {
   const results: DiffResult[] = [];
   const aKeys = Object.keys(fa);
   const bKeys = Object.keys(fb);
   const allKeys = new Set([...aKeys, ...bKeys]);
   const processed = new Set<string>();
+  const fuzzyEnabled = bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
 
   // Pre-build indexes for O(1) rename/move lookups instead of O(n²)
   // Index: serialized value → [keys in fb that are NOT in fa]
@@ -132,13 +139,18 @@ export function diffFlatMaps(fa: FlatMap, fb: FlatMap): DiffResult[] {
         }
       }
 
-      // Fuzzy rename fallback — fires only when exact-match index misses
-      if (!renamedTo) {
+      // Fuzzy rename fallback — fires only when exact-match index misses AND
+      // the spec is small enough that O(n×m) Levenshtein won't freeze the UI.
+      // isRelated() is used as a cheap pre-filter so we only run matchScore on
+      // candidates sharing an ancestor — matches the semantics that fuzzy
+      // renames only make sense within a common path context.
+      if (!renamedTo && fuzzyEnabled) {
         let bestScore = -1;
         let bestKey: string | null = null;
-        for (const fbKey of Object.keys(fb)) {
+        for (const fbKey of bKeys) {
           if (fbKey in fa || processed.has(fbKey)) continue;
           if (leafName(fbKey) === leaf) continue; // same leaf = move, not rename
+          if (!isRelated(key, fbKey)) continue;   // cheap O(path) gate before O(path²) matchScore
           const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
           if (score >= FUZZY_THRESHOLD && score > bestScore) {
             bestScore = score;
