@@ -61,13 +61,13 @@ export class WebAdapter implements WebServerPort {
     // Provider version listing
     const versionsMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/versions$/);
     if (req.method === "GET" && versionsMatch) {
-      return this.handleProviderVersions(versionsMatch[1]);
+      return this.handleProviderVersions(versionsMatch[1]!);
     }
 
     // Provider spec fetch
     const specMatch = url.pathname.match(/^\/api\/providers\/([^/]+)\/spec$/);
     if (req.method === "GET" && specMatch) {
-      return this.handleProviderSpec(specMatch[1], url.searchParams.get("version") || "");
+      return this.handleProviderSpec(specMatch[1]!, url.searchParams.get("version") || "");
     }
 
     // Serve Vite-built frontend assets
@@ -316,7 +316,9 @@ const PROVIDERS: Record<string, Provider> = {
       return [...(d.versions || [])]
         .sort((a, b) => {
           const pa = a.split(".").map(Number), pb = b.split(".").map(Number);
-          return pb[0] - pa[0] || pb[1] - pa[1] || (pb[2] || 0) - (pa[2] || 0);
+          return (pb[0] ?? 0) - (pa[0] ?? 0)
+              || (pb[1] ?? 0) - (pa[1] ?? 0)
+              || (pb[2] ?? 0) - (pa[2] ?? 0);
         });
     },
   },

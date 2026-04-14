@@ -7,8 +7,8 @@ describe("extractProduct", () => {
       "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.2022-11-28.json",
       "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.2026-03-10.json",
     ];
-    const p1 = extractProduct(urls[0], "api.github.com.2022-11-28", "github");
-    const p2 = extractProduct(urls[1], "api.github.com.2026-03-10", "github");
+    const p1 = extractProduct(urls[0]!, "api.github.com.2022-11-28", "github");
+    const p2 = extractProduct(urls[1]!, "api.github.com.2026-03-10", "github");
     expect(p1?.key).toBe("api.github.com");
     expect(p2?.key).toBe("api.github.com");
     expect(p1?.key).toBe(p2?.key);
@@ -56,6 +56,6 @@ describe("groupByProduct for GitHub date-versioned specs", () => {
     ];
     const groups = groupByProduct(versions, "github");
     expect(groups).toHaveLength(1);
-    expect(groups[0].versions).toHaveLength(3);
+    expect(groups[0]!.versions).toHaveLength(3);
   });
 });

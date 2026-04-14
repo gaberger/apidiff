@@ -68,7 +68,10 @@ function generateCodeExamples(diff: DiffResult): CodeExampleSet {
   const oldPath = diff.path.split(".").map((p) => `["${p}"]`).join("");
   const newPath = (diff.newPath ?? diff.path).split(".").map((p) => `["${p}"]`).join("");
 
-  const examples: CodeExampleSet = {};
+  // Build in a mutable record, then widen to the readonly CodeExampleSet on
+  // return. CodeExampleSet's readonly index signature asserts immutability
+  // for consumers, not for the builder that constructs it.
+  const examples: Record<string, { before: string; after: string }> = {};
 
   if (diff.type === "removed") {
     examples.node = {

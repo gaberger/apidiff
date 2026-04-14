@@ -3,7 +3,10 @@ import { DocusaurusDiscoveryAdapter } from "./docusaurus-discovery-adapter.js";
 import type { SpecSource } from "../../core/domain/discovery-types.js";
 
 function makeFetch(responses: Map<string, { ok: boolean; body?: unknown }>): typeof fetch {
-  return async (input: RequestInfo | URL) => {
+  // Cast: the adapter only calls fetch(url, init) — typeof fetch in recent
+  // @types/node adds a `preconnect` method on the function object that's
+  // irrelevant to a test stub. Easier to cast than to ship an inert stub.
+  const impl = async (input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     const r = responses.get(url);
     if (!r) return new Response(null, { status: 404 });
@@ -11,6 +14,7 @@ function makeFetch(responses: Map<string, { ok: boolean; body?: unknown }>): typ
     if (r.body !== undefined) return new Response(JSON.stringify(r.body), { status: 200 });
     return new Response(null, { status: 200 });
   };
+  return impl as unknown as typeof fetch;
 }
 
 describe("DocusaurusDiscoveryAdapter", () => {

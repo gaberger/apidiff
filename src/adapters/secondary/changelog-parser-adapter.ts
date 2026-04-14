@@ -31,7 +31,7 @@ export class ChangelogParserAdapter implements ChangelogParserPort {
       pattern.lastIndex = 0;
       let match: RegExpExecArray | null;
       while ((match = pattern.exec(text)) !== null) {
-        found.add(match[1]);
+        if (match[1]) found.add(match[1]);
         if (found.size >= MAX_VERSIONS) break;
       }
       if (found.size >= MAX_VERSIONS) break;

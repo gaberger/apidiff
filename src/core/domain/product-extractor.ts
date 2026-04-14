@@ -31,7 +31,8 @@ export function extractProduct(
   //   twilio_conversations_v1.json    → product=conversations
   if (slug === "twilio" || /twilio-oai/i.test(safeUrl)) {
     const m = safeUrl.match(/twilio_([a-z0-9]+)_v[0-9]+/i);
-    if (m) return { key: m[1].toLowerCase(), name: prettyTwilio(m[1]) };
+    const seg = m?.[1];
+    if (seg) return { key: seg.toLowerCase(), name: prettyTwilio(seg) };
   }
 
   // ── GitHub REST: descriptions/{api.github.com|ghes-3.x|ghec}/*
@@ -42,25 +43,29 @@ export function extractProduct(
     /descriptions(?:-next)?\/(api\.github\.com|ghec|ghes-\d+\.\d+)\//i.test(safeUrl);
   if (slug === "github" || looksLikeGitHubRest) {
     const m = safeUrl.match(/descriptions(?:-next)?\/([^/]+)\//i);
-    if (m) return { key: m[1].toLowerCase(), name: prettyGitHub(m[1]) };
+    const seg = m?.[1];
+    if (seg) return { key: seg.toLowerCase(), name: prettyGitHub(seg) };
   }
 
   // ── Azure: specification/<service>/resource-manager/... or data-plane/...
   if (slug === "azure") {
     const m = safeUrl.match(/specification\/([^/]+)\//i);
-    if (m) return { key: m[1].toLowerCase(), name: titleCase(m[1]) };
+    const seg = m?.[1];
+    if (seg) return { key: seg.toLowerCase(), name: titleCase(seg) };
   }
 
   // ── Google Cloud / APIs.guru shape: <provider>/<service>/<version>/swagger.json
   if (slug === "google-cloud" || /googleapis\.com/i.test(safeUrl)) {
     const m = safeUrl.match(/googleapis\.com\/([^/]+)\//i);
-    if (m) return { key: m[1].toLowerCase(), name: titleCase(m[1]) };
+    const seg = m?.[1];
+    if (seg) return { key: seg.toLowerCase(), name: titleCase(seg) };
   }
 
   // ── Cloudflare: api-schemas has per-product directories
   if (slug === "cloudflare") {
     const m = safeUrl.match(/api-schemas\/([^/]+)\//i);
-    if (m) return { key: m[1].toLowerCase(), name: titleCase(m[1]) };
+    const seg = m?.[1];
+    if (seg) return { key: seg.toLowerCase(), name: titleCase(seg) };
   }
 
   // ── Forward Networks: docs.fwd.app/<ver>/api/spec/<section>.json
@@ -68,8 +73,9 @@ export function extractProduct(
   // "complete" is the full combined spec — group it separately as "All sections".
   if (slug === "forward-networks" || /docs\.fwd\.app/i.test(safeUrl)) {
     const m = safeUrl.match(/\/api\/spec\/([a-z0-9-]+)\.(?:json|ya?ml)$/i);
-    if (m) {
-      const section = m[1].toLowerCase();
+    const seg = m?.[1];
+    if (seg) {
+      const section = seg.toLowerCase();
       if (section === "complete") return { key: "complete", name: "All sections (combined)" };
       return { key: section, name: titleCase(section) };
     }
@@ -79,14 +85,16 @@ export function extractProduct(
   // Only applied when the URL has a recognizable spec/openapi/api segment — otherwise
   // return undefined and let the UI render a flat list.
   const dirMatch = safeUrl.match(/\/([^/]+)\/[^/]+\.(?:json|ya?ml)$/i);
-  if (dirMatch && dirMatch[1].length > 0 && !isGenericDirName(dirMatch[1])) {
-    return { key: dirMatch[1].toLowerCase(), name: titleCase(dirMatch[1]) };
+  const dirSegment = dirMatch?.[1];
+  if (dirSegment && dirSegment.length > 0 && !isGenericDirName(dirSegment)) {
+    return { key: dirSegment.toLowerCase(), name: titleCase(dirSegment) };
   }
 
   // Try the label: "Messaging v1" → messaging
   const labelMatch = safeLabel.match(/^([A-Za-z][A-Za-z0-9_-]+)\s+v[0-9]/);
-  if (labelMatch) {
-    return { key: labelMatch[1].toLowerCase(), name: titleCase(labelMatch[1]) };
+  const labelSegment = labelMatch?.[1];
+  if (labelSegment) {
+    return { key: labelSegment.toLowerCase(), name: titleCase(labelSegment) };
   }
 
   return undefined;

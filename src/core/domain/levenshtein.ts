@@ -14,20 +14,23 @@ export function levenshtein(a: string, b: string): number {
   let prev = Array.from({ length: n + 1 }, (_, i) => i);
   let curr = new Array<number>(n + 1);
 
+  // Array accesses below are bounds-safe by construction (prev/curr are
+  // both length n+1, loops stay within [0..n]). The non-null assertions
+  // silence noUncheckedIndexedAccess without runtime cost.
   for (let i = 1; i <= m; i++) {
     curr[0] = i;
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
       curr[j] = Math.min(
-        prev[j] + 1,       // deletion
-        curr[j - 1] + 1,   // insertion
-        prev[j - 1] + cost // substitution
+        prev[j]! + 1,       // deletion
+        curr[j - 1]! + 1,   // insertion
+        prev[j - 1]! + cost // substitution
       );
     }
     [prev, curr] = [curr, prev];
   }
 
-  return prev[n];
+  return prev[n]!;
 }
 
 export function pathSimilarity(oldPath: string, newPath: string): number {

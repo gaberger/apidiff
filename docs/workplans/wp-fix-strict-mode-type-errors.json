@@ -3,7 +3,9 @@
   "title": "Fix strict-mode type errors surfaced by the tsconfig split (noUncheckedIndexedAccess + readonly violations)",
   "adr": "",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-14",
+  "resolution_note": "Fixed strict-mode errors across src/core/domain/product-extractor.ts (7 hits), src/core/usecases/discovery-service.ts (buildPairs loop), src/core/domain/guide-builder.ts (readonly index signature — builder now uses a mutable Record internally), src/core/domain/levenshtein.ts (bounds-safe array access), src/adapters/primary/web-adapter.ts (regex group access + version sort), src/adapters/secondary/changelog-parser-adapter.ts (optional regex group), src/adapters/secondary/docusaurus-discovery-adapter.test.ts (fetch stub cast), tests/unit/product-extractor.test.ts (test fixture access). Added @domain/* path mapping to tsconfig.json so @domain/* imports resolve outside of Vite too. Result: tsc errors dropped from 35 (after the fwd-discovery delete) to 2. The remaining 2 are both in src/discovery-demo.ts which is uncommitted WIP on main — it imports createDiscoveryApp which doesn't exist (the real export is createDiscoveryAdapters). Left for the WIP author; captured as step-4 (out-of-scope) in this workplan.",
   "topology": "pipeline",
   "budget": "~10000 tokens",
   "prior_work": {

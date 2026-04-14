@@ -91,10 +91,14 @@ function sortVersions(versions: DiscoveredVersion[]): DiscoveredVersion[] {
 function buildPairs(sorted: DiscoveredVersion[]): VersionPair[] {
   const pairs: VersionPair[] = [];
   for (let i = 0; i < sorted.length - 1; i++) {
+    // Loop bound guarantees both indices are in range; assert non-null to
+    // satisfy noUncheckedIndexedAccess.
+    const a = sorted[i]!;
+    const b = sorted[i + 1]!;
     pairs.push({
-      label: `${sorted[i].label} → ${sorted[i + 1].label}`,
-      v1: sorted[i],
-      v2: sorted[i + 1],
+      label: `${a.label} → ${b.label}`,
+      v1: a,
+      v2: b,
     });
   }
   return pairs;
