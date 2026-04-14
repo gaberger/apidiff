@@ -30,4 +30,12 @@ export default defineConfig({
       },
     },
   },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
 })

@@ -1,0 +1,74 @@
+{
+  "id": "wp-fix-main-thread-block-dereference-and-diff",
+  "title": "Fix: $RefParser.dereference + computeDiff block the main thread for 100s+ on large specs",
+  "adr": "ADR-014",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~45000 tokens",
+  "prior_work": {
+    "done": [
+      "commit 3af08da fixed two quadratic hot paths in computeDiff",
+      "Despite that fix, large GitHub specs (multi-MB, thousands of $refs) still block the main thread",
+      "Browser reports 'message handler took 111038ms' inside React scheduler during dereference+diff",
+      "Fetch pipeline (ADR-018) is unaffected — issue is purely post-fetch compute"
+    ]
+  },
+  "notes": [
+    "handleLoadSpecs in DiffViewer.jsx calls $RefParser.dereference then computeDiff, both sync-on-main-thread",
+    "FetchProgress banner dismisses when fetch completes but the UI stays frozen afterwards — users get no feedback during the 100s compute",
+    "Migration to Web Worker keeps the domain pure — diff-algorithm already has zero I/O so it can ship to a worker as-is"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Create src/workers/diff-worker.ts. Web Worker that receives { oldSpec, newSpec } and posts back { results, refsResolved }. Internally imports @apidevtools/json-schema-ref-parser and src/core/domain/diff-algorithm. Uses vite's `?worker` suffix for bundling.",
+      "layer": "adapters/primary",
+      "adapter": "web-worker",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "worker file compiles; vite dev+build succeed; manual postMessage roundtrip returns DiffResult[]"
+    },
+    {
+      "id": "step-2",
+      "description": "Add src/hooks/use-diff-worker.js that manages the worker lifecycle (spawn on first use, reuse, terminate on unmount). Returns { runDiff, status, progress } where progress is a coarse 'dereferencing'|'diffing'|'done' signal.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "hook exposes runDiff(oldSpec, newSpec) returning Promise<{ results, refsResolved }>"
+    },
+    {
+      "id": "step-3",
+      "description": "Rewire DiffViewer.handleLoadSpecs: replace inline $RefParser.dereference + computeDiff with runDiff(). Emit progress into the same fetchStages state the FetchProgress banner already reads — add a 'Dereferencing $refs' and 'Computing diff' stage so the banner keeps animating while the worker runs.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "large spec pair (e.g. GitHub 2022-11-28 -> 2026-03-10) dereferences + diffs without freezing the main thread; banner continues to animate through dereference and diff stages"
+    },
+    {
+      "id": "step-4",
+      "description": "Add a cancel affordance: if the user cancels the compare (Reset button or nav) mid-run, the hook terminates the worker and spawns a fresh one. Keeps stale results from landing after the user moved on.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "clicking Reset mid-run produces no results, no console errors"
+    },
+    {
+      "id": "step-5",
+      "description": "Run bun run typecheck, bun run lint, hex analyze . — worker file lives under src/adapters/primary-like path, imports only from src/core/domain/* (no ports crossing). Domain stays pure.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-3", "step-4"],
+      "tier": 3,
+      "done_condition": "typecheck/lint/analyze all pass; boundary rules respected"
+    }
+  ]
+}

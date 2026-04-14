@@ -1,0 +1,48 @@
+{
+  "id": "wp-consolidate-vite-configs",
+  "title": "Consolidate vite.config.js and vite.config.ts into a single source of truth",
+  "adr": "ADR-012",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~15000 tokens",
+  "prior_work": {
+    "done": [
+      "Both vite.config.js and vite.config.ts exist; vite picks .js first which makes .ts edits invisible",
+      ".ts had richer content (BASE44_API_KEY middleware) but was silently ignored",
+      "Worker config fix landed in .js file only (ADR-014 follow-up)"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Audit the delta between vite.config.js (active) and vite.config.ts (ignored). Confirm which side holds the BASE44_API_KEY middleware and whether it's needed for current dev workflows.",
+      "layer": "research",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "delta captured in a note; decision made on which middleware must survive the merge"
+    },
+    {
+      "id": "step-2",
+      "description": "Merge all unique config into a single vite.config.ts (TS preferred for type-checking plugin options). Include: base44 plugin, react plugin, alias resolution, dev server proxy, worker format/rollupOptions, and BASE44_API_KEY middleware if needed.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "single vite.config.ts contains the superset; bun run build succeeds; bun run dev serves correctly"
+    },
+    {
+      "id": "step-3",
+      "description": "Delete vite.config.js. Verify bun run build still emits the worker chunk and CSS bundle.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "vite.config.js removed; build still succeeds with worker chunk present"
+    }
+  ]
+}

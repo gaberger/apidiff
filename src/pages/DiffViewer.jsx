@@ -12,9 +12,9 @@ import IntegrationHeader from "@/components/diff/IntegrationHeader";
 import FetchProgress from "@/components/diff/FetchProgress";
 import MigrationGuide from "@/components/guide/MigrationGuide";
 import { useSyncedScroll } from "@/hooks/use-synced-scroll";
+import { useDiffWorker } from "@/hooks/use-diff-worker.js";
 import { computeDiff } from "@/lib/domain/diff-algorithm.js";
 import { buildGuide } from "@/lib/domain/guide-builder.js";
-import $RefParser from "@apidevtools/json-schema-ref-parser";
 import YAML from "yaml";
 
 // Parse an OpenAPI spec text as JSON, then YAML as a fallback. Throws with a
@@ -53,6 +53,7 @@ export default function DiffViewer() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [fetchStages, setFetchStages] = useState([]);
+  const { runDiff } = useDiffWorker();
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -98,40 +99,59 @@ export default function DiffViewer() {
       const oldRefs = collectRefs(oldSpec);
       const newRefs = collectRefs(newSpec);
 
-      if (oldRefs.length > 0 || newRefs.length > 0) {
-        setResolving(true);
-        try {
-          if (oldRefs.length > 0) oldSpec = await $RefParser.dereference(structuredClone(oldSpec));
-          if (newRefs.length > 0) newSpec = await $RefParser.dereference(structuredClone(newSpec));
+      // Offload dereference + diff to a Web Worker so the main thread
+      // stays responsive on large specs. The worker returns the resolved
+      // specs and the diff; we apply $ref annotation here (fast on main).
+      setResolving(true);
+      try {
+        const stages = [
+          { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
+          { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+        ];
+        setFetchStages(stages.map((s) => ({ ...s })));
 
-          // Annotate resolved JSON: inject __$ref markers at locations that were references
-          const annotate = (obj, refs) => {
-            for (const ref of refs) {
-              const parts = ref.path.split(".");
-              let node = obj;
-              for (let i = 0; i < parts.length - 1; i++) {
-                if (node && typeof node === "object") node = node[parts[i]];
-              }
-              const lastKey = parts[parts.length - 1];
-              if (node && typeof node === "object" && node[lastKey] && typeof node[lastKey] === "object") {
-                node[lastKey]["__$ref"] = ref.target;
-              }
+        const { results: workerResults, oldResolved, newResolved, refsResolved: rr } = await runDiff(oldSpec, newSpec, {
+          onProgress: (evt) => {
+            if (evt.stage === "dereferencing") stages[0].status = "in-progress";
+            if (evt.stage === "diffing") {
+              stages[0].status = "complete";
+              stages[1].status = "in-progress";
             }
-          };
-          annotate(oldSpec, oldRefs);
-          annotate(newSpec, newRefs);
+            setFetchStages(stages.map((s) => ({ ...s })));
+          },
+        });
 
-          setBefore(JSON.stringify(oldSpec, null, 2));
-          setAfter(JSON.stringify(newSpec, null, 2));
-          setRefsResolved({ old: oldRefs.length, new: newRefs.length });
-        } finally {
-          setResolving(false);
+        stages[1].status = "complete";
+        setFetchStages(stages.map((s) => ({ ...s })));
+
+        const annotate = (obj, refs) => {
+          for (const ref of refs) {
+            const parts = ref.path.split(".");
+            let node = obj;
+            for (let i = 0; i < parts.length - 1; i++) {
+              if (node && typeof node === "object") node = node[parts[i]];
+            }
+            const lastKey = parts[parts.length - 1];
+            if (node && typeof node === "object" && node[lastKey] && typeof node[lastKey] === "object") {
+              node[lastKey]["__$ref"] = ref.target;
+            }
+          }
+        };
+        if (oldRefs.length > 0) annotate(oldResolved, oldRefs);
+        if (newRefs.length > 0) annotate(newResolved, newRefs);
+
+        if (rr) {
+          setBefore(JSON.stringify(oldResolved, null, 2));
+          setAfter(JSON.stringify(newResolved, null, 2));
+          setRefsResolved(rr);
+        } else {
+          setRefsResolved(null);
         }
-      } else {
-        setRefsResolved(null);
-      }
 
-      setResults(computeDiff(oldSpec, newSpec));
+        setResults(workerResults);
+      } finally {
+        setResolving(false);
+      }
     } catch (e) {
       setResolving(false);
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -163,24 +183,43 @@ export default function DiffViewer() {
     setActiveFilter("all");
     setActiveTab("compare");
     try {
-      let oldSpec = typeof v1 === 'string' ? JSON.parse(v1) : structuredClone(v1);
-      let newSpec = typeof v2 === 'string' ? JSON.parse(v2) : structuredClone(v2);
-      const hasRefs = (obj) => JSON.stringify(obj).includes('"$ref"');
-      if (hasRefs(oldSpec) || hasRefs(newSpec)) {
-        setResolving(true);
-        try {
-          if (hasRefs(oldSpec)) oldSpec = await $RefParser.dereference(oldSpec);
-          if (hasRefs(newSpec)) newSpec = await $RefParser.dereference(newSpec);
-          setBefore(JSON.stringify(oldSpec, null, 2));
-          setAfter(JSON.stringify(newSpec, null, 2));
-        } finally {
-          setResolving(false);
-        }
+      const oldSpec = typeof v1 === 'string' ? JSON.parse(v1) : structuredClone(v1);
+      const newSpec = typeof v2 === 'string' ? JSON.parse(v2) : structuredClone(v2);
+
+      // Append compute stages to the existing fetchStages so the banner
+      // keeps animating through the post-fetch dereference + diff pipeline.
+      setFetchStages((prev) => [
+        ...prev,
+        { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
+        { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+      ]);
+
+      setResolving(true);
+      try {
+        const { results: workerResults, oldResolved, newResolved } = await runDiff(oldSpec, newSpec, {
+          onProgress: (evt) => {
+            setFetchStages((prev) => prev.map((s) => {
+              if (s.id === "deref" && evt.stage === "diffing") return { ...s, status: "complete" };
+              if (s.id === "diff" && evt.stage === "diffing") return { ...s, status: "in-progress" };
+              return s;
+            }));
+          },
+        });
+        setFetchStages((prev) => prev.map((s) =>
+          s.id === "diff" || s.id === "deref" ? { ...s, status: "complete" } : s,
+        ));
+        setBefore(JSON.stringify(oldResolved, null, 2));
+        setAfter(JSON.stringify(newResolved, null, 2));
+        setResults(workerResults);
+      } finally {
+        setResolving(false);
       }
-      setResults(computeDiff(oldSpec, newSpec));
     } catch (e) {
       setResolving(false);
       setError(e.message);
+      setFetchStages((prev) => prev.map((s) =>
+        s.status === "in-progress" ? { ...s, status: "error", error: e.message } : s,
+      ));
     }
   };
 
