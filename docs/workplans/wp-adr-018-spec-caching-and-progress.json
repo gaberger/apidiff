@@ -1,0 +1,88 @@
+{
+  "id": "wp-adr-018-spec-caching-and-progress",
+  "title": "ADR-018: Spec cache + progress bar surfacing",
+  "adr": "ADR-018",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~50000 tokens",
+  "prior_work": {
+    "done": [
+      "Two fetch sites: IntegrationHeader.jsx:66-67 (dual) and SpecInput.jsx:275 (single)",
+      "Both use base44.functions.invoke('proxyFetch', { url })",
+      "No caching layer; no progress surfacing beyond a small button spinner"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Build src/lib/spec-cache.js: localStorage-backed cache with TTL (24h), size guard (3.5MB per entry), LRU eviction on quota-exceeded. API: { get(url), put(url, content), purge() }. Keys prefixed apidiff:spec:<sha1(url)>. All errors swallowed internally (cache must never break the app).",
+      "layer": "adapters/primary",
+      "adapter": "browser-storage",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "get/put/purge exposed; quota-exceeded path triggers LRU eviction; oversized entries skip cache silently"
+    },
+    {
+      "id": "step-2",
+      "description": "Build src/lib/fetch-spec.js: wraps base44.functions.invoke('proxyFetch', ...) with cache check + progress callback. Signature: fetchSpec(url, { onProgress, signal }) -> Promise<string>. Emits cache-lookup → cache-hit|fetching → parsing → caching → done stages. Throws typed SpecFetchError on failure.",
+      "layer": "adapters/primary",
+      "adapter": "fetch-facade",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "fetchSpec handles hit and miss paths; progress callback fires for each stage"
+    },
+    {
+      "id": "step-3",
+      "description": "Build src/components/diff/FetchProgress.jsx: sticky banner with provider-gradient bar + stage label row. Props { stages: [{ id, label, status }], accentColor, onDismiss }. Status: pending | in-progress | complete | error. Auto-dismiss on all-complete after 600ms.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "component renders with sample stage array; transitions pending→in-progress→complete; auto-dismisses after completion"
+    },
+    {
+      "id": "step-4",
+      "description": "Rewire IntegrationHeader.handleCompare to use fetchSpec sequentially with a per-stage onProgress callback. Replace the Promise.all pattern with: fetchSpec(v1.url) → fetchSpec(v2.url) → onLoadSpecs(...). Progress state lifts up via a new prop `onProgress` that DiffViewer wires into <FetchProgress />.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2", "step-3"],
+      "tier": 2,
+      "done_condition": "picking two versions + click Load shows live FetchProgress; cached fetches flash cache-hit state and dismiss quickly"
+    },
+    {
+      "id": "step-5",
+      "description": "Rewire SpecInput URL-mode fetch (line ~275) to use fetchSpec with the same onProgress wiring. Single-fetch flow: one progress stage + parse stage.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2", "step-3"],
+      "tier": 2,
+      "done_condition": "pasting a URL in SpecInput shows FetchProgress; cached URLs return instantly with cache-hit flash"
+    },
+    {
+      "id": "step-6",
+      "description": "Add 'Clear spec cache' action to src/pages/settings/*: button calls specCache.purge() and shows toast confirming N entries cleared + bytes freed.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "settings page exposes clear-cache button; clicking reports cleared count"
+    },
+    {
+      "id": "step-7",
+      "description": "Run bun run typecheck, bun run lint, hex analyze . — primary adapter only; no domain/port changes expected.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-4", "step-5", "step-6"],
+      "tier": 3,
+      "done_condition": "typecheck/lint/analyze all green"
+    }
+  ]
+}

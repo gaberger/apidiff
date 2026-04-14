@@ -9,6 +9,7 @@ import DiffResults from "@/components/diff/DiffResults";
 import EmptyState from "@/components/diff/EmptyState";
 import IntegrationList from "@/components/sidebar/IntegrationList";
 import IntegrationHeader from "@/components/diff/IntegrationHeader";
+import FetchProgress from "@/components/diff/FetchProgress";
 import MigrationGuide from "@/components/guide/MigrationGuide";
 import { useSyncedScroll } from "@/hooks/use-synced-scroll";
 import { computeDiff } from "@/lib/domain/diff-algorithm.js";
@@ -51,6 +52,7 @@ export default function DiffViewer() {
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
+  const [fetchStages, setFetchStages] = useState([]);
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -386,6 +388,13 @@ export default function DiffViewer() {
         </div>
       </header>
 
+      {/* Fetch progress banner */}
+      <FetchProgress
+        stages={fetchStages}
+        accentColor={selectedIntegration?.color ?? "hsl(var(--primary))"}
+        onDismiss={() => setFetchStages([])}
+      />
+
       {/* Sidebar + Main */}
       <div className="flex flex-1 overflow-hidden">
         <IntegrationList
@@ -427,6 +436,7 @@ export default function DiffViewer() {
                     integration={selectedIntegration}
                     onLoadSpecs={handleLoadSpecs}
                     onClear={() => setSelectedIntegration(null)}
+                    onProgress={setFetchStages}
                   />
                 )}
 

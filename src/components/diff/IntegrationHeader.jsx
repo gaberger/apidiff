@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { Loader2, X, GitCompareArrows } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
+import { fetchSpec } from "@/lib/fetch-spec.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
 
-export default function IntegrationHeader({ integration, onLoadSpecs, onClear }) {
+export default function IntegrationHeader({ integration, onLoadSpecs, onClear, onProgress }) {
   const [v1Idx, setV1Idx] = useState(null);
   const [v2Idx, setV2Idx] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -61,14 +61,33 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear })
     const v1 = versions[v1Idx];
     const v2 = versions[v2Idx];
 
+    const stages = [
+      { id: "v1", label: `Fetching ${v1.label}`, status: "pending", cacheHit: false },
+      { id: "v2", label: `Fetching ${v2.label}`, status: "pending", cacheHit: false },
+    ];
+    const push = () => onProgress?.(stages.map((s) => ({ ...s })));
+
+    const makeCallback = (stageId) => (evt) => {
+      const stage = stages.find((s) => s.id === stageId);
+      if (!stage) return;
+      if (evt.stage === "cache-hit") { stage.status = "complete"; stage.cacheHit = true; }
+      else if (evt.stage === "fetching") { stage.status = "in-progress"; }
+      else if (evt.stage === "done") { stage.status = "complete"; }
+      else if (evt.stage === "error") { stage.status = "error"; stage.error = evt.message; }
+      push();
+    };
+
     setLoading(true);
+    push();
     try {
-      const [r1, r2] = await Promise.all([
-        base44.functions.invoke('proxyFetch', { url: v1.url }).then(r => r.data.document),
-        base44.functions.invoke('proxyFetch', { url: v2.url }).then(r => r.data.document),
-      ]);
-      const categoryLabel = hasProducts && activeGroup?.product?.name ? ` · ${activeGroup.product.name}` : "";
-      onLoadSpecs(r1, r2, `${integration.name}${categoryLabel}: ${v1.label} → ${v2.label}`);
+      const r1 = await fetchSpec(v1.url, { onProgress: makeCallback("v1") });
+      const r2 = await fetchSpec(v2.url, { onProgress: makeCallback("v2") });
+      const categoryLabel = hasProducts && activeGroup?.product?.name ? ` \u00b7 ${activeGroup.product.name}` : "";
+      onLoadSpecs(r1, r2, `${integration.name}${categoryLabel}: ${v1.label} \u2192 ${v2.label}`);
+    } catch (err) {
+      const lastActive = stages.find((s) => s.status === "in-progress");
+      if (lastActive) { lastActive.status = "error"; lastActive.error = err?.message ?? "fetch failed"; }
+      push();
     } finally {
       setLoading(false);
     }
