@@ -1,3 +1,6 @@
+import { Buffer } from "buffer";
+globalThis.Buffer = Buffer;
+
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { computeDiff } from "../lib/domain/diff-algorithm.js";
 
