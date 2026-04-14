@@ -1,19 +1,115 @@
 import React from "react";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 const typeConfig = {
-  removed:       { label: "Removed",     pill: "bg-red-100 text-red-700 border border-red-200",       border: "border-l-red-400" },
-  renamed:       { label: "Renamed",     pill: "bg-purple-100 text-purple-700 border border-purple-200", border: "border-l-purple-400" },
-  moved:         { label: "Moved",       pill: "bg-blue-100 text-blue-700 border border-blue-200",     border: "border-l-blue-400" },
-  "type-change": { label: "Type Change", pill: "bg-amber-100 text-amber-700 border border-amber-200",  border: "border-l-amber-400" },
-  added:         { label: "Added",       pill: "bg-green-100 text-green-700 border border-green-200",  border: "border-l-green-400" },
-  changed:       { label: "Changed",     pill: "bg-amber-100 text-amber-700 border border-amber-200",  border: "border-l-amber-400" },
-  unchanged:     { label: "Unchanged",   pill: "bg-stone-100 text-stone-500 border border-stone-200",  border: "border-l-stone-300" },
+  removed:       { label: "Removed",     pill: "bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-200 dark:border-red-800",             border: "border-l-red-400 dark:border-l-red-500" },
+  renamed:       { label: "Renamed",     pill: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/40 dark:text-purple-200 dark:border-purple-800", border: "border-l-purple-400 dark:border-l-purple-500" },
+  moved:         { label: "Moved",       pill: "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-800",         border: "border-l-blue-400 dark:border-l-blue-500" },
+  "type-change": { label: "Type Change", pill: "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800",  border: "border-l-amber-400 dark:border-l-amber-500" },
+  added:         { label: "Added",       pill: "bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-200 dark:border-green-800",  border: "border-l-green-400 dark:border-l-green-500" },
+  changed:       { label: "Changed",     pill: "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800",  border: "border-l-amber-400 dark:border-l-amber-500" },
+  unchanged:     { label: "Unchanged",   pill: "bg-stone-100 text-stone-500 border border-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:border-stone-700",    border: "border-l-stone-300 dark:border-l-stone-600" },
 };
 
 function formatValue(val) {
   if (val === undefined || val === null) return "null";
   if (typeof val === "object") return JSON.stringify(val);
   return String(val);
+}
+
+function formatValuePretty(val) {
+  if (val === undefined || val === null) return "null";
+  if (typeof val === "object") {
+    try { return JSON.stringify(val, null, 2); } catch { return String(val); }
+  }
+  return String(val);
+}
+
+const LONG_VALUE_THRESHOLD = 48;
+
+/**
+ * Renders an old/new diff value as a pill.
+ * - Short values: same compact pill as before (no regression in row density).
+ * - Long values: clickable pill with line-clamp preview; opens a popover with
+ *   pretty-printed value in a monospace block + copy-to-clipboard.
+ */
+function DiffValuePill({ value, variant }) {
+  const [open, setOpen] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+
+  const text = formatValue(value);
+  const pretty = formatValuePretty(value);
+  const isLong = text.length > LONG_VALUE_THRESHOLD;
+
+  // Color grammar preserved: red = removed, green = added. Dark-mode variants added.
+  const tone = variant === "removed"
+    ? "bg-red-50 text-red-600 border border-red-200 line-through dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/70"
+    : "bg-green-50 text-green-600 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/70";
+
+  if (!isLong) {
+    return (
+      <span
+        className={`px-1.5 py-0.5 rounded ${tone} w-fit max-w-[200px] truncate`}
+        title={text}
+      >
+        {text}
+      </span>
+    );
+  }
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(pretty);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard unavailable; swallow quietly.
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Expand ${variant} value`}
+          className={`text-left px-1.5 py-0.5 rounded ${tone} w-fit max-w-[280px] line-clamp-2 whitespace-pre-wrap break-words cursor-pointer hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus:ring-1 focus:ring-stone-400 dark:focus:ring-stone-500`}
+        >
+          {text}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        className="w-[min(520px,90vw)] p-0 bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700"
+      >
+        <div className="flex items-center justify-between px-3 py-2 border-b border-stone-200 dark:border-stone-700">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+            {variant === "removed" ? "Old value" : "New value"}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onCopy}
+            className="h-7 px-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+          >
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+        <pre
+          className={`m-0 max-h-80 overflow-auto px-3 py-2 text-xs font-mono whitespace-pre-wrap break-words ${
+            variant === "removed"
+              ? "text-red-700 dark:text-red-300"
+              : "text-green-700 dark:text-green-300"
+          }`}
+        >
+          {pretty}
+        </pre>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function pathSegments(fullPath) {
@@ -38,13 +134,13 @@ function PathBreadcrumb({ segs, highlightFrom = segs.length - 1, side, onPathCli
         const isDiff = i >= highlightFrom;
         return (
           <React.Fragment key={i}>
-            {i > 0 && <span className="text-stone-300 select-none">/</span>}
+            {i > 0 && <span className="text-stone-300 dark:text-stone-600 select-none">/</span>}
             <span
               onClick={() => onPathClick && onPathClick(partialPath, side)}
               className={`cursor-pointer px-0.5 rounded transition-colors ${
                 isDiff
-                  ? "font-semibold text-stone-800 bg-stone-100 hover:bg-stone-200"
-                  : "text-stone-400 hover:text-stone-600"
+                  ? "font-semibold text-stone-800 bg-stone-100 hover:bg-stone-200 dark:text-stone-100 dark:bg-stone-800 dark:hover:bg-stone-700"
+                  : "text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
               }`}
               title={partialPath}
             >
@@ -65,22 +161,22 @@ export default function DiffItem({ result, onPathClick }) {
   const confidence = result.confidence;
   const confidenceLabel = confidence != null ? `${Math.round(confidence * 100)}%` : null;
   const confidenceColor = confidence == null ? "" :
-    confidence >= 0.85 ? "text-green-600" :
-    confidence >= 0.6  ? "text-amber-500" : "text-red-500";
+    confidence >= 0.85 ? "text-green-600 dark:text-green-400" :
+    confidence >= 0.6  ? "text-amber-500 dark:text-amber-400" : "text-red-500 dark:text-red-400";
 
   const side = result.type === "added" ? "right"
     : result.type === "removed" ? "left"
     : "both";
 
   return (
-    <tr className={`border-b border-stone-100 hover:bg-stone-50/80 transition-colors border-l-2 ${config.border}`}>
+    <tr className={`border-b border-stone-100 dark:border-stone-800 hover:bg-stone-50/80 dark:hover:bg-stone-800/50 transition-colors border-l-2 ${config.border}`}>
 
       {/* Path column */}
       <td className="px-4 py-3">
         {isRenamed ? (
           <div className="flex flex-col gap-1.5">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 shrink-0 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider bg-red-50 text-red-500 border border-red-200">OLD</span>
+              <span className="mt-0.5 shrink-0 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider bg-red-50 text-red-500 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800">OLD</span>
               <PathBreadcrumb
                 segs={pathSegments(result.path)}
                 highlightFrom={split.common.length}
@@ -89,7 +185,7 @@ export default function DiffItem({ result, onPathClick }) {
               />
             </div>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 shrink-0 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider bg-green-50 text-green-600 border border-green-200">NEW</span>
+              <span className="mt-0.5 shrink-0 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wider bg-green-50 text-green-600 border border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800">NEW</span>
               <PathBreadcrumb
                 segs={pathSegments(result.newPath)}
                 highlightFrom={split.common.length}
@@ -126,24 +222,20 @@ export default function DiffItem({ result, onPathClick }) {
       <td className="px-3 py-3 font-mono text-xs">
         {result.type === "type-change" && result.oldType && result.newType ? (
           <div className="flex items-center gap-2">
-            <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 line-through">{result.oldType}</span>
-            <span className="text-stone-400">→</span>
-            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">{result.newType}</span>
+            <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 line-through dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/70">{result.oldType}</span>
+            <span className="text-stone-400 dark:text-stone-500">→</span>
+            <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/70">{result.newType}</span>
           </div>
         ) : (
           <div className="flex flex-col gap-1">
             {result.old !== undefined && (
-              <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 line-through w-fit max-w-[200px] truncate" title={formatValue(result.old)}>
-                {formatValue(result.old)}
-              </span>
+              <DiffValuePill value={result.old} variant="removed" />
             )}
             {result.new !== undefined && (
-              <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 w-fit max-w-[200px] truncate" title={formatValue(result.new)}>
-                {formatValue(result.new)}
-              </span>
+              <DiffValuePill value={result.new} variant="added" />
             )}
             {result.old === undefined && result.new === undefined && (
-              <span className="text-stone-300">—</span>
+              <span className="text-stone-300 dark:text-stone-600">—</span>
             )}
           </div>
         )}
