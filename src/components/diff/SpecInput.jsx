@@ -370,7 +370,7 @@ export default function SpecInput({
         )}
 
         {/* Line numbers + textarea wrapper */}
-        <div className="flex w-full h-[520px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 overflow-hidden focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all">
+        <div className="flex w-full h-[520px] rounded-xl border border-border bg-card shadow-e2 overflow-hidden focus-within:shadow-e3 focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all duration-base ease-standard">
           {/* Line number gutter */}
           <div
             ref={lineGutterRef}

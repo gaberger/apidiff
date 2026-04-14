@@ -274,35 +274,36 @@ export default function DiffViewer() {
   const shortcutHint = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform) ? "⌘↵" : "Ctrl+↵";
 
   return (
-    <div className="min-h-screen bg-stone-50 dark:bg-stone-900 text-stone-800 dark:text-stone-100 flex flex-col transition-colors">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-secondary/40 text-foreground flex flex-col transition-colors duration-base ease-standard">
       {/* Header */}
-      <header className="border-b border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-900/80 backdrop-blur-sm sticky top-0 z-20">
+      <header className="border-b border-border bg-background/70 dark:bg-background/60 backdrop-blur-xl sticky top-0 z-20 shadow-e1 transition-shadow duration-base ease-standard">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-500/50 to-transparent" />
         <div className="px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2 min-w-0">
               <h1 className="text-sm font-bold tracking-tight whitespace-nowrap">
-                <span className="text-stone-800 dark:text-stone-100">api</span>
-                <span className="text-amber-600">diff</span>
+                <span className="text-foreground">api</span>
+                <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
               </h1>
               <nav className="ml-2 sm:ml-6 flex items-center gap-1">
                 <button
                   onClick={() => setActiveTab("compare")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-all duration-fast ease-standard ${
                     activeTab === "compare"
-                      ? "text-stone-800 dark:text-stone-100 bg-stone-100 dark:bg-stone-700"
-                      : "text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+                      ? "text-foreground bg-secondary shadow-e1"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
                 >
                   Compare
                 </button>
                 <button
                   onClick={() => guide && setActiveTab("guide")}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-all duration-fast ease-standard ${
                     activeTab === "guide"
-                      ? "text-stone-800 bg-stone-100"
+                      ? "text-foreground bg-secondary shadow-e1"
                       : guide
-                        ? "text-stone-400 hover:text-stone-600"
-                        : "text-stone-300 cursor-not-allowed"
+                        ? "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                        : "text-muted-foreground/50 cursor-not-allowed"
                   }`}
                 >
                   Guide
@@ -315,7 +316,7 @@ export default function DiffViewer() {
               <Link
                 to="/settings"
                 aria-label="Settings"
-                className="p-1.5 rounded-md text-xs bg-stone-100 dark:bg-stone-800 text-stone-400 hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-200 transition-colors inline-flex items-center"
+                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard inline-flex items-center"
                 title="Discover specs, manage integrations"
               >
                 <SettingsIcon className="w-3.5 h-3.5" />
@@ -325,7 +326,7 @@ export default function DiffViewer() {
               <button
                 onClick={toggleTheme}
                 aria-label="Toggle theme"
-                className="p-1.5 rounded-md text-xs bg-stone-100 dark:bg-stone-800 text-stone-400 hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-200 transition-colors"
+                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard"
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               >
                 {theme === "dark"
@@ -336,10 +337,10 @@ export default function DiffViewer() {
               {/* Scroll lock toggle */}
               <button
                 onClick={toggleScrollLock}
-                className={`p-1.5 rounded-md text-xs transition-colors ${
+                className={`p-1.5 rounded-md text-xs transition-all duration-fast ease-standard hover:shadow-e2 hover:-translate-y-px ${
                   scrollLocked
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-stone-100 text-stone-400"
+                    ? "bg-amber-100 text-amber-700 shadow-e1 dark:bg-amber-500/20 dark:text-amber-300"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
                 title={scrollLocked ? "Scroll sync: ON" : "Scroll sync: OFF"}
               >
@@ -363,7 +364,7 @@ export default function DiffViewer() {
                 onClick={handleCompare}
                 disabled={!canCompare || resolving}
                 title={canCompare ? `Compare specs (${shortcutHint})` : "Paste JSON into both panels to compare"}
-                className="h-8 px-2 sm:px-4 text-xs font-semibold"
+                className="h-8 px-2 sm:px-4 text-xs font-semibold bg-gradient-to-b from-primary to-primary/90 hover:shadow-e3 hover:-translate-y-px transition-all duration-fast ease-standard disabled:translate-y-0 disabled:shadow-none"
               >
                 {resolving ? (
                   <>
