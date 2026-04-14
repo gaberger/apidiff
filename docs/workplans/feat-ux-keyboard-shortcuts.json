@@ -3,7 +3,9 @@
   "title": "Feature: Keyboard shortcuts + discoverable help overlay for DiffViewer",
   "adr": "ADR-012",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-14",
+  "completed_commit": "285a005",
   "topology": "pipeline",
   "budget": "~25000 tokens",
   "prior_work": {
@@ -22,6 +24,7 @@
       "port": "",
       "dependencies": [],
       "tier": 0,
+      "files": ["src/hooks/use-keyboard-shortcuts.js"],
       "done_condition": "hook file exists; manual test: mod+enter fires from anywhere incl. textarea; plain letters do NOT fire inside inputs"
     },
     {
@@ -32,6 +35,7 @@
       "port": "",
       "dependencies": ["step-1"],
       "tier": 1,
+      "files": ["src/pages/DiffViewer.jsx"],
       "done_condition": "all five shortcuts work from keyboard without clicking; no regression to existing button handlers"
     },
     {
@@ -42,6 +46,7 @@
       "port": "",
       "dependencies": ["step-2"],
       "tier": 2,
+      "files": ["src/components/diff/ShortcutsHelp.jsx"],
       "done_condition": "pressing '?' opens dialog; dialog renders correct modifier labels per platform; escape closes it"
     },
     {
@@ -52,6 +57,7 @@
       "port": "",
       "dependencies": ["step-3"],
       "tier": 3,
+      "files": ["src/pages/DiffViewer.jsx"],
       "done_condition": "button visible in header, clicking opens same dialog as '?' key"
     }
   ]
