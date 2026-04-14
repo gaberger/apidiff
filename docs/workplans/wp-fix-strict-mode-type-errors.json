@@ -1,0 +1,61 @@
+{
+  "id": "wp-fix-strict-mode-type-errors",
+  "title": "Fix strict-mode type errors surfaced by the tsconfig split (noUncheckedIndexedAccess + readonly violations)",
+  "adr": "",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~10000 tokens",
+  "prior_work": {
+    "done": [
+      "wp-fix-tsconfig-tests-rootdir split the tsconfigs and surfaced errors that had been hidden behind TS6059 rootDir failures.",
+      "Three distinct buckets: (1) noUncheckedIndexedAccess in product-extractor + discovery-service, (2) readonly index signature writes in guide-builder, (3) uncommitted WIP in discovery-demo.ts referencing a non-existent createDiscoveryApp export."
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "src/core/domain/product-extractor.ts — fix TS2345/TS2532 at lines 83, 89. Add non-null assertions or narrowing checks where index access is proven safe by the surrounding logic; otherwise push the optionality into the return type.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/core/domain/product-extractor.ts"],
+      "done_condition": "tsc --noEmit -p tsconfig.json reports zero errors in this file"
+    },
+    {
+      "id": "step-2",
+      "description": "src/core/usecases/discovery-service.ts — fix TS2532/TS2322 at lines 95-97. Current code reads discoveredVersions[i] without checking bounds. Either guard with length check or use .at(i) with a narrowing assertion.",
+      "layer": "usecases",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/core/usecases/discovery-service.ts"],
+      "done_condition": "tsc --noEmit -p tsconfig.json reports zero errors in this file"
+    },
+    {
+      "id": "step-3",
+      "description": "src/core/domain/guide-builder.ts — TS2542 at lines 74-92: writing to a readonly index signature on CodeExampleSet. Either relax the type (drop `readonly`) if mutation is intentional, or build a new object with spread rather than mutating in place.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/core/domain/guide-builder.ts"],
+      "done_condition": "tsc --noEmit -p tsconfig.app.json reports zero errors in this file"
+    },
+    {
+      "id": "step-4",
+      "description": "src/discovery-demo.ts is in uncommitted WIP on main (appears in `git status -s` as M). It imports `createDiscoveryApp` which does not exist in composition-root — the real export is `createDiscoveryAdapters`. This is a DO-NOT-TOUCH file per the uncommitted-WIP review (commit f4813a0's sibling analysis); defer fix to whoever authored the change or ask in #apidiff before proceeding.",
+      "layer": "coordination",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/discovery-demo.ts"],
+      "done_condition": "either (a) author fixes the import + lands the WIP, OR (b) this step is reclassified as out-of-scope and closed"
+    }
+  ]
+}

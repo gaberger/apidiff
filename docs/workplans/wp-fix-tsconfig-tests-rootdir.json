@@ -3,7 +3,9 @@
   "title": "Fix: tsconfig rootDir excludes tests/ (5 spurious TS6059 errors)",
   "adr": "",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-14",
+  "resolution_note": "Split into tsconfig.json (src-only production build) + new tsconfig.test.json (extends main, rootDir='.', includes src+tests). package.json typecheck now runs all three configs. Closes the 5 TS6059 errors. Surfaced ~10 pre-existing strict-mode errors in src/core/domain/product-extractor.ts, src/core/usecases/discovery-service.ts, src/core/domain/guide-builder.ts, and uncommitted WIP in src/discovery-demo.ts — tracked as wp-fix-strict-mode-type-errors.",
   "topology": "pipeline",
   "budget": "~5000 tokens",
   "prior_work": {

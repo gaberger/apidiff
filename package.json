@@ -14,7 +14,7 @@
     "start:cli": "bun run src/cli.ts",
     "start:web": "bun run src/web.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json",
     "lint": "eslint . --quiet",
     "preview": "vite preview"
   },
