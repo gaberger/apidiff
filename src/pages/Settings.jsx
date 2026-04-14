@@ -21,8 +21,18 @@ export default function Settings() {
   const [newIntegration, setNewIntegration] = useState(null);
 
   useEffect(() => {
-    base44.entities.Integration.list().then((data) => {
-      setIntegrations(data);
+    base44.entities.Integration.list().then((items) => {
+      // base44 returns either [{id, data:{...fields}}] or [{id, ...fields}] depending on
+      // the entity version — flatten so the card fields read predictably.
+      setIntegrations(
+        (items || []).map((item) => {
+          const d = item.data || item;
+          return { id: item.id ?? d.id, ...d };
+        }),
+      );
+      setLoading(false);
+    }).catch((e) => {
+      console.error("Failed to load integrations:", e);
       setLoading(false);
     });
   }, []);
