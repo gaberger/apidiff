@@ -165,17 +165,16 @@ export default function IntegrationList({ selected, onSelect, collapsed, onToggl
       </div>
 
       {/* Footer */}
-      {!collapsed && (
-        <div className="border-t border-stone-200">
-          <Link
-            to="/settings"
-            className="flex items-center gap-2 px-3 py-2.5 text-xs text-stone-400 hover:bg-stone-100 hover:text-stone-600 transition-colors"
-          >
-            <Settings className="h-3.5 w-3.5" />
-            Manage
-          </Link>
-        </div>
-      )}
+      <div className="border-t border-stone-200 dark:border-stone-700">
+        <Link
+          to="/settings"
+          className="flex items-center gap-2 px-3 py-2.5 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+          title={collapsed ? "Settings" : undefined}
+        >
+          <Settings className="h-3.5 w-3.5 flex-shrink-0" />
+          {!collapsed && <span>Settings</span>}
+        </Link>
+      </div>
     </motion.aside>
   );
 }

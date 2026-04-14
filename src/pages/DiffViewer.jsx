@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
 import { motion, AnimatePresence } from "framer-motion";
 import SpecInput from "@/components/diff/SpecInput";
@@ -285,6 +286,16 @@ export default function DiffViewer() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Settings link */}
+              <Link
+                to="/settings"
+                aria-label="Settings"
+                className="p-1.5 rounded-md text-xs bg-stone-100 dark:bg-stone-800 text-stone-400 hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-200 transition-colors inline-flex items-center"
+                title="Discover specs, manage integrations"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+              </Link>
+
               {/* Theme toggle */}
               <button
                 onClick={toggleTheme}
