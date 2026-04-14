@@ -1,7 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Search, Loader2, Plus, ExternalLink, GitBranch, BookOpen, Bot } from "lucide-react";
+import { Search, Loader2, Plus, ExternalLink, GitBranch, BookOpen, Bot, ChevronDown, ChevronRight } from "lucide-react";
+import { groupByProduct } from "@/lib/domain/product-extractor.js";
+
+function inferSlugFromUrl(url) {
+  if (!url) return "";
+  const m = String(url).match(/github\.com\/([^/]+)\/([^/]+)/i);
+  if (m) return m[2].toLowerCase().replace(/-oai$/, "").replace(/-openapi.*$/, "");
+  return "";
+}
 
 export default function DiscoveryPanel({ onAddComparisons }) {
   const [baseUrl, setBaseUrl] = useState("");
@@ -11,6 +19,24 @@ export default function DiscoveryPanel({ onAddComparisons }) {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [source, setSource] = useState(null);
+  const [collapsedProducts, setCollapsedProducts] = useState(() => new Set());
+
+  const versionGroups = useMemo(() => {
+    const versions = results?.versions || [];
+    if (versions.length === 0) return [];
+    const slug = inferSlugFromUrl(versions[0]?.url);
+    return groupByProduct(versions, slug);
+  }, [results]);
+
+  const hasProducts = versionGroups.length > 1;
+
+  const toggleProduct = (key) => {
+    setCollapsedProducts((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
 
 
@@ -120,17 +146,60 @@ export default function DiscoveryPanel({ onAddComparisons }) {
             <div>
               <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-2">
                 <GitBranch className="w-3 h-3" /> Discovered Specs ({results.versions.length})
+                {hasProducts && (
+                  <span className="ml-1 text-[10px] font-normal normal-case text-stone-400">
+                    across {versionGroups.length} products
+                  </span>
+                )}
               </div>
-              <div className="space-y-1">
-                {results.versions.map((v, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs bg-white border border-stone-200 rounded px-2.5 py-1.5">
-                    <span className="font-mono font-semibold text-stone-700 truncate flex-1">{v.label}</span>
-                    <a href={v.url} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-amber-600">
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                ))}
-              </div>
+              {hasProducts ? (
+                <div className="space-y-2">
+                  {versionGroups.map((group) => {
+                    const key = group.product?.key ?? "__all__";
+                    const name = group.product?.name ?? "Other";
+                    const isCollapsed = collapsedProducts.has(key);
+                    return (
+                      <div key={key} className="border border-stone-200 rounded bg-stone-50/60">
+                        <button
+                          onClick={() => toggleProduct(key)}
+                          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-semibold text-stone-700 hover:bg-stone-100"
+                        >
+                          {isCollapsed
+                            ? <ChevronRight className="w-3 h-3" />
+                            : <ChevronDown className="w-3 h-3" />}
+                          <span>{name}</span>
+                          <span className="ml-auto font-mono text-[10px] text-stone-400">
+                            {group.versions.length} version{group.versions.length !== 1 ? "s" : ""}
+                          </span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className="space-y-1 px-2 pb-2">
+                            {group.versions.map((v, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs bg-white border border-stone-200 rounded px-2.5 py-1.5">
+                                <span className="font-mono font-semibold text-stone-700 truncate flex-1">{v.label}</span>
+                                <a href={v.url} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-amber-600">
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {results.versions.map((v, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs bg-white border border-stone-200 rounded px-2.5 py-1.5">
+                      <span className="font-mono font-semibold text-stone-700 truncate flex-1">{v.label}</span>
+                      <a href={v.url} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-amber-600">
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
