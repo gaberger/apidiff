@@ -135,32 +135,50 @@ export default function SpecInput({
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
 
-  // JSON syntax highlighting + diff line coloring (ADR-004 safe: React elements, no innerHTML)
-  const highlightedLines = useMemo(() => {
+  // Stage 1 — colorize every line ONCE per value change. This is the expensive
+  // part (colorizeJsonLine returns arrays of React elements). For huge specs
+  // (>10k lines) skip JSON syntax coloring entirely and render plain text —
+  // avoids minutes of render work when loading a 30k-line dereferenced Twilio
+  // spec. Users trade syntax color for a usable load; diff row highlighting
+  // still works.
+  const HIGHLIGHT_LINE_LIMIT = 10000;
+  const colorizedRows = useMemo(() => {
     if (!value) return null;
     const lines = value.split("\n");
-    const diffBgColors = {
-      removed: "bg-red-50",
-      added: "bg-green-50",
-      renamed: "bg-purple-50",
-      moved: "bg-blue-50",
-      "type-change": "bg-amber-50",
-      changed: "bg-amber-50",
-    };
+    if (lines.length > HIGHLIGHT_LINE_LIMIT) {
+      return lines.map((line, i) => ({ i, children: line }));
+    }
+    return lines.map((line, i) => ({ i, children: colorizeJsonLine(line) }));
+  }, [value]);
 
-    return lines.map((line, i) => {
+  // Stage 2 — wrap rows with diff-bg + active-highlight styling. This memo
+  // runs on highlightMap + activeHighlight changes (clicks), but ONLY rebuilds
+  // the thin wrapper <div>s; the colorized children are referentially stable
+  // so React skips their reconciliation.
+  const highlightedLines = useMemo(() => {
+    if (!colorizedRows) return null;
+    const diffBgColors = {
+      removed: "bg-red-50 dark:bg-red-900/30",
+      added: "bg-green-50 dark:bg-green-900/30",
+      renamed: "bg-purple-50 dark:bg-purple-900/30",
+      moved: "bg-blue-50 dark:bg-blue-900/30",
+      "type-change": "bg-amber-50 dark:bg-amber-900/30",
+      changed: "bg-amber-50 dark:bg-amber-900/30",
+    };
+    return colorizedRows.map(({ i, children }) => {
       const diffInfo = diffHighlightMap?.get(i);
       const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
-      const highlightStyle = activeHighlight === i
+      const isActive = activeHighlight === i;
+      const style = isActive
         ? { backgroundColor: "rgba(251,191,36,0.5)", borderTop: "1px solid rgba(245,158,11,0.7)", borderBottom: "1px solid rgba(245,158,11,0.7)", display: "block", minWidth: "100%" }
         : { display: "block", minWidth: "100%" };
       return (
-        <div key={i} className={bgClass} style={highlightStyle}>
-          {colorizeJsonLine(line)}
+        <div key={i} className={bgClass} style={style}>
+          {children}
         </div>
       );
     });
-  }, [value, diffHighlightMap, activeHighlight]);
+  }, [colorizedRows, diffHighlightMap, activeHighlight]);
 
   // Drag counter to handle nested drag events
   const dragCounter = useRef(0);

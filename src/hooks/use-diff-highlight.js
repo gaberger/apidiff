@@ -1,8 +1,13 @@
 import { useMemo } from "react";
 
+// Above this line count, the "walk-down" scan (was O(lines × changedPaths))
+// dominates load time. Exact + walk-up matching still runs — that covers the
+// lines where changed values actually live; only the container-highlighting
+// polish is dropped for huge specs.
+const WALK_DOWN_LIMIT_LINES = 5000;
+
 /**
  * Maps diff results to line numbers in a JSON string.
- * Ported from the vanilla buildLinePathMap() in index.html.
  *
  * @param {string} jsonString - pretty-printed JSON text
  * @param {Array<{ path: string, newPath?: string, type: string }>} results - diff results
@@ -13,31 +18,43 @@ export function useDiffHighlight(jsonString, results) {
     const highlights = new Map();
     if (!jsonString) return highlights;
 
-    // Step 1: build line -> JSON path map (mirrors vanilla buildLinePathMap)
     const linePathMap = buildLinePathMap(jsonString);
+    const lineCount = Array.isArray(linePathMap) ? linePathMap.length : Object.keys(linePathMap).length;
 
-    // Step 2: index results by path for fast lookup
-    const pathTypes = {};
+    // Index results by exact path for O(1) lookup.
+    const pathTypes = Object.create(null);
     if (results && results.length) {
       for (const r of results) {
         if (r.type !== "unchanged") {
           pathTypes[r.path] = { type: r.type, path: r.path };
-          if (r.newPath) {
-            pathTypes[r.newPath] = { type: r.type, path: r.newPath };
-          }
+          if (r.newPath) pathTypes[r.newPath] = { type: r.type, path: r.newPath };
         }
       }
     }
 
-    // Step 3: cross-reference each line's path with results
-    for (const [lineNum, jsonPath] of Object.entries(linePathMap)) {
-      if (!jsonPath) continue;
-
-      // Check exact match first, then walk up parent paths
-      const match = findMatch(jsonPath, pathTypes);
-      if (match) {
-        highlights.set(Number(lineNum), match);
+    // Build a *prefix* index over changed paths: every ancestor prefix of a
+    // changed path gets mapped to the nearest descendant's change info. This
+    // replaces the O(changedPaths) walk-down loop inside findMatch with an
+    // O(1) Map lookup. For a changed "a.b.c.d", we record prefixes "a.b.c",
+    // "a.b", "a" — each pointing at the original change (first writer wins
+    // so the shallowest ancestor reports the nearest descendant).
+    const walkDownEnabled = lineCount <= WALK_DOWN_LIMIT_LINES;
+    const prefixIndex = walkDownEnabled ? new Map() : null;
+    if (walkDownEnabled) {
+      for (const path of Object.keys(pathTypes)) {
+        const parts = path.split(".");
+        for (let i = parts.length - 1; i > 0; i--) {
+          const prefix = parts.slice(0, i).join(".");
+          if (!prefixIndex.has(prefix)) prefixIndex.set(prefix, pathTypes[path]);
+        }
       }
+    }
+
+    // Cross-reference each line's path with results.
+    for (const [lineNumStr, jsonPath] of Object.entries(linePathMap)) {
+      if (!jsonPath) continue;
+      const match = findMatch(jsonPath, pathTypes, prefixIndex);
+      if (match) highlights.set(Number(lineNumStr), match);
     }
 
     return highlights;
@@ -45,29 +62,20 @@ export function useDiffHighlight(jsonString, results) {
 }
 
 /**
- * Find a matching path in pathTypes by checking:
  * 1. Exact match
- * 2. This line is a child of a changed path (walk up)
- * 3. A changed path is a child of this line (walk down — for object openers)
+ * 2. Walk up to parent paths that changed
+ * 3. (Bounded) O(1) prefix index lookup for nested-change containers
  */
-function findMatch(jsonPath, pathTypes) {
+function findMatch(jsonPath, pathTypes, prefixIndex) {
   if (pathTypes[jsonPath]) return pathTypes[jsonPath];
 
-  // Check if this line is a child of a changed path (walk up)
   let p = jsonPath;
   while (p.includes(".")) {
     p = p.slice(0, p.lastIndexOf("."));
     if (pathTypes[p]) return pathTypes[p];
   }
 
-  // Check if a changed path is nested under this line (walk down)
-  // e.g., line path is "properties.message_sid", result path is "properties.message_sid.type"
-  for (const changedPath of Object.keys(pathTypes)) {
-    if (changedPath.startsWith(jsonPath + ".")) {
-      return pathTypes[changedPath];
-    }
-  }
-
+  if (prefixIndex) return prefixIndex.get(jsonPath) ?? null;
   return null;
 }
 
