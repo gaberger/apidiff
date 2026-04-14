@@ -395,7 +395,7 @@ export default function DiffViewer() {
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
 
-        <main className="flex-1 overflow-y-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+        <main className="flex-1 overflow-hidden flex flex-col">
           <AnimatePresence mode="wait">
             {/* ═══ COMPARE TAB ═══ */}
             {activeTab === "compare" && (
@@ -404,7 +404,10 @@ export default function DiffViewer() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                className="flex flex-col flex-1 min-h-0"
               >
+                {/* Fixed zone: notices + spec inputs (do not scroll with analysis) */}
+                <div className="shrink-0 px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
                 {/* $ref resolution notice */}
                 {refsResolved && (
                   <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-700">
@@ -428,7 +431,7 @@ export default function DiffViewer() {
                 )}
 
                 {/* Input panels */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                   <SpecInput
                     label="Original Spec"
                     value={before}
@@ -450,7 +453,11 @@ export default function DiffViewer() {
                     highlightLine={rightHighlight}
                   />
                 </div>
+                </div>
+                {/* End fixed zone */}
 
+                {/* Scroll zone: analysis + guide form + empty state */}
+                <div className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-4 sm:pb-6">
                 {/* Error */}
                 {error && (
                   <motion.div
@@ -536,6 +543,8 @@ export default function DiffViewer() {
                 {!results && !error && (
                   <EmptyState />
                 )}
+                </div>
+                {/* End scroll zone */}
               </motion.div>
             )}
 
@@ -546,6 +555,7 @@ export default function DiffViewer() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-6 lg:px-8 py-4 sm:py-6"
               >
                 <MigrationGuide
                   guide={guide}
