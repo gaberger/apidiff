@@ -50,6 +50,45 @@ function categoryFor(integration) {
   return SLUG_TO_CATEGORY.get(key) || "other";
 }
 
+// Brand colors for curated providers. Falls back to stone grey when unknown —
+// matches the existing integration.color fallback.
+const REGISTRY_COLORS = {
+  stripe: "#635BFF",
+  twilio: "#F22F46",
+  github: "#181717",
+  azure: "#0078D4",
+  "google-cloud": "#4285F4",
+  openai: "#10A37F",
+  "forward-networks": "#00A69C",
+  cloudflare: "#F6821F",
+  sendgrid: "#1A82E2",
+  paypal: "#0070BA",
+  okta: "#007DC1",
+  slack: "#4A154B",
+  discord: "#5865F2",
+};
+
+/**
+ * Convert a PROVIDER_REGISTRY entry into the shape IntegrationList renders.
+ * Only kind:'url' sources can surface directly — they ship explicit spec URLs
+ * that map 1:1 to versions. Other kinds (github, apis-guru, docusaurus) need
+ * a runtime discovery call, not done here.
+ */
+function registryEntryToIntegration(p) {
+  if (p.specSource.kind !== "url") return null;
+  return {
+    id: `registry:${p.slug}`,
+    name: p.name,
+    slug: p.slug,
+    category: p.category,
+    color: REGISTRY_COLORS[p.slug] || "#78716c",
+    logo_url: "",
+    versions: p.specSource.specUrls.map((u) => ({ label: u.label, url: u.url })),
+    comparisons: [],
+    __source: "registry",
+  };
+}
+
 export default function IntegrationList({ selected, onSelect, collapsed, onToggleCollapse }) {
   const [integrations, setIntegrations] = useState([]);
   const [collapsedCats, setCollapsedCats] = useState(() => new Set());
@@ -63,10 +102,28 @@ export default function IntegrationList({ selected, onSelect, collapsed, onToggl
     }).catch(() => {});
   }, []);
 
+  // Merge base44 integrations with kind:'url' registry entries. If the same slug
+  // exists in both, the base44 record wins (user-editable state beats defaults).
+  const mergedIntegrations = useMemo(() => {
+    const bySlug = new Map();
+    for (const integ of integrations) {
+      const slug = (integ.slug || integ.name || "").toLowerCase();
+      if (slug) bySlug.set(slug, integ);
+    }
+    const merged = [...integrations];
+    for (const p of PROVIDER_REGISTRY) {
+      const slug = p.slug.toLowerCase();
+      if (bySlug.has(slug)) continue;
+      const synthesized = registryEntryToIntegration(p);
+      if (synthesized) merged.push(synthesized);
+    }
+    return merged;
+  }, [integrations]);
+
   // Group by category, preserve the curated category order, alphabetise within each group.
   const grouped = useMemo(() => {
     const byCat = new Map();
-    for (const integ of integrations) {
+    for (const integ of mergedIntegrations) {
       const cat = categoryFor(integ);
       if (!byCat.has(cat)) byCat.set(cat, []);
       byCat.get(cat).push(integ);
@@ -83,7 +140,7 @@ export default function IntegrationList({ selected, onSelect, collapsed, onToggl
       if (!CATEGORY_ORDER.includes(cat)) ordered.push([cat, list]);
     }
     return ordered;
-  }, [integrations]);
+  }, [mergedIntegrations]);
 
   const toggleCategory = (cat) => {
     setCollapsedCats((prev) => {
