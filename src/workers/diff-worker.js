@@ -1,5 +1,5 @@
 import $RefParser from "@apidevtools/json-schema-ref-parser";
-import { computeDiff } from "@/lib/domain/diff-algorithm.js";
+import { computeDiff } from "../lib/domain/diff-algorithm.js";
 
 function countRefs(obj) {
   try { return (JSON.stringify(obj).match(/"\$ref"/g) || []).length; }

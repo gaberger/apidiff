@@ -26,7 +26,12 @@ export function useDiffWorker() {
         }
       });
       workerRef.current.addEventListener("error", (ev) => {
-        for (const [, p] of pendingRef.current) p.reject(new Error(ev.message || "worker error"));
+        const msg = ev?.message || ev?.error?.message || "Worker failed to load or crashed";
+        for (const [, p] of pendingRef.current) p.reject(new Error(msg));
+        pendingRef.current.clear();
+      });
+      workerRef.current.addEventListener("messageerror", (ev) => {
+        for (const [, p] of pendingRef.current) p.reject(new Error("Worker message deserialization failed: " + (ev?.data ?? "")));
         pendingRef.current.clear();
       });
     }

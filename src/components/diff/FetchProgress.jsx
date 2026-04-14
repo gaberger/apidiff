@@ -51,7 +51,11 @@ export default function FetchProgress({ stages, accentColor = "hsl(var(--primary
               <Loader2 className={`w-3.5 h-3.5 ${hasActive ? "animate-spin" : ""}`} style={{ color: accentColor }} />
             )}
             <span className="font-semibold text-foreground">
-              {hasError ? "Fetch failed" : anyCacheHit && allDone ? "Loaded from cache" : hasActive ? "Loading specs…" : allDone ? "Ready" : "Preparing…"}
+              {hasError ? (
+                stages.find((s) => s.status === "error")?.error
+                  ? `Error: ${stages.find((s) => s.status === "error").error}`
+                  : `Failed at ${stages.find((s) => s.status === "error")?.label ?? "step"}`
+              ) : anyCacheHit && allDone ? "Loaded from cache" : hasActive ? "Working…" : allDone ? "Ready" : "Preparing…"}
             </span>
             <span className="t-meta">{percent}%</span>
           </div>
