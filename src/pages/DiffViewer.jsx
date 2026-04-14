@@ -14,6 +14,31 @@ import { useSyncedScroll } from "@/hooks/use-synced-scroll";
 import { computeDiff } from "@/lib/domain/diff-algorithm.js";
 import { buildGuide } from "@/lib/domain/guide-builder.js";
 import $RefParser from "@apidevtools/json-schema-ref-parser";
+import YAML from "yaml";
+
+// Parse an OpenAPI spec text as JSON, then YAML as a fallback. Throws with a
+// descriptive error if neither parser accepts it. Accepting both formats means
+// discovery can surface *.yaml|*.yml files from repos without forcing users to
+// convert them manually.
+function parseSpec(text, sideLabel) {
+  const trimmed = text.trim();
+  if (!trimmed) throw new Error(`${sideLabel} spec is empty`);
+  // Heuristic: JSON specs start with { or [; everything else → YAML.
+  const looksJson = trimmed[0] === "{" || trimmed[0] === "[";
+  if (looksJson) {
+    try { return JSON.parse(trimmed); }
+    catch (jsonErr) {
+      // Fall through to YAML — some JSON-looking specs have trailing commas or
+      // comments that YAML's superset parser accepts.
+      try { return YAML.parse(trimmed); }
+      catch { throw new Error(`${sideLabel}: not valid JSON — ${jsonErr.message}`); }
+    }
+  }
+  try { return YAML.parse(trimmed); }
+  catch (yamlErr) {
+    throw new Error(`${sideLabel}: not valid JSON or YAML — ${yamlErr.message}`);
+  }
+}
 
 export default function DiffViewer() {
   // Editor state
@@ -53,8 +78,8 @@ export default function DiffViewer() {
     setActiveFilter("all");
 
     try {
-      let oldSpec = JSON.parse(before.trim());
-      let newSpec = JSON.parse(after.trim());
+      let oldSpec = parseSpec(before, "Original spec");
+      let newSpec = parseSpec(after, "Updated spec");
 
       // Collect $ref locations before resolving, then annotate after
       const collectRefs = (obj, prefix = "") => {
