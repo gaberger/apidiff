@@ -1,0 +1,40 @@
+{
+  "id": "wp-fix-tsconfig-tests-rootdir",
+  "title": "Fix: tsconfig rootDir excludes tests/ (5 spurious TS6059 errors)",
+  "adr": "",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~5000 tokens",
+  "prior_work": {
+    "done": [
+      "Surfaced by the 2026-04-14 swarm evaluation after wp-fix-fwd-discovery-adapter-rust-corruption cleared the other 35 errors.",
+      "`tsc --noEmit` reports: `error TS6059: File 'tests/unit/*.test.ts' is not under 'rootDir' 'src'. Matched by include pattern 'tests/**/*.ts' in tsconfig.json`",
+      "Affects flatten.test.ts, guide-builder.test.ts, product-extractor.test.ts, response-diff-service.test.ts, spec-input-adapter.test.ts"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Decide the architecturally correct fix: EITHER remove `tests/**/*.ts` from the main tsconfig's `include` and create a separate `tsconfig.tests.json` that extends the main one with `rootDirs: ['src', 'tests']` and its own `include`, OR change the main tsconfig's `rootDir` to `.` and tighten `include` to `['src/**/*', 'tests/**/*']`. The split-config option is cleaner because the production build shouldn't compile tests.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["tsconfig.json", "tsconfig.tests.json"],
+      "done_condition": "decision documented in step-2 implementation"
+    },
+    {
+      "id": "step-2",
+      "description": "Implement the chosen split. If split-config: add tsconfig.tests.json, update package.json test script to pass --project tsconfig.tests.json, update main tsconfig to exclude tests. If rootDir fix: widen main tsconfig rootDir and include.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "files": ["tsconfig.json", "package.json"],
+      "done_condition": "`bun run typecheck` passes with zero errors; test runner still finds and executes all .test.ts files"
+    }
+  ]
+}
