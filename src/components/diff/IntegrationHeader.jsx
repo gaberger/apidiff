@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { ArrowRight, Loader2, X } from "lucide-react";
+import { Loader2, X, GitCompareArrows } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
+import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
 
@@ -75,93 +76,84 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear })
 
   return (
     <div
-      className="rounded-lg border p-3 sm:p-4 mb-4"
-      style={{ borderColor: color + "40", background: color + "08" }}
+      className="rounded-xl border p-3 sm:p-4 mb-4 shadow-e1 transition-shadow duration-base ease-standard"
+      style={{ borderColor: color + "30", background: color + "08" }}
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
           {integration.logo_url?.trim() ? (
-            <img src={integration.logo_url} alt="" className="w-6 h-6 object-contain rounded" />
+            <img src={integration.logo_url} alt="" className="w-7 h-7 object-contain rounded" />
           ) : (
-            <div className="w-6 h-6 rounded-full" style={{ background: color }} />
+            <div className="w-7 h-7 rounded-full" style={{ background: color }} />
           )}
-          <span className="font-semibold text-sm text-stone-800">{integration.name}</span>
-          <span className="text-[11px] text-stone-400">{versions.length} version{versions.length !== 1 ? "s" : ""}</span>
+          <div className="flex flex-col">
+            <span className="font-semibold text-sm text-foreground">{integration.name}</span>
+            <span className="t-meta">
+              {versions.length} version{versions.length !== 1 ? "s" : ""} discovered
+            </span>
+          </div>
         </div>
-        <button onClick={onClear} className="p-1 rounded hover:bg-stone-200 text-stone-400">
+        <button
+          onClick={onClear}
+          aria-label="Clear integration"
+          className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors duration-fast"
+        >
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {versions.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {hasProducts && (
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 flex-shrink-0">
-                Category
-              </label>
-              <select
-                value={productKey}
-                onChange={(e) => handleProductChange(e.target.value)}
-                className="flex-1 text-xs px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-300"
-              >
-                {groups.map((g) => {
-                  const key = g.product?.key ?? "";
-                  const name = g.product?.name ?? "All versions";
-                  return (
-                    <option key={key} value={key}>
-                      {name} ({g.versions.length})
-                    </option>
-                  );
-                })}
-              </select>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="t-meta">Category</span>
+              {groups.map((g) => {
+                const key = g.product?.key ?? "";
+                const name = g.product?.name ?? "All";
+                const active = key === productKey;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleProductChange(key)}
+                    className={`text-xs px-2.5 py-1 rounded-md border transition-all duration-fast ease-standard ${
+                      active
+                        ? "bg-foreground text-background border-transparent shadow-e1"
+                        : "bg-card text-muted-foreground border-border hover:text-foreground hover:shadow-e1"
+                    }`}
+                  >
+                    {name} <span className="opacity-60">({g.versions.length})</span>
+                  </button>
+                );
+              })}
             </div>
           )}
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={v1Idx ?? ""}
-              onChange={(e) => setV1Idx(e.target.value === "" ? null : Number(e.target.value))}
-              className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-300"
-            >
-              <option value="">Select old version…</option>
-              {activeVersions.map((v) => (
-                <option key={v.__idx ?? v.url} value={v.__idx ?? ""} disabled={v.__idx === v2Idx}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
 
-            <ArrowRight className="w-4 h-4 text-stone-300 flex-shrink-0" />
+          <VersionTimeline
+            versions={activeVersions}
+            selectedV1Idx={v1Idx}
+            selectedV2Idx={v2Idx}
+            onSelect={({ v1Idx: a, v2Idx: b }) => { setV1Idx(a); setV2Idx(b); }}
+            accentColor={color}
+          />
 
-            <select
-              value={v2Idx ?? ""}
-              onChange={(e) => setV2Idx(e.target.value === "" ? null : Number(e.target.value))}
-              className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-300"
-            >
-              <option value="">Select new version…</option>
-              {activeVersions.map((v) => (
-                <option key={v.__idx ?? v.url} value={v.__idx ?? ""} disabled={v.__idx === v1Idx}>
-                  {v.label}
-                </option>
-              ))}
-            </select>
-
+          <div className="flex items-center justify-end">
             <button
               onClick={handleCompare}
               disabled={v1Idx === null || v2Idx === null || v1Idx === v2Idx || loading}
-              className="px-4 py-1.5 text-xs font-semibold rounded-md text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-semibold rounded-md text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-fast ease-standard flex items-center gap-1.5 shadow-e1 hover:shadow-e2 hover:-translate-y-px disabled:translate-y-0 disabled:shadow-none"
               style={{ background: color }}
             >
               {loading ? (
-                <><Loader2 className="w-3 h-3 animate-spin" /> Loading…</>
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading specs…</>
               ) : (
-                "Load Specs"
+                <><GitCompareArrows className="w-3.5 h-3.5" /> Load & Compare</>
               )}
             </button>
           </div>
         </div>
       ) : (
-        <p className="text-xs text-stone-400 italic">
+        <p className="text-xs text-muted-foreground italic">
           No versions discovered yet. Use Settings to run discovery or paste specs manually below.
         </p>
       )}

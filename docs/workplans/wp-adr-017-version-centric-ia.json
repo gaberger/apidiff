@@ -1,0 +1,98 @@
+{
+  "id": "wp-adr-017-version-centric-ia",
+  "title": "ADR-017: Version-centric IA — VersionTimeline, severity, endpoint grouping, code-impact language",
+  "adr": "ADR-017",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~90000 tokens",
+  "prior_work": {
+    "done": [
+      "IntegrationHeader already plumbs integration.versions[] with label+url+optional release date",
+      "DiffResult domain type exists in src/core/domain/types.ts",
+      "DiffResults + DiffSummary + DiffItem components exist as current flat-table surface"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Add VersionTimeline component (src/components/diff/VersionTimeline.jsx): horizontal scrollable strip of version dots on a time axis. Props: { versions, selectedV1Idx, selectedV2Idx, onSelect }. Clicking a dot selects it (first click = v1, second = v2, third resets). Renders provider color ticks, version labels below, release date tooltips. Uses ADR-014 tokens.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "component renders with sample versions; two-click selection updates highlighted dots and triggers onSelect"
+    },
+    {
+      "id": "step-2",
+      "description": "Replace IntegrationHeader dropdown picker with VersionTimeline. Keep product grouping (multi-product providers) as a filter chip row above the timeline. Compare button in the same strip, disabled until two dots selected.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "IntegrationHeader renders the timeline; selecting two versions and clicking Compare invokes existing onLoadSpecs"
+    },
+    {
+      "id": "step-3",
+      "description": "Add DiffSeverity domain type + classifier in src/core/domain/diff-severity.ts. Pure function `classifyDiff(row: DiffResult): 'breaking'|'non-breaking'|'cosmetic'`. Rules per ADR-017. Unit test with bun test covering each branch.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "classifier unit-tested; all branches covered; domain imports nothing outside domain/"
+    },
+    {
+      "id": "step-4",
+      "description": "Extend DiffSummary to show a breaking-count callout distinct from added/removed/modified tallies. Red pill with count + 'breaking'. Click filters to breaking-only.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 1,
+      "done_condition": "summary bar shows breaking count; clicking filters results"
+    },
+    {
+      "id": "step-5",
+      "description": "Add severity chip to DiffItem row (left of current type badge). breaking=red, non-breaking=green, cosmetic=muted. Uses ADR-014 shadow-e0/elevation tokens for consistency.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 1,
+      "done_condition": "every row shows a severity chip reflecting classifier output"
+    },
+    {
+      "id": "step-6",
+      "description": "Build endpoint grouping: parse METHOD + /path from DiffResult.path (first segment after 'paths.'). Group rows by 'METHOD /path'. Shared schemas group into 'Shared schemas' bucket. DiffResults renders as Accordion (shadcn) with group header: 'POST /charges · 8 changes (3 breaking)'.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-5"],
+      "tier": 2,
+      "done_condition": "results display grouped by endpoint; breaking count per group correct; flat/grouped toggle preserved via localStorage"
+    },
+    {
+      "id": "step-7",
+      "description": "Rewrite DiffItem display text to consumer-impact language. Add utility src/lib/impact-phrasing.js that maps (path, type, from, to) → 'Request field X became required', 'Response field Y removed', etc. Fall back to raw JSONPath when no rule matches. Keep 'Show raw JSONPath' toggle.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-5"],
+      "tier": 2,
+      "done_condition": "common diff shapes render as plain English; rare shapes fall back to path; toggle surfaces raw view"
+    },
+    {
+      "id": "step-8",
+      "description": "Run bun run typecheck, bun test (new severity tests pass), bun run lint, hex analyze . — all clean. Commit per-step or per-surface as 2-3 commits.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-6", "step-7"],
+      "tier": 3,
+      "done_condition": "typecheck/lint/analyze all green; severity tests pass"
+    }
+  ]
+}
