@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Loader2, X, GitCompareArrows } from "lucide-react";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
 import { fetchSpec } from "@/lib/fetch-spec.js";
+import { prettyVersionLabel } from "@/lib/version-label.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
@@ -62,8 +63,8 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
     const v2 = versions[v2Idx];
 
     const stages = [
-      { id: "v1", label: `Fetching ${v1.label}`, status: "pending", cacheHit: false },
-      { id: "v2", label: `Fetching ${v2.label}`, status: "pending", cacheHit: false },
+      { id: "v1", label: `Fetching ${prettyVersionLabel(v1.label)}`, status: "pending", cacheHit: false },
+      { id: "v2", label: `Fetching ${prettyVersionLabel(v2.label)}`, status: "pending", cacheHit: false },
     ];
     const push = () => onProgress?.(stages.map((s) => ({ ...s })));
 
@@ -83,7 +84,7 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       const r1 = await fetchSpec(v1.url, { onProgress: makeCallback("v1") });
       const r2 = await fetchSpec(v2.url, { onProgress: makeCallback("v2") });
       const categoryLabel = hasProducts && activeGroup?.product?.name ? ` \u00b7 ${activeGroup.product.name}` : "";
-      onLoadSpecs(r1, r2, `${integration.name}${categoryLabel}: ${v1.label} \u2192 ${v2.label}`);
+      onLoadSpecs(r1, r2, `${integration.name}${categoryLabel}: ${prettyVersionLabel(v1.label)} \u2192 ${prettyVersionLabel(v2.label)}`);
     } catch (err) {
       const lastActive = stages.find((s) => s.status === "in-progress");
       if (lastActive) { lastActive.status = "error"; lastActive.error = err?.message ?? "fetch failed"; }

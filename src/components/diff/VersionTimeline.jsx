@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { prettyVersionLabel } from "@/lib/version-label.js";
 
 function pickReleaseDate(v) {
   if (v.released_at) return v.released_at;
@@ -24,7 +25,8 @@ export default function VersionTimeline({
   const items = useMemo(() => {
     return versions.map((v) => ({
       idx: v.__idx,
-      label: v.label,
+      label: prettyVersionLabel(v.label),
+      rawLabel: v.label,
       url: v.url,
       date: pickReleaseDate(v),
     }));
