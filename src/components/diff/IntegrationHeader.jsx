@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ArrowRight, Loader2, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { groupByProduct } from "@/lib/domain/product-extractor.js";
 
 export default function IntegrationHeader({ integration, onLoadSpecs, onClear }) {
   const [v1Idx, setV1Idx] = useState(null);
@@ -9,6 +10,17 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear })
 
   const versions = integration.versions || [];
   const color = integration.color || "#666";
+  const slug = (integration.slug || integration.name || "").toLowerCase();
+
+  // Group versions into <optgroup>s while preserving each version's original
+  // index — v1Idx/v2Idx state indexes into the flat `versions` array.
+  const optgroups = useMemo(() => {
+    if (versions.length === 0) return [];
+    const indexed = versions.map((v, idx) => ({ ...v, __idx: idx }));
+    const groups = groupByProduct(indexed, slug);
+    if (groups.length < 2) return null; // fall back to flat rendering
+    return groups;
+  }, [versions, slug]);
 
   async function handleCompare() {
     if (v1Idx === null || v2Idx === null || v1Idx === v2Idx) return;
@@ -52,12 +64,22 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear })
           <select
             value={v1Idx ?? ""}
             onChange={(e) => setV1Idx(e.target.value === "" ? null : Number(e.target.value))}
-            className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 bg-white text-stone-700 focus:outline-none focus:ring-1 focus:ring-stone-300"
+            className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-300"
           >
             <option value="">Select old version…</option>
-            {versions.map((v, i) => (
-              <option key={i} value={i} disabled={i === v2Idx}>{v.label}</option>
-            ))}
+            {optgroups
+              ? optgroups.map((g) => (
+                  <optgroup key={g.product?.key ?? "__all__"} label={g.product?.name ?? "Other"}>
+                    {g.versions.map((v) => (
+                      <option key={v.__idx} value={v.__idx} disabled={v.__idx === v2Idx}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : versions.map((v, i) => (
+                  <option key={i} value={i} disabled={i === v2Idx}>{v.label}</option>
+                ))}
           </select>
 
           <ArrowRight className="w-4 h-4 text-stone-300 flex-shrink-0" />
@@ -65,12 +87,22 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear })
           <select
             value={v2Idx ?? ""}
             onChange={(e) => setV2Idx(e.target.value === "" ? null : Number(e.target.value))}
-            className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 bg-white text-stone-700 focus:outline-none focus:ring-1 focus:ring-stone-300"
+            className="flex-1 min-w-[120px] text-xs px-2.5 py-1.5 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:ring-1 focus:ring-stone-300"
           >
             <option value="">Select new version…</option>
-            {versions.map((v, i) => (
-              <option key={i} value={i} disabled={i === v1Idx}>{v.label}</option>
-            ))}
+            {optgroups
+              ? optgroups.map((g) => (
+                  <optgroup key={g.product?.key ?? "__all__"} label={g.product?.name ?? "Other"}>
+                    {g.versions.map((v) => (
+                      <option key={v.__idx} value={v.__idx} disabled={v.__idx === v1Idx}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : versions.map((v, i) => (
+                  <option key={i} value={i} disabled={i === v1Idx}>{v.label}</option>
+                ))}
           </select>
 
           <button
