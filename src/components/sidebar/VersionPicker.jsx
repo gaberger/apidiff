@@ -1,19 +1,71 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { groupByProduct } from "@/lib/domain/product-extractor.js";
+
+const STORAGE_PREFIX = "apidiff:lastProduct:";
 
 export default function VersionPicker({ provider, onSelectComparison }) {
   const [v1Idx, setV1Idx] = useState(null);
   const [v2Idx, setV2Idx] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const versions = provider.versions || [];
+  const allVersions = provider.versions || [];
+  const providerSlug = (provider.slug || provider.name || "").toLowerCase();
+
+  // Group versions by product — returns [{ product: {key,name}|undefined, versions: [...] }, ...]
+  const groups = useMemo(
+    () => groupByProduct(allVersions, providerSlug),
+    [allVersions, providerSlug],
+  );
+  const hasProducts = groups.length > 1;
+
+  const [productKey, setProductKey] = useState(() => {
+    if (!hasProducts) return "";
+    try {
+      const saved = window.localStorage.getItem(STORAGE_PREFIX + providerSlug);
+      if (saved && groups.some((g) => (g.product?.key ?? "") === saved)) return saved;
+    } catch { /* localStorage unavailable — default below */ }
+    return groups[0]?.product?.key ?? "";
+  });
+
+  // Reset product + selections whenever the provider changes.
+  useEffect(() => {
+    setV1Idx(null);
+    setV2Idx(null);
+    if (!hasProducts) {
+      setProductKey("");
+      return;
+    }
+    let next = groups[0]?.product?.key ?? "";
+    try {
+      const saved = window.localStorage.getItem(STORAGE_PREFIX + providerSlug);
+      if (saved && groups.some((g) => (g.product?.key ?? "") === saved)) next = saved;
+    } catch { /* ignore */ }
+    setProductKey(next);
+  }, [providerSlug, hasProducts, groups]);
+
+  const activeGroup = useMemo(() => {
+    if (!hasProducts) return groups[0];
+    return groups.find((g) => (g.product?.key ?? "") === productKey) ?? groups[0];
+  }, [groups, productKey, hasProducts]);
+  const versions = activeGroup?.versions ?? [];
+
+  function handleProductChange(nextKey) {
+    setProductKey(nextKey);
+    setV1Idx(null);
+    setV2Idx(null);
+    try {
+      window.localStorage.setItem(STORAGE_PREFIX + providerSlug, nextKey);
+    } catch { /* ignore */ }
+  }
 
   async function handleCompare() {
     if (v1Idx === null || v2Idx === null || v1Idx === v2Idx) return;
     const v1 = versions[v1Idx];
     const v2 = versions[v2Idx];
-    const label = `${provider.name}: ${v1.label} → ${v2.label}`;
+    const productLabel = activeGroup?.product?.name ? ` · ${activeGroup.product.name}` : "";
+    const label = `${provider.name}${productLabel}: ${v1.label} → ${v2.label}`;
 
     setLoading(true);
     try {
@@ -27,18 +79,40 @@ export default function VersionPicker({ provider, onSelectComparison }) {
     }
   }
 
-  if (versions.length === 0) return null;
+  if (allVersions.length === 0) return null;
 
   return (
     <div className="px-3 pl-6 py-2 space-y-1.5">
+      {hasProducts && (
+        <>
+          <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+            Product ({groups.length})
+          </div>
+          <select
+            value={productKey}
+            onChange={(e) => handleProductChange(e.target.value)}
+            className="w-full text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
+          >
+            {groups.map((g) => {
+              const key = g.product?.key ?? "";
+              const name = g.product?.name ?? "All versions";
+              return (
+                <option key={key} value={key}>
+                  {name} ({g.versions.length})
+                </option>
+              );
+            })}
+          </select>
+        </>
+      )}
       <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
-        Pick two versions
+        Pick two versions{hasProducts ? ` · ${versions.length} available` : ""}
       </div>
       <div className="flex gap-1.5 items-center">
         <select
           value={v1Idx ?? ""}
           onChange={(e) => setV1Idx(e.target.value === "" ? null : Number(e.target.value))}
-          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 bg-white text-stone-700 focus:outline-none focus:border-stone-400 truncate"
+          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
         >
           <option value="">Old…</option>
           {versions.map((v, i) => (
@@ -51,7 +125,7 @@ export default function VersionPicker({ provider, onSelectComparison }) {
         <select
           value={v2Idx ?? ""}
           onChange={(e) => setV2Idx(e.target.value === "" ? null : Number(e.target.value))}
-          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 bg-white text-stone-700 focus:outline-none focus:border-stone-400 truncate"
+          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
         >
           <option value="">New…</option>
           {versions.map((v, i) => (

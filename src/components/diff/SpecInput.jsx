@@ -352,11 +352,11 @@ export default function SpecInput({
         )}
 
         {/* Line numbers + textarea wrapper */}
-        <div className="flex w-full h-[280px] sm:h-[400px] lg:h-[520px] rounded-lg border border-stone-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all">
+        <div className="flex w-full h-[520px] rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 overflow-hidden focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all">
           {/* Line number gutter */}
           <div
             ref={lineGutterRef}
-            className="flex-shrink-0 w-10 bg-stone-100 border-r border-stone-200 overflow-hidden select-none"
+            className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
             aria-hidden="true"
           >
             <div className="py-2 sm:py-3 pr-2 text-right font-mono text-[10px] sm:text-[11px] leading-[1.6] text-stone-400">
@@ -384,7 +384,7 @@ export default function SpecInput({
               onChange={(e) => onChange(e.target.value)}
               onScroll={handleScroll}
               placeholder={`Paste JSON, drop a file, or fetch from URL...\n\nSupports OpenAPI 3.x / Swagger 2.0\nJSON or YAML format`}
-              className="relative z-10 w-full h-full resize-none bg-transparent py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] text-transparent caret-stone-800 placeholder:text-stone-400 focus:outline-none"
+              className="relative z-10 w-full h-full resize-none bg-transparent py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] text-transparent caret-stone-800 dark:caret-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
               style={{ caretColor: "#1c1917", WebkitTextFillColor: "transparent" }}
               spellCheck={false}
             />

@@ -1,6 +1,7 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2 } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/use-theme.js";
 import { motion, AnimatePresence } from "framer-motion";
 import SpecInput from "@/components/diff/SpecInput";
 import DiffResults from "@/components/diff/DiffResults";
@@ -32,6 +33,9 @@ export default function DiffViewer() {
   const leftEditorRef = useRef(null);
   const rightEditorRef = useRef(null);
   const { scrollLocked, toggleScrollLock, suppressSync } = useSyncedScroll(leftEditorRef, rightEditorRef);
+
+  // Theme
+  const { theme, toggle: toggleTheme } = useTheme();
 
   // Flash highlight for path click
   const [leftHighlight, setLeftHighlight] = useState(null);
@@ -200,9 +204,14 @@ export default function DiffViewer() {
     }
 
     if (targetLine >= 0) {
-      const totalLines = lines.length || 1;
-      const lineHeight = textarea.scrollHeight / totalLines;
-      textarea.scrollTop = Math.max(0, targetLine * lineHeight - textarea.clientHeight / 3);
+      // Use computed CSS line-height — scrollHeight/totalLines is an average that
+      // breaks whenever the textarea wraps long lines. Include paddingTop so line 0
+      // is at the top of the visible text, not the top of the padding box.
+      const cs = window.getComputedStyle(textarea);
+      const lineHeight = parseFloat(cs.lineHeight) || 20;
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      const targetY = paddingTop + targetLine * lineHeight;
+      textarea.scrollTop = Math.max(0, targetY - textarea.clientHeight / 3);
     }
     return targetLine;
   }, []);
@@ -225,15 +234,28 @@ export default function DiffViewer() {
 
   const canCompare = before.trim() && after.trim();
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canCompare && !resolving) {
+        e.preventDefault();
+        handleCompare();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canCompare, resolving, before, after]);
+
+  const shortcutHint = typeof navigator !== "undefined" && /Mac/i.test(navigator.platform) ? "⌘↵" : "Ctrl+↵";
+
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 dark:bg-stone-900 text-stone-800 dark:text-stone-100 flex flex-col transition-colors">
       {/* Header */}
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+      <header className="border-b border-stone-200 dark:border-stone-700 bg-white/80 dark:bg-stone-900/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-2 min-w-0">
               <h1 className="text-sm font-bold tracking-tight whitespace-nowrap">
-                <span className="text-stone-800">api</span>
+                <span className="text-stone-800 dark:text-stone-100">api</span>
                 <span className="text-amber-600">diff</span>
               </h1>
               <nav className="ml-2 sm:ml-6 flex items-center gap-1">
@@ -241,8 +263,8 @@ export default function DiffViewer() {
                   onClick={() => setActiveTab("compare")}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-colors ${
                     activeTab === "compare"
-                      ? "text-stone-800 bg-stone-100"
-                      : "text-stone-400 hover:text-stone-600"
+                      ? "text-stone-800 dark:text-stone-100 bg-stone-100 dark:bg-stone-700"
+                      : "text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
                   }`}
                 >
                   Compare
@@ -263,6 +285,18 @@ export default function DiffViewer() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Theme toggle */}
+              <button
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+                className="p-1.5 rounded-md text-xs bg-stone-100 dark:bg-stone-800 text-stone-400 hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-200 transition-colors"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {theme === "dark"
+                  ? <Sun className="w-3.5 h-3.5" />
+                  : <Moon className="w-3.5 h-3.5" />}
+              </button>
+
               {/* Scroll lock toggle */}
               <button
                 onClick={toggleScrollLock}
@@ -292,6 +326,7 @@ export default function DiffViewer() {
                 size="sm"
                 onClick={handleCompare}
                 disabled={!canCompare || resolving}
+                title={canCompare ? `Compare specs (${shortcutHint})` : "Paste JSON into both panels to compare"}
                 className="h-8 px-2 sm:px-4 text-xs font-semibold"
               >
                 {resolving ? (
@@ -303,6 +338,9 @@ export default function DiffViewer() {
                   <>
                     <GitCompareArrows className="w-3.5 h-3.5 mr-1.5" />
                     Compare
+                    {canCompare && (
+                      <kbd className="hidden sm:inline-flex ml-1.5 px-1 py-0.5 text-[10px] font-mono bg-white/20 rounded">{shortcutHint}</kbd>
+                    )}
                   </>
                 )}
               </Button>
@@ -381,9 +419,17 @@ export default function DiffViewer() {
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="rounded-lg border border-red-200 bg-red-50 p-4 mb-6"
+                    className="rounded-lg border border-red-200 bg-red-50 p-4 mb-6 flex items-start justify-between gap-3"
+                    role="alert"
                   >
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700 flex-1">{error}</p>
+                    <button
+                      onClick={() => setError(null)}
+                      aria-label="Dismiss error"
+                      className="text-red-400 hover:text-red-600 shrink-0 -mt-0.5"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
                   </motion.div>
                 )}
 
