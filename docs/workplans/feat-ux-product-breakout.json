@@ -1,0 +1,61 @@
+{
+  "id": "feat-ux-product-breakout",
+  "title": "Feature: API product breakout — surface subproducts (Twilio Messaging/Voice/Video, Azure services, GitHub GHES) as a distinct dimension above versions",
+  "adr": "ADR-013",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~80000 tokens",
+  "prior_work": {
+    "done": [
+      "src/core/domain/discovery-types.ts — DiscoveredVersion has {label,version,url,format}. No product dimension.",
+      "src/adapters/secondary/github-discovery-adapter.ts — returns flat DiscoveredVersion[] from repo scan",
+      "src/adapters/secondary/apisguru-discovery-adapter.ts — returns flat DiscoveredVersion[] from APIs.guru",
+      "src/components/sidebar/VersionPicker.jsx — flat dropdown/list of all versions",
+      "src/components/sidebar/IntegrationList.jsx — now grouped by ApiCategory (this PR's quick win)"
+    ],
+    "motivation": "Providers like Twilio ship ~15 subproducts (Messaging/Voice/Video/Studio/Verify/TaskRouter/Flex/Conversations/Lookups/Pricing/Numbers/Events/Serverless/Monitor/Routes) in one repo. Azure ships hundreds of services (Compute, Storage, Network, ...). GitHub ships api.github.com, ghes-3.11, ghes-3.12, ghec. Flattening these into a single version dropdown is unusable at scale — users cannot find the API they want, and version comparison becomes meaningless across subproducts."
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Extend domain types: add optional ApiProduct dimension to DiscoveredVersion. Shape: { readonly product?: { key: string; name: string } }. Also add helper to extract product from spec URL/filename (Twilio: regex /spec\\/json\\/twilio_([^_]+)_v\\d+/, GitHub: regex /api\\.github\\.com|ghes-(\\d+\\.\\d+)|ghec/, Azure: the service name from azure-rest-api-specs/specification/<service>/, fallback: parse info.title). Pure domain — zero external deps, no imports outside domain/.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "src/core/domain/discovery-types.ts has ApiProduct type; src/core/domain/product-extractor.ts has extractProduct(url, title, providerSlug) returning ApiProduct|undefined; unit tests pass for Twilio/GitHub/Azure/fallback patterns"
+    },
+    {
+      "id": "step-2",
+      "description": "Update github-discovery-adapter and apisguru-discovery-adapter to call product-extractor for each discovered spec and populate the new product field. Do NOT filter/deduplicate — just annotate. Existing consumers that ignore the field continue to work (backwards compatible).",
+      "layer": "adapters/secondary",
+      "adapter": "discovery",
+      "port": "DiscoveryPort",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "discovery results for Twilio include product for every version; running discovery-demo.ts prints grouped subproducts"
+    },
+    {
+      "id": "step-3",
+      "description": "Group versions by product in VersionPicker.jsx. UI: two-tier selector — product (sorted alphabetically, with count badge) → versions within that product. When a provider has only one product (Stripe, OpenAI), skip the product level entirely and render flat. Preserve existing v1/v2 pair-selection behavior within a single product (cross-product diffing is meaningless).",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "Twilio shows 15 product groups; Stripe still shows flat version list; selecting two versions from the same product enables Compare; picking versions from different products shows a disabled Compare with a 'pick two versions of the same product' hint"
+    },
+    {
+      "id": "step-4",
+      "description": "Persist last-selected product per provider in localStorage (key 'apidiff:lastProduct:<slug>'). On provider switch, restore the previously selected product. This matters because Twilio users typically work in one product (Messaging) at a time and shouldn't re-pick it every session.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 3,
+      "done_condition": "selecting a product persists across page reload; switching providers restores each provider's last product independently"
+    }
+  ]
+}

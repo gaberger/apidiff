@@ -1,0 +1,68 @@
+{
+  "id": "feat-ux-dark-mode",
+  "title": "Feature: Dark mode + theme toggle for React primary adapter",
+  "adr": "ADR-012",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~40000 tokens",
+  "prior_work": {
+    "done": [
+      "src/pages/DiffViewer.jsx — uses stone/amber palette with hardcoded bg-stone-50 / text-stone-800 classes",
+      "src/components/diff/*.jsx — shares palette via utility classes (no theme tokens)",
+      "tailwind.config — default (class-based darkMode not yet enabled)"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Enable Tailwind class-based dark mode. Set darkMode: 'class' in tailwind.config so consumers can apply <html class=\"dark\"> to flip the palette without system-pref coupling.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "tailwind.config exports darkMode:'class'; build succeeds"
+    },
+    {
+      "id": "step-2",
+      "description": "Add useTheme hook in src/hooks/use-theme.js that reads localStorage('apidiff:theme') with system-pref fallback (prefers-color-scheme), exposes { theme, setTheme, toggle }, and writes the 'dark' class to documentElement on change. Persists choice across sessions.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "hook toggles html.dark class and persists to localStorage; initial render respects system pref when no stored value"
+    },
+    {
+      "id": "step-3",
+      "description": "Add dark: variant classes to DiffViewer.jsx and all src/components/diff/*.jsx. Map stone-50 -> stone-900, stone-800 -> stone-100, white -> stone-800, border-stone-200 -> stone-700, red-50 -> red-900/40, blue-50 -> blue-900/40. Keep amber-600 accent for both themes. Do not introduce new palette colors.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "every diff component renders legibly in both themes; no stone-50/white backgrounds remain without a dark: counterpart"
+    },
+    {
+      "id": "step-4",
+      "description": "Add theme toggle button to DiffViewer.jsx header next to scroll-lock button. Sun icon for light mode, Moon icon for dark mode, aria-label='Toggle theme'. Uses useTheme hook. Matches existing icon-button styling (h-8, rounded-md, stone-400 hover).",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2", "step-3"],
+      "tier": 3,
+      "done_condition": "toggle visible in header; clicking flips theme; state persists on reload"
+    },
+    {
+      "id": "step-5",
+      "description": "Visual regression check: load sample fixture pairs in both themes and verify diff badges (added/removed/renamed/moved/type-change) remain distinguishable. Contrast ratio >=4.5:1 for body text in dark mode.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-4"],
+      "tier": 4,
+      "done_condition": "manual screenshot comparison attached to PR; no badge color collides with dark background"
+    }
+  ]
+}

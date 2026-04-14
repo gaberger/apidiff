@@ -1,0 +1,58 @@
+{
+  "id": "feat-ux-keyboard-shortcuts",
+  "title": "Feature: Keyboard shortcuts + discoverable help overlay for DiffViewer",
+  "adr": "ADR-012",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~25000 tokens",
+  "prior_work": {
+    "done": [
+      "src/pages/DiffViewer.jsx — handleCompare(), scroll-lock toggle, tab switch already wired",
+      "src/components/ui/* — shadcn primitives (Dialog available for help overlay)",
+      "src/hooks/use-synced-scroll.js — existing hook pattern to follow"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Add src/hooks/use-keyboard-shortcuts.js. Accepts a map { 'mod+enter': handler, 'mod+k': handler, 'escape': handler, '?': handler }. Normalizes mod -> metaKey on darwin, ctrlKey elsewhere. Attaches single window listener, respects target.isContentEditable and INPUT/TEXTAREA focus (only 'escape' and 'mod+enter' fire inside editors). Returns nothing; cleanup on unmount.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "hook file exists; manual test: mod+enter fires from anywhere incl. textarea; plain letters do NOT fire inside inputs"
+    },
+    {
+      "id": "step-2",
+      "description": "Wire shortcuts in DiffViewer.jsx: mod+enter -> handleCompare, mod+k -> focus left editor, mod+shift+k -> focus right editor, escape -> setError(null), '?' -> setHelpOpen(true). Shortcuts are no-ops when the respective preconditions fail (e.g. mod+enter does nothing when before/after empty — mirrors existing button disabled state).",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "all five shortcuts work from keyboard without clicking; no regression to existing button handlers"
+    },
+    {
+      "id": "step-3",
+      "description": "Add src/components/diff/ShortcutsHelp.jsx — Dialog listing all shortcuts with <kbd> styling. Two columns: Compare/Navigate (mod+enter, mod+k, mod+shift+k) and General (escape, ?). Closes on escape or overlay click. Use existing Dialog primitive from @/components/ui/dialog. Labels use 'Cmd' on mac, 'Ctrl' elsewhere (detect once via navigator.platform).",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "pressing '?' opens dialog; dialog renders correct modifier labels per platform; escape closes it"
+    },
+    {
+      "id": "step-4",
+      "description": "Add small '?' hint button in DiffViewer header (next to scroll-lock / theme toggle). aria-label='Keyboard shortcuts'. Opens ShortcutsHelp. Same h-8 rounded-md stone-400 hover styling as sibling buttons. This makes shortcuts discoverable without requiring users to know to press '?'.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 3,
+      "done_condition": "button visible in header, clicking opens same dialog as '?' key"
+    }
+  ]
+}
