@@ -58,6 +58,18 @@ export function extractProduct(
     if (m) return { key: m[1].toLowerCase(), name: titleCase(m[1]) };
   }
 
+  // ── Forward Networks: docs.fwd.app/<ver>/api/spec/<section>.json
+  // Section slug is kebab-case (checks, networks, nqe, path-search, ...).
+  // "complete" is the full combined spec — group it separately as "All sections".
+  if (slug === "forward-networks" || /docs\.fwd\.app/i.test(safeUrl)) {
+    const m = safeUrl.match(/\/api\/spec\/([a-z0-9-]+)\.(?:json|ya?ml)$/i);
+    if (m) {
+      const section = m[1].toLowerCase();
+      if (section === "complete") return { key: "complete", name: "All sections (combined)" };
+      return { key: section, name: titleCase(section) };
+    }
+  }
+
   // ── Generic fallback: directory name immediately above the spec file.
   // Only applied when the URL has a recognizable spec/openapi/api segment — otherwise
   // return undefined and let the UI render a flat list.

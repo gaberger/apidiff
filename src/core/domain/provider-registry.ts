@@ -179,6 +179,35 @@ export const PROVIDER_REGISTRY: readonly ApiProvider[] = [
     changelogUrl: "https://platform.openai.com/docs/changelog",
     docsUrl: "https://platform.openai.com/docs/api-reference",
   },
+
+  // ── Infrastructure / Network Assurance ───────────────
+  // Forward Networks publishes OpenAPI 3.1 specs per Docusaurus-docs version.
+  // Versions advertised in https://docs.fwd.app/versions.json — but only recent
+  // versions (26.2+) actually host /spec/complete.json; older versions return 404.
+  // Per-section specs live at /<ver>/api/spec/<kebab-slug>.json (e.g. checks.json,
+  // networks.json, nqe.json, path-search.json). Listed top-level "complete" specs
+  // here; a dynamic Forward-discovery adapter can enumerate per-section URLs.
+  {
+    name: "Forward Networks",
+    slug: "forward-networks",
+    category: "infrastructure",
+    specSource: { kind: "url", specUrls: [
+      { label: "v26.3 · Complete",  url: "https://docs.fwd.app/26.3/api/spec/complete.json" },
+      { label: "v26.2 · Complete",  url: "https://docs.fwd.app/26.2/api/spec/complete.json" },
+      { label: "v26.3 · Checks",    url: "https://docs.fwd.app/26.3/api/spec/checks.json" },
+      { label: "v26.2 · Checks",    url: "https://docs.fwd.app/26.2/api/spec/checks.json" },
+      { label: "v26.3 · Networks",  url: "https://docs.fwd.app/26.3/api/spec/networks.json" },
+      { label: "v26.2 · Networks",  url: "https://docs.fwd.app/26.2/api/spec/networks.json" },
+      { label: "v26.3 · NQE",       url: "https://docs.fwd.app/26.3/api/spec/nqe.json" },
+      { label: "v26.2 · NQE",       url: "https://docs.fwd.app/26.2/api/spec/nqe.json" },
+      { label: "v26.3 · Aliases",   url: "https://docs.fwd.app/26.3/api/spec/aliases.json" },
+      { label: "v26.2 · Aliases",   url: "https://docs.fwd.app/26.2/api/spec/aliases.json" },
+      { label: "v26.3 · Credentials", url: "https://docs.fwd.app/26.3/api/spec/credentials.json" },
+      { label: "v26.2 · Credentials", url: "https://docs.fwd.app/26.2/api/spec/credentials.json" },
+      { label: "v26.3 · Path Search", url: "https://docs.fwd.app/26.3/api/spec/path-search.json" },
+    ] },
+    docsUrl: "https://docs.fwd.app/latest/api/",
+  },
 ] as const;
 
 /** Lookup a provider by slug (case-insensitive) */

@@ -28,6 +28,15 @@ function extractProduct(url, label, providerSlug) {
     if (m)
       return { key: m[1].toLowerCase(), name: titleCase(m[1]) };
   }
+  if (slug === "forward-networks" || /docs\.fwd\.app/i.test(safeUrl)) {
+    const m = safeUrl.match(/\/api\/spec\/([a-z0-9-]+)\.(?:json|ya?ml)$/i);
+    if (m) {
+      const section = m[1].toLowerCase();
+      if (section === "complete")
+        return { key: "complete", name: "All sections (combined)" };
+      return { key: section, name: titleCase(section) };
+    }
+  }
   const dirMatch = safeUrl.match(/\/([^/]+)\/[^/]+\.(?:json|ya?ml)$/i);
   if (dirMatch && dirMatch[1].length > 0 && !isGenericDirName(dirMatch[1])) {
     return { key: dirMatch[1].toLowerCase(), name: titleCase(dirMatch[1]) };
