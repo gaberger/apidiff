@@ -20,6 +20,7 @@
   "steps": [
     {
       "id": "step-1",
+      "name": "Add ResolvedSpec domain types",
       "description": "Add ResolvedSpec type and OpenAPI format union to domain types. ResolvedSpec has format, document, and metadata fields. No external imports.",
       "layer": "domain",
       "adapter": null,
@@ -28,10 +29,13 @@
       "tier": 0,
       "specs": ["S01", "S02", "S03", "S04"],
       "worktree_branch": "feat/spec-input/domain",
-      "done_condition": "types.ts compiles with ResolvedSpec exported, hex analyze passes"
+      "done_condition": "types.ts compiles with ResolvedSpec exported, hex analyze passes",
+      "tasks": [],
+      "status": "pending"
     },
     {
       "id": "step-2",
+      "name": "Define SpecInputPort interface",
       "description": "Add SpecInputPort interface to ports/index.ts with fromUrl(url: string) and fromFile(content: string, filename: string) methods, both returning Promise<ResolvedSpec>.",
       "layer": "ports",
       "adapter": null,
@@ -40,10 +44,13 @@
       "tier": 0,
       "specs": ["S01", "S03"],
       "worktree_branch": "feat/spec-input/ports",
-      "done_condition": "ports/index.ts compiles with SpecInputPort exported, hex analyze passes"
+      "done_condition": "ports/index.ts compiles with SpecInputPort exported, hex analyze passes",
+      "tasks": [],
+      "status": "pending"
     },
     {
       "id": "step-3",
+      "name": "Implement SpecInputAdapter (secondary)",
       "description": "Implement SpecInputAdapter as a secondary adapter. fromUrl: HTTP GET, detect JSON/YAML, parse, detect OpenAPI version (swagger:'2.0' or openapi:'3.x'), resolve $ref via @apidevtools/json-schema-ref-parser, validate well-formedness (unique keys, bounded depth), extract title/version metadata. fromFile: detect format from extension (.yaml/.yml → YAML, else JSON), parse, same validation pipeline. Reject non-OpenAPI, empty files, malformed YAML with descriptive errors.",
       "layer": "adapters/secondary",
       "adapter": "spec-input-adapter",
@@ -52,10 +59,13 @@
       "tier": 1,
       "specs": ["S01", "S02", "S03", "S04", "S07", "S08", "S10", "S11", "S12"],
       "worktree_branch": "feat/spec-input/adapter-secondary",
-      "done_condition": "Unit tests pass for: JSON URL fetch, YAML file parse, OpenAPI 2.0 detection, OpenAPI 3.0 detection, invalid URL error, malformed YAML error, $ref resolution, non-OpenAPI rejection, empty file rejection"
+      "done_condition": "Unit tests pass for: JSON URL fetch, YAML file parse, OpenAPI 2.0 detection, OpenAPI 3.0 detection, invalid URL error, malformed YAML error, $ref resolution, non-OpenAPI rejection, empty file rejection",
+      "tasks": [],
+      "status": "pending"
     },
     {
       "id": "step-4",
+      "name": "Update WebAdapter with URL + file drop",
       "description": "Update WebAdapter: (1) Add POST /api/fetch-spec endpoint that accepts {url, side} body, calls SpecInputPort.fromUrl(), returns ResolvedSpec JSON. (2) Add file drop handler constructor parameter (SpecInputPort). (3) Update static/index.html: add URL input field + Fetch button next to each textarea, add drop zone overlay on each textarea with dragover/drop handlers using File API, populate textarea via textContent/value (never innerHTML per ADR-004). Drop zone calls POST /api/fetch-file with file content.",
       "layer": "adapters/primary",
       "adapter": "web-adapter",
@@ -64,10 +74,13 @@
       "tier": 2,
       "specs": ["S05", "S06", "S09"],
       "worktree_branch": "feat/spec-input/adapter-primary",
-      "done_condition": "Web adapter compiles with new endpoints. HTML has drop zones and URL inputs. No innerHTML/outerHTML/insertAdjacentHTML used with external data. hex analyze passes."
+      "done_condition": "Web adapter compiles with new endpoints. HTML has drop zones and URL inputs. No innerHTML/outerHTML/insertAdjacentHTML used with external data. hex analyze passes.",
+      "tasks": [],
+      "status": "pending"
     },
     {
       "id": "step-5",
+      "name": "Wire SpecInputAdapter in composition-root",
       "description": "Wire SpecInputAdapter into composition root. Update createWebApp() to instantiate SpecInputAdapter and pass it to WebAdapter constructor. Update createCliApp() to use SpecInputAdapter for spec loading.",
       "layer": "composition-root",
       "adapter": null,
@@ -76,10 +89,13 @@
       "tier": 4,
       "specs": ["S13"],
       "worktree_branch": "feat/spec-input/wiring",
-      "done_condition": "Full app builds and starts. composition-root.ts is the only file importing adapters. hex analyze passes."
+      "done_condition": "Full app builds and starts. composition-root.ts is the only file importing adapters. hex analyze passes.",
+      "tasks": [],
+      "status": "pending"
     },
     {
       "id": "step-6",
+      "name": "Integration tests for spec input",
       "description": "Integration tests: (1) Fetch a real OpenAPI spec URL (e.g. Petstore), verify ResolvedSpec has correct format and metadata. (2) Parse a YAML spec file, verify identical output to JSON equivalent. (3) End-to-end: two specs in → diff results out → guide generated with correct changes. (4) Verify error cases: 404 URL, malformed YAML, non-OpenAPI JSON, empty file.",
       "layer": "integration",
       "adapter": null,
@@ -88,7 +104,9 @@
       "tier": 5,
       "specs": ["S01", "S02", "S03", "S04", "S07", "S08", "S10", "S11", "S12", "S13"],
       "worktree_branch": "feat/spec-input/integration",
-      "done_condition": "All integration tests pass. bun test --filter spec-input exits 0."
+      "done_condition": "All integration tests pass. bun test --filter spec-input exits 0.",
+      "tasks": [],
+      "status": "pending"
     }
   ],
   "dependencies": {
