@@ -27,7 +27,8 @@ export type ApiCategory =
 export type SpecSource =
   | { readonly kind: "github"; readonly owner: string; readonly repo: string; readonly path?: string }
   | { readonly kind: "apis-guru"; readonly providerKey: string }
-  | { readonly kind: "url"; readonly specUrls: readonly DirectSpecUrl[] };
+  | { readonly kind: "url"; readonly specUrls: readonly DirectSpecUrl[] }
+  | { readonly kind: "docusaurus"; readonly baseUrl: string };
 
 /** A direct URL to an OpenAPI spec, with version label */
 export interface DirectSpecUrl {
@@ -56,6 +57,6 @@ export interface DiscoveryResult {
   readonly versions: DiscoveredVersion[];
   readonly pairs: VersionPair[];
   readonly changelogVersions: string[];
-  readonly source: "github" | "apis-guru" | "url";
+  readonly source: "github" | "apis-guru" | "url" | "docusaurus";
   readonly discoveredAt: string; // ISO 8601
 }

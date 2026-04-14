@@ -9,6 +9,12 @@ import { OasdiffAdapter } from "./adapters/secondary/oasdiff-adapter.js";
 import { CliAdapter } from "./adapters/primary/cli-adapter.js";
 import { WebAdapter } from "./adapters/primary/web-adapter.js";
 import { SpecInputAdapter } from "./adapters/secondary/spec-input-adapter.js";
+import { GitHubDiscoveryAdapter } from "./adapters/secondary/github-discovery-adapter.js";
+import { ApisGuruDiscoveryAdapter } from "./adapters/secondary/apisguru-discovery-adapter.js";
+import { UrlDiscoveryAdapter } from "./adapters/secondary/url-discovery-adapter.js";
+import { DocusaurusDiscoveryAdapter } from "./adapters/secondary/docusaurus-discovery-adapter.js";
+import type { ApiDiscoveryPort } from "./core/ports/index.js";
+import type { SpecSource } from "./core/domain/discovery-types.js";
 
 export function createCliApp() {
   const storage = new MemoryChecklistStorage();
@@ -35,4 +41,14 @@ export function createWebApp() {
   );
 
   return { responseDiffService, webAdapter, specInput };
+}
+
+/** Registry of discovery adapters keyed by the SpecSource kind they handle. */
+export function createDiscoveryAdapters(): Map<SpecSource["kind"], ApiDiscoveryPort> {
+  const adapters = new Map<SpecSource["kind"], ApiDiscoveryPort>();
+  adapters.set("github", new GitHubDiscoveryAdapter(process.env.GITHUB_TOKEN));
+  adapters.set("apis-guru", new ApisGuruDiscoveryAdapter());
+  adapters.set("url", new UrlDiscoveryAdapter());
+  adapters.set("docusaurus", new DocusaurusDiscoveryAdapter());
+  return adapters;
 }
