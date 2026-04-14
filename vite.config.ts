@@ -17,7 +17,12 @@ export default defineConfig(({ mode }) => {
         visualEditAgent: true,
       }),
       react(),
-      // Inject api_key header into all /api proxy requests for dev auth
+      // Inject api_key header into all /api proxy requests for dev auth.
+      // Runs server-side in the Vite dev middleware only — the key is read
+      // via loadEnv (NOT import.meta.env), so it never ends up in the
+      // client bundle. In production this middleware is inactive and auth
+      // is expected to flow through the session-exchange endpoint tracked
+      // by wp-security-client-api-key-remediation.
       ...(env.BASE44_API_KEY
         ? [
             {
@@ -54,6 +59,13 @@ export default defineConfig(({ mode }) => {
           inlineDynamicImports: true,
         },
       },
+    },
+    optimizeDeps: {
+      // Force pre-bundling so the Web Worker (diff-worker.js) gets a
+      // single ESM bundle of $RefParser instead of a maze of .cjs files
+      // the dev server refuses to transform. Must stay in sync with
+      // the worker import.
+      include: ["@apidevtools/json-schema-ref-parser"],
     },
   };
 });

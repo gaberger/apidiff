@@ -1,0 +1,39 @@
+{
+  "id": "wp-fix-diff-worker-cancel-affordance",
+  "title": "Terminate diff-worker on Reset / unmount to drop stale results",
+  "adr": "ADR-014",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~8000 tokens",
+  "prior_work": {
+    "done": [
+      "wp-fix-main-thread-block-dereference-and-diff shipped the worker + useDiffWorker hook (eb7d029).",
+      "Reset button in DiffViewer clears local state but does NOT call worker.terminate() — an in-flight diff still posts its result message after Reset, which lands in the pendingRef map if the next compare is in flight."
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Add a `cancel()` method to useDiffWorker that (a) rejects every pending promise with a DOMException('cancelled', 'AbortError'), (b) calls workerRef.current.terminate(), (c) nulls workerRef so the next runDiff spawns a fresh worker. Also terminate on unmount via the existing useEffect cleanup.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/hooks/use-diff-worker.js"],
+      "done_condition": "cancel() terminates + respawns the worker; pending runDiff() promises reject with AbortError"
+    },
+    {
+      "id": "step-2",
+      "description": "Wire Reset in DiffViewer.handleReset to call diffWorker.cancel() before clearing state. Swallow AbortError in handleCompare's catch block so it doesn't surface as a user-visible 'compare failed' message.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "files": ["src/pages/DiffViewer.jsx"],
+      "done_condition": "clicking Reset during an in-flight diff on a large spec produces no results, no console errors, no 'compare failed' toast"
+    }
+  ]
+}

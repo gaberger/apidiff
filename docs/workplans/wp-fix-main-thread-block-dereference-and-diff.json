@@ -3,7 +3,10 @@
   "title": "Fix: $RefParser.dereference + computeDiff block the main thread for 100s+ on large specs",
   "adr": "ADR-014",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-14",
+  "completed_commits": ["eb7d029", "c3eed71", "0aa8694"],
+  "completed_note": "Shipped across three commits before this reconcile: eb7d029 offloaded $RefParser + computeDiff to src/workers/diff-worker.js with src/hooks/use-diff-worker.js lifecycle; c3eed71 surfaced real worker errors and pre-bundled $RefParser for dev; 0aa8694 polyfilled Buffer in the worker context. FetchProgress already animates through dereference/diff stages (DiffViewer.jsx:107-125). Cancel affordance (step-4) is partial — Reset clears results but does not terminate the worker; enqueued as wp-fix-diff-worker-cancel-affordance.",
   "topology": "pipeline",
   "budget": "~45000 tokens",
   "prior_work": {

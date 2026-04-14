@@ -3,7 +3,8 @@
   "title": "Consolidate vite.config.js and vite.config.ts into a single source of truth",
   "adr": "ADR-012",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-14",
   "topology": "pipeline",
   "budget": "~15000 tokens",
   "prior_work": {
