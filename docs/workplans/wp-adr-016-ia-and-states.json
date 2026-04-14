@@ -1,0 +1,108 @@
+{
+  "id": "wp-adr-016-ia-and-states",
+  "title": "ADR-016: Information architecture — empty/loading/error states, async state hook, keyboard help overlay, progressive disclosure",
+  "adr": "ADR-016",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~70000 tokens",
+  "prior_work": {
+    "done": [
+      "@tanstack/react-query installed (unused for network async today)",
+      "cmdk installed — used in ADR-015 palette"
+    ],
+    "blocked_by": ["wp-adr-014-design-tokens", "wp-adr-015-shadcn-adoption"]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Wire empty states into primary surfaces. SpecInput empty editor: EmptyState with action buttons (Drop spec / Paste URL / Pick provider). DiffResults empty: two variants — 'No diff computed yet' (run Diff action) vs 'Specs are identical' (checkmark icon, t-meta hint). MigrationGuide empty: 'Compute a diff to generate migration steps'. ProviderSidebar empty: 'Add a provider in Settings'.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "every primary surface renders a meaningful EmptyState instead of blank markup when data is absent"
+    },
+    {
+      "id": "step-2",
+      "description": "Create src/hooks/use-async-state.js. Exposes { status, data, error, run } where status cycles idle → loading → success/error. Replaces try/catch+setState boilerplate. Not for network (use react-query for that) — only for parse/diff/build compute steps.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "hook exported; unit-tested with a sync success + sync failure case"
+    },
+    {
+      "id": "step-3",
+      "description": "Adopt react-query for spec URL fetch inside SpecInput.jsx (useQuery with enabled flag triggered on submit). Show LoadingState while pending, ErrorState on failure with a Retry action that calls refetch. Respect Content-Length for determinate progress when available; else indeterminate skeleton.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "spec URL fetch shows loading skeleton then content; failure shows ErrorState with functional Retry"
+    },
+    {
+      "id": "step-4",
+      "description": "Apply use-async-state to diff computation in DiffViewer.jsx. If compute exceeds 100ms, render a diff-row skeleton using shadcn Skeleton primitives. On completion, crossfade (duration-base) to real results.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 1,
+      "done_condition": "large spec pairs show skeleton; small specs render synchronously without flash"
+    },
+    {
+      "id": "step-5",
+      "description": "Build src/components/help/KeyboardHelp.jsx — shadcn Dialog listing all shortcuts grouped (Navigation, Diff, Editor, Settings). Registered via global '?' key listener in App.jsx. Each shortcut row uses .t-meta label + kbd chrome.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "'?' opens help dialog; contents match actual registered shortcuts; Esc closes"
+    },
+    {
+      "id": "step-6",
+      "description": "Surface shortcuts in-context: every action button that has a keyboard shortcut displays it inside its shadcn Tooltip (e.g. Tooltip text 'Run diff  ⌘↵'). Build a small shortcuts registry (src/lib/shortcuts.js) that both the help dialog and the Tooltip layer read from.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-5"],
+      "tier": 1,
+      "done_condition": "shortcut-bearing buttons show the shortcut in their tooltip; registry is single source"
+    },
+    {
+      "id": "step-7",
+      "description": "Progressive disclosure on DiffResults: group rows by added/removed/modified/renamed. Each group header shows count + chevron; starts collapsed when total rows > 50, expanded otherwise. Uses shadcn Accordion.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "large diffs open to compact grouped view; small diffs render expanded as before"
+    },
+    {
+      "id": "step-8",
+      "description": "Progressive disclosure on MigrationGuide: show Timeline by default, 'View checklist' button expands full task list (Collapsible). Rename detection results fold under a 'Renames (N)' pill that expands on click.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "guide default view is timeline only; checklist opens on demand; rename pill expands"
+    },
+    {
+      "id": "step-9",
+      "description": "Run `bun run typecheck`, `bun run lint`, `hex analyze .`. No domain/port/usecase touched — only primary adapter and hooks.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1", "step-2", "step-3", "step-4", "step-5", "step-6", "step-7", "step-8"],
+      "tier": 2,
+      "done_condition": "typecheck/lint/analyze all pass"
+    }
+  ]
+}

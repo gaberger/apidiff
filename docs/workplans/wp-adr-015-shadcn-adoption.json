@@ -1,0 +1,109 @@
+{
+  "id": "wp-adr-015-shadcn-adoption",
+  "title": "ADR-015: shadcn/ui component adoption across provider sidebar, diff chips, spec input, settings, toasts, states, command palette",
+  "adr": "ADR-015",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~80000 tokens",
+  "prior_work": {
+    "done": [
+      "All @radix-ui/* primitives present in package.json",
+      "src/components/ui/ contains shadcn-generated Button, Card, Dialog, Tabs, Accordion, ToggleGroup, ScrollArea, Tooltip, Select, Input, Label, Sonner",
+      "cmdk installed, unused"
+    ],
+    "blocked_by": ["wp-adr-014-design-tokens (tokens must land first)"]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Replace hand-rolled collapsible in src/components/sidebar/ProviderSidebar.jsx with shadcn Accordion + ScrollArea. Each provider group becomes an AccordionItem. Preserve existing click-to-load behavior. Tooltips on provider logos use shadcn Tooltip. ARIA + keyboard nav come free from Radix.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "sidebar renders with Accordion; keyboard arrow nav works; no regressions to provider click-load"
+    },
+    {
+      "id": "step-2",
+      "description": "Replace diff filter chips in src/components/diff/DiffSummary.jsx with shadcn ToggleGroup type='multiple'. Selected filters drive existing filter state. Keep count badges per chip.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "filter chips use ToggleGroup; multi-select filtering still works; keyboard roving tabindex functional"
+    },
+    {
+      "id": "step-3",
+      "description": "Refactor src/components/diff/SpecInput.jsx input-mode selector (file / URL / paste) to shadcn Tabs. TabsContent per mode wraps existing editor/URL-field/drop-zone components. Default tab = file.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "three tabs render; switching preserves input content per tab; editor overlay (ADR-007) still aligned"
+    },
+    {
+      "id": "step-4",
+      "description": "Sweep src/pages/settings/* forms: replace native <input>, <select>, <label> with shadcn Input, Select, Label. Wire with react-hook-form + shadcn Form wrapper for consistent validation. Preserve existing validation rules (registry URL, API key format).",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "all settings forms use shadcn Form primitives; submit + validation behavior unchanged"
+    },
+    {
+      "id": "step-5",
+      "description": "Consolidate toast/alert surfaces on sonner (already installed). Remove ad-hoc alert divs. Add <Toaster /> once in App.jsx. Replace window.alert calls with toast.error / toast.success.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "grep for `window.alert|alert\\(` in src/components,src/pages returns zero; all user-facing notifications go through sonner"
+    },
+    {
+      "id": "step-6",
+      "description": "Create src/components/ui/states/{EmptyState,LoadingState,ErrorState}.jsx. Each accepts { title, description, actions, icon } and renders using ADR-014 tokens (t-h2, t-body, t-meta, shadow-e1). Export from src/components/ui/states/index.js.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "three wrapper components exported; storybook-style manual render in DiffViewer shows correct layout"
+    },
+    {
+      "id": "step-7",
+      "description": "Add command palette: src/components/command/CommandPalette.jsx using cmdk + shadcn Dialog. Global ⌘K / Ctrl+K opens. Commands: Go to Diff, Go to Guide, Go to Settings, Load Provider (submenu), Run Diff, Export Guide. Commands fire existing navigation/actions.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-6"],
+      "tier": 1,
+      "done_condition": "⌘K opens palette; typing filters commands; Enter executes; Esc closes"
+    },
+    {
+      "id": "step-8",
+      "description": "Enforce import discipline: run `grep -r '@radix-ui/' src/components src/pages --include='*.jsx' --include='*.tsx'` and confirm only files under src/components/ui import from @radix-ui. Any violating feature component must re-import from the src/components/ui wrapper.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1", "step-2", "step-3", "step-4"],
+      "tier": 2,
+      "done_condition": "no direct @radix-ui imports outside src/components/ui"
+    },
+    {
+      "id": "step-9",
+      "description": "Run `bun run typecheck`, `bun run lint`, `hex analyze .`. No primary adapter should import from another adapter. Composition-root untouched.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-7", "step-8"],
+      "tier": 3,
+      "done_condition": "typecheck/lint/analyze all pass"
+    }
+  ]
+}

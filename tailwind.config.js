@@ -86,6 +86,23 @@ module.exports = {
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
   			'accordion-up': 'accordion-up 0.2s ease-out'
+  		},
+  		boxShadow: {
+  			'e0': 'var(--elevation-0)',
+  			'e1': 'var(--elevation-1)',
+  			'e2': 'var(--elevation-2)',
+  			'e3': 'var(--elevation-3)',
+  			'e4': 'var(--elevation-4)'
+  		},
+  		transitionDuration: {
+  			'fast': 'var(--motion-fast)',
+  			'base': 'var(--motion-base)',
+  			'slow': 'var(--motion-slow)'
+  		},
+  		transitionTimingFunction: {
+  			'standard': 'var(--ease-standard)',
+  			'emphasized': 'var(--ease-emphasized)',
+  			'decel': 'var(--ease-decel)'
   		}
   	}
   },

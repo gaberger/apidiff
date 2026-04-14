@@ -1,0 +1,98 @@
+{
+  "id": "wp-adr-014-design-tokens",
+  "title": "ADR-014: Design system refinement — elevation, motion, density, typography tokens",
+  "adr": "ADR-014",
+  "created": "2026-04-14",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~35000 tokens",
+  "prior_work": {
+    "done": [
+      "src/index.css — HSL color tokens defined for light and dark mode",
+      "tailwind.config.js — shadcn-standard theme extension in place",
+      "tailwindcss-animate + framer-motion installed"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Add elevation shadow tokens to src/index.css :root and .dark blocks. Define --elevation-0..4 as box-shadow strings. Dark variant uses hsl(var(--primary) / 0.15) tinted shadow, light uses neutral gray. Tokens: e0 none, e1 0 1px 2px, e2 0 2px 8px, e3 0 8px 24px, e4 0 16px 48px.",
+      "layer": "adapters/primary",
+      "adapter": "react-css",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "index.css exposes --elevation-0 through --elevation-4 in both light and dark scopes"
+    },
+    {
+      "id": "step-2",
+      "description": "Extend tailwind.config.js theme.boxShadow with shadow-e0..e4 keys that read the CSS vars (`'e1': 'var(--elevation-1)'`). Build succeeds.",
+      "layer": "config",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 0,
+      "done_condition": "tailwind config maps e0..e4 to CSS vars; `bun run build` passes"
+    },
+    {
+      "id": "step-3",
+      "description": "Add motion tokens to index.css: --motion-fast (120ms), --motion-base (220ms), --motion-slow (360ms), --ease-standard (cubic-bezier(0.2,0,0,1)), --ease-emphasized (cubic-bezier(0.2,0,0,1.1)), --ease-decel (cubic-bezier(0,0,0.2,1)). Extend tailwind transitionDuration and transitionTimingFunction with matching keys.",
+      "layer": "adapters/primary",
+      "adapter": "react-css",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 1,
+      "done_condition": "duration-fast, ease-standard, etc. are usable Tailwind classes"
+    },
+    {
+      "id": "step-4",
+      "description": "Add typography rhythm classes in src/index.css @layer components: .t-display, .t-h1, .t-h2, .t-body, .t-meta per ADR-014 spec (sizes/weights/tracking). .t-meta uses uppercase + text-muted-foreground.",
+      "layer": "adapters/primary",
+      "adapter": "react-css",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "semantic typography classes resolve and render at specified sizes/weights"
+    },
+    {
+      "id": "step-5",
+      "description": "Add density attribute styles in index.css: [data-density='compact'] .dsy-row scoped py-1.5 text-sm; [data-density='comfortable'] .dsy-row py-3 text-base. Default data-density=comfortable applied to <html> via main.jsx.",
+      "layer": "adapters/primary",
+      "adapter": "react-css",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "toggling data-density on <html> switches row padding in preview"
+    },
+    {
+      "id": "step-6",
+      "description": "Sweep src/components/diff/*.jsx, src/components/sidebar/*.jsx, src/components/guide/*.jsx and src/pages/*.jsx: replace ad-hoc shadow-sm/shadow-md with shadow-e1/e2/e3; replace duration-150/200/300 with duration-fast/base/slow; replace heading Tailwind stacks with .t-h1/.t-h2/.t-meta. Do NOT change layout or logic — tokens only.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-2", "step-3", "step-4"],
+      "tier": 2,
+      "done_condition": "grep for `shadow-sm|shadow-md|duration-150|duration-200|duration-300` in src/components returns zero; visual regression eyeballed on DiffViewer"
+    },
+    {
+      "id": "step-7",
+      "description": "Tag diff table rows and sidebar rows with .dsy-row class so density scale applies. Add density toggle button (Sun-like icon pair) to DiffViewer header that flips data-density on <html>. Persist choice in localStorage('apidiff:density').",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-5", "step-6"],
+      "tier": 3,
+      "done_condition": "density toggle visible; clicking changes diff row padding; choice persists across reload"
+    },
+    {
+      "id": "step-8",
+      "description": "Run `bun run typecheck`, `bun run lint`, and `hex analyze .` — must all pass with zero new violations. Architecture boundaries untouched (CSS-only + primary adapter components).",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-7"],
+      "tier": 4,
+      "done_condition": "typecheck/lint/analyze all pass"
+    }
+  ]
+}
