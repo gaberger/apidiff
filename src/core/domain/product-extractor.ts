@@ -35,7 +35,12 @@ export function extractProduct(
   }
 
   // ── GitHub REST: descriptions/{api.github.com|ghes-3.x|ghec}/*
-  if (slug === "github") {
+  // Match by slug OR by URL shape so custom-named integrations (e.g.,
+  // "github-rest", "GitHub") still get the right deployment-variant grouping
+  // instead of falling through to the generic matcher.
+  const looksLikeGitHubRest = /rest-api-description\//i.test(safeUrl) ||
+    /descriptions(?:-next)?\/(api\.github\.com|ghec|ghes-\d+\.\d+)\//i.test(safeUrl);
+  if (slug === "github" || looksLikeGitHubRest) {
     const m = safeUrl.match(/descriptions(?:-next)?\/([^/]+)\//i);
     if (m) return { key: m[1].toLowerCase(), name: prettyGitHub(m[1]) };
   }
@@ -169,6 +174,17 @@ function titleCase(s: string): string {
 }
 
 function isGenericDirName(name: string): boolean {
-  const generic = new Set(["openapi", "spec", "specs", "api", "apis", "schema", "schemas", "dist", "json", "yaml", "src"]);
-  return generic.has(name.toLowerCase());
+  const lc = name.toLowerCase();
+  const generic = new Set([
+    // Structural / build directories
+    "openapi", "spec", "specs", "api", "apis", "schema", "schemas", "dist", "json", "yaml", "yml", "src", "descriptions", "descriptions-next", "docs", "doc",
+    // Release channels (these are NOT products — they are rollout stages)
+    "latest", "preview", "stable", "edge", "next", "main", "master", "beta", "alpha", "rc", "nightly", "canary", "experimental", "current",
+  ]);
+  if (generic.has(lc)) return true;
+  // Version-shaped directory names are NOT products — they are versions.
+  if (/^\d{4}-\d{2}-\d{2}/.test(lc)) return true;
+  if (/^v?\d+(\.\d+){0,2}$/.test(lc)) return true;
+  if (/^\d{4}$/.test(lc)) return true;
+  return false;
 }
