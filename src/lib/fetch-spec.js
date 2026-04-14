@@ -28,26 +28,42 @@ export async function fetchSpec(url, { onProgress, bypassCache = false } = {}) {
   }
 
   emit(onProgress, "fetching", { url });
-  let document;
+  let response;
   try {
-    const response = await base44.functions.invoke("proxyFetch", { url });
-    document = response?.data?.document;
+    response = await base44.functions.invoke("proxyFetch", { url });
   } catch (err) {
-    emit(onProgress, "error", { url, phase: "fetch", message: err?.message });
-    throw new SpecFetchError(
-      `Fetch failed: ${err?.message ?? "unknown error"}`,
-      { url, phase: "fetch", cause: err },
-    );
+    const msg = err?.response?.data?.error || err?.message || "unknown error";
+    emit(onProgress, "error", { url, phase: "fetch", message: msg });
+    throw new SpecFetchError(`Fetch failed: ${msg}`, { url, phase: "fetch", cause: err });
   }
 
-  if (typeof document !== "string" || document.length === 0) {
-    emit(onProgress, "error", { url, phase: "parse", message: "Empty response" });
+  const data = response?.data;
+  if (data?.error) {
+    emit(onProgress, "error", { url, phase: "proxy", message: data.error });
+    throw new SpecFetchError(data.error, { url, phase: "proxy" });
+  }
+
+  const document = data?.document;
+  if (document == null) {
+    emit(onProgress, "error", { url, phase: "parse", message: "Empty response from proxy" });
     throw new SpecFetchError("Empty response from proxy", { url, phase: "parse" });
   }
 
-  emit(onProgress, "caching", { url, size: document.length });
-  specCache.put(url, document);
+  // proxyFetch may return `document` as a parsed object (when it auto-parsed
+  // JSON) or as a string (for YAML / raw text). Normalize to string for both
+  // caching and downstream parsing, which expects a string.
+  const content = typeof document === "string"
+    ? document
+    : JSON.stringify(document, null, 2);
 
-  emit(onProgress, "done", { url, size: document.length });
-  return document;
+  if (content.length === 0) {
+    emit(onProgress, "error", { url, phase: "parse", message: "Empty document" });
+    throw new SpecFetchError("Empty document", { url, phase: "parse" });
+  }
+
+  emit(onProgress, "caching", { url, size: content.length });
+  specCache.put(url, content);
+
+  emit(onProgress, "done", { url, size: content.length });
+  return content;
 }
