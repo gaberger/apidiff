@@ -114,8 +114,11 @@ export function useDiffWorker() {
       }
     };
 
-    const [{ resolved: oldResolved, stringified: oldStringified, refCount: oldRefs },
-           { resolved: newResolved, stringified: newStringified, refCount: newRefs }] =
+    // Deref workers now only send back stringified JSON (no resolved object).
+    // This eliminates the structured-clone of the full spec graph across the
+    // worker→main boundary (B1a fix).
+    const [{ stringified: oldStringified, refCount: oldRefs },
+           { stringified: newStringified, refCount: newRefs }] =
       await Promise.all([
         runOnce(derefOld, oldPayload, { onProgress: forward }),
         runOnce(derefNew, newPayload, { onProgress: forward }),
@@ -126,7 +129,9 @@ export function useDiffWorker() {
       throw new Error("cancelled");
     }
 
-    const diffResult = await runOnce(diff, { id, oldResolved, newResolved, signal }, { onProgress, onPartial });
+    // Pass JSON strings to the diff worker — it parses them internally (off-thread).
+    // This eliminates the second structured-clone: main→diff-worker (B1b fix).
+    const diffResult = await runOnce(diff, { id, oldJson: oldStringified, newJson: newStringified, signal }, { onProgress, onPartial });
 
     if (cancelledIdsRef.current.has(id)) {
       cancelledIdsRef.current.delete(id);
@@ -136,8 +141,6 @@ export function useDiffWorker() {
     return {
       results: JSON.parse(diffResult.resultsJson),
       summaryCounts: diffResult.summaryCounts,
-      oldResolved,
-      newResolved,
       oldStringified,
       newStringified,
       refsResolved: (oldRefs + newRefs) > 0 ? { old: oldRefs, new: newRefs } : null,

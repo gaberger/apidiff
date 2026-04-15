@@ -1,10 +1,15 @@
-// Diff worker — accepts pre-resolved spec objects from the dereference
+// Diff worker — accepts pre-resolved specs as JSON strings from the dereference
 // worker pool and runs the two-pass diff:
 //   pass 1: computeStructuralDiff (fast, exact-path) → posts partial-results
 //   pass 2: enrichDiffWithRenames (slow, fuzzy) → posts done
 //
 // Parsing + $ref resolution moved to src/workers/dereference-worker.js so
 // they can run in parallel for old + new specs.
+//
+// Specs are received as JSON strings (oldJson/newJson) rather than objects.
+// This avoids the structured-clone of the full object graph across the
+// main→worker boundary — JSON.parse here is off-thread and doesn't block
+// the browser (B1b fix).
 
 import { computeStructuralDiff, enrichDiffWithRenames } from "../lib/domain/diff-algorithm.js";
 import { flatten } from "../lib/domain/flatten.js";
@@ -14,13 +19,13 @@ function isAborted(signal) {
 }
 
 self.addEventListener("message", (e) => {
-  const { id, oldResolved, newResolved, signal } = e.data || {};
+  const { id, oldJson, newJson, signal } = e.data || {};
   try {
     self.postMessage({ id, type: "progress", stage: "flattening-old" });
-    const fa = flatten(oldResolved);
+    const fa = flatten(JSON.parse(oldJson));
 
     self.postMessage({ id, type: "progress", stage: "flattening-new" });
-    const fb = flatten(newResolved);
+    const fb = flatten(JSON.parse(newJson));
 
     self.postMessage({ id, type: "progress", stage: "diffing-structural" });
     const structural = computeStructuralDiff(fa, fb);

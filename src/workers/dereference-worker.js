@@ -11,11 +11,6 @@ globalThis.Buffer = Buffer;
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import YAML from "yaml";
 
-function countRefs(obj) {
-  try { return (JSON.stringify(obj).match(/"\$ref"/g) || []).length; }
-  catch { return 0; }
-}
-
 function parseSpec(text, sideLabel) {
   const trimmed = text.trim();
   if (!trimmed) throw new Error(`${sideLabel} spec is empty`);
@@ -40,16 +35,25 @@ self.addEventListener("message", async (e) => {
     const parsed = text !== undefined ? parseSpec(text, sideLabel || "spec") : spec;
 
     self.postMessage({ id, type: "progress", stage: "dereferencing" });
-    const refCount = countRefs(parsed);
+    // Count refs on the raw text string when available — avoids a full JSON.stringify
+    // of the parsed object just to count occurrences (B2 fix).
+    const refCount = text !== undefined
+      ? (text.match(/"\$ref"\s*:/g) || []).length
+      : (() => { try { return (JSON.stringify(parsed).match(/"\$ref"/g) || []).length; } catch { return 0; } })();
+    // $RefParser.dereference does not mutate an exclusively-owned input; the
+    // worker owns `parsed` so structuredClone is unnecessary here (B3 fix).
     const resolved = refCount > 0
-      ? await $RefParser.dereference(structuredClone(parsed))
+      ? await $RefParser.dereference(parsed)
       : parsed;
 
-    // Stringify in the worker so the main thread never touches large spec strings.
+    // Stringify in the worker so the main thread never touches large spec objects.
     self.postMessage({ id, type: "progress", stage: "stringifying" });
     const stringified = JSON.stringify(resolved, null, 2);
 
-    self.postMessage({ id, type: "done", resolved, stringified, refCount });
+    // Only send the stringified form — resolved object is NOT sent back.
+    // This eliminates the structured-clone cost of copying a large object graph
+    // across the worker→main boundary (B1a fix).
+    self.postMessage({ id, type: "done", stringified, refCount });
   } catch (err) {
     self.postMessage({
       id,

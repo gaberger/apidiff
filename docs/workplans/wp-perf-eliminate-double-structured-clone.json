@@ -1,0 +1,56 @@
+{
+  "id": "wp-perf-eliminate-double-structured-clone",
+  "title": "Eliminate double structured-clone of resolved spec objects across worker boundaries",
+  "status": "done",
+  "priority": "high",
+  "motivation": "The resolved spec object (a fully-dereferenced JSON tree, 5–15MB) currently crosses TWO structured-clone boundaries on every diff run: (1) dereference-worker → main thread, (2) main thread → diff-worker. Each clone can freeze the main thread 200–600ms per side. The deref worker already produces a stringified JSON string; the fix is to pass that string to the diff worker which parses it internally (off-thread).",
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Remove `resolved` from dereference-worker's `done` message",
+      "description": "In src/workers/dereference-worker.js: change postMessage done payload to only send `stringified` (JSON string) and `refCount`. Drop `resolved` from the message so structured clone never copies the object to the main thread.",
+      "file": "src/workers/dereference-worker.js",
+      "status": "done"
+    },
+    {
+      "id": "T2",
+      "title": "Pass stringified JSON strings to diff-worker instead of resolved objects",
+      "description": "In src/hooks/use-diff-worker.js: after the parallel deref await, forward `{ id, oldJson: oldStringified, newJson: newStringified }` to the diff worker instead of `{ id, oldResolved, newResolved }`. Remove the structured clone of both resolved objects.",
+      "file": "src/hooks/use-diff-worker.js",
+      "status": "done"
+    },
+    {
+      "id": "T3",
+      "title": "Parse JSON strings inside diff-worker before flattening",
+      "description": "In src/workers/diff-worker.js: accept `{ oldJson, newJson }` strings, call JSON.parse on each (off-thread), then pass the parsed objects to flatten(). Add a progress stage 'parsing-old'/'parsing-new' before 'flattening-old'/'flattening-new'.",
+      "file": "src/workers/diff-worker.js",
+      "status": "done"
+    },
+    {
+      "id": "T4",
+      "title": "Update runDiff return type — drop resolved, keep stringified",
+      "description": "In src/hooks/use-diff-worker.js: the runDiff() return no longer has oldResolved/newResolved (they were never serialized to the main thread). Callers that need the object can JSON.parse(oldStringified) lazily. Update the return shape.",
+      "file": "src/hooks/use-diff-worker.js",
+      "status": "done"
+    },
+    {
+      "id": "T5",
+      "title": "Fix countRefs: count on original text string, not serialized object",
+      "description": "In src/workers/dereference-worker.js: replace countRefs(parsed) with a regex on the original `text` input. This eliminates a hidden O(n) JSON.stringify just to count $ref occurrences.",
+      "file": "src/workers/dereference-worker.js",
+      "status": "done"
+    },
+    {
+      "id": "T6",
+      "title": "Remove structuredClone(parsed) before $RefParser.dereference",
+      "description": "In src/workers/dereference-worker.js: $RefParser.dereference does not mutate its input. The structuredClone guard is unnecessary and costs 50–200ms on large specs. Remove it.",
+      "file": "src/workers/dereference-worker.js",
+      "status": "done"
+    }
+  ],
+  "follow_on": [
+    "Switch Shiki to WASM oniguruma engine (shiki-bundle.ts) for 3-5x faster colorization",
+    "Move JSON.parse(resultsJson) off main thread via micro-task chunking",
+    "Re-enable enrichDiffWithRenames with FUZZY_SIZE_LIMIT guard once freeze root cause (double clone) is resolved"
+  ]
+}
