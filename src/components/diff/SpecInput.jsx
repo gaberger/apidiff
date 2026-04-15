@@ -103,7 +103,7 @@ function colorizeJsonLine(line) {
   return tokens;
 }
 
-export default function SpecInput({
+const SpecInputRaw = React.memo(function SpecInput({
   label,
   value,
   onChange,
@@ -476,4 +476,8 @@ export default function SpecInput({
       />
     </div>
   );
+});
+
+export default function SpecInput(props) {
+  return <SpecInputRaw {...props} />;
 }

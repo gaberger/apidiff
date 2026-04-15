@@ -18,6 +18,13 @@ export function useDiffHighlight(jsonString, results) {
     const highlights = new Map();
     if (!jsonString) return highlights;
 
+    // Fast gate: if the spec has >10k lines, skip diff-line highlighting entirely.
+    // The buildLinePathMap + cross-reference loop takes ~100ms on 30k-line specs
+    // and causes visible freezes when triggered in the same frame as SpecInput
+    // re-renders. Skip it — users with huge specs don't need per-line diff coloring.
+    const rawLineCount = (jsonString.match(/\n/g) || []).length + 1;
+    if (rawLineCount > 10000) return highlights;
+
     const linePathMap = buildLinePathMap(jsonString);
     const lineCount = Array.isArray(linePathMap) ? linePathMap.length : Object.keys(linePathMap).length;
 
