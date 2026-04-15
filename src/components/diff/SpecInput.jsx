@@ -126,6 +126,7 @@ export default function SpecInput({
   const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState("");
   const [activeHighlight, setActiveHighlight] = useState(null);
+  const [highlightedLines, setHighlightedLines] = useState(null);
 
   // Track active highlight line (no timeout — stays until new click)
   useEffect(() => {
@@ -136,50 +137,54 @@ export default function SpecInput({
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
 
-  // Stage 1 — colorize every line ONCE per value change. This is the expensive
-  // part (colorizeJsonLine returns arrays of React elements). For huge specs
-  // (>10k lines) skip JSON syntax coloring entirely and render plain text —
-  // avoids minutes of render work when loading a 30k-line dereferenced Twilio
-  // spec. Users trade syntax color for a usable load; diff row highlighting
-  // still works.
-  const HIGHLIGHT_LINE_LIMIT = 10000;
-  const colorizedRows = useMemo(() => {
-    if (!value) return null;
-    const lines = value.split("\n");
-    if (lines.length > HIGHLIGHT_LINE_LIMIT) {
-      return lines.map((line, i) => ({ i, children: line }));
-    }
-    return lines.map((line, i) => ({ i, children: colorizeJsonLine(line) }));
-  }, [value]);
+  // Deferred colorization: when value changes, render plain text immediately so
+  // the textarea is usable right away, then compute JSON syntax coloring in the
+  // background and swap it in. This keeps the main thread unblocked during the
+  // setBefore/setAfter calls after a large spec loads.
+  const lines = useMemo(() => value ? value.split("\n") : [], [value]);
+  const editorHeight = 520;
 
-  // Stage 2 — wrap rows with diff-bg + active-highlight styling. This memo
-  // runs on highlightMap + activeHighlight changes (clicks), but ONLY rebuilds
-  // the thin wrapper <div>s; the colorized children are referentially stable
-  // so React skips their reconciliation.
-  const highlightedLines = useMemo(() => {
-    if (!colorizedRows) return null;
-    const diffBgColors = {
-      removed: "bg-red-50 dark:bg-red-900/30",
-      added: "bg-green-50 dark:bg-green-900/30",
-      renamed: "bg-purple-50 dark:bg-purple-900/30",
-      moved: "bg-blue-50 dark:bg-blue-900/30",
-      "type-change": "bg-amber-50 dark:bg-amber-900/30",
-      changed: "bg-amber-50 dark:bg-amber-900/30",
-    };
-    return colorizedRows.map(({ i, children }) => {
-      const diffInfo = diffHighlightMap?.get(i);
-      const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
-      const isActive = activeHighlight === i;
-      const style = isActive
-        ? { backgroundColor: "rgba(251,191,36,0.5)", borderTop: "1px solid rgba(245,158,11,0.7)", borderBottom: "1px solid rgba(245,158,11,0.7)", display: "block", minWidth: "100%" }
-        : { display: "block", minWidth: "100%" };
-      return (
-        <div key={i} className={bgClass} style={style}>
-          {children}
-        </div>
-      );
-    });
-  }, [colorizedRows, diffHighlightMap, activeHighlight]);
+  useEffect(() => {
+    if (!value) { setHighlightedLines(null); return; }
+
+    // Render plain text immediately — zero computation, instant paint.
+    const plainLines = lines.map((line, i) => (
+      <div key={i} style={{ display: "block", minWidth: "100%" }}>{line}</div>
+    ));
+    setHighlightedLines(plainLines);
+
+    // Colorize in the background using requestIdleCallback. For specs >5k lines
+    // skip colorizing entirely to avoid blocking the main thread for seconds.
+    const LINE_LIMIT = 5000;
+    if (lines.length > LINE_LIMIT) return;
+
+    const id = requestIdleCallback(() => {
+      const diffBgColors = {
+        removed: "bg-red-50 dark:bg-red-900/30",
+        added: "bg-green-50 dark:bg-green-900/30",
+        renamed: "bg-purple-50 dark:bg-purple-900/30",
+        moved: "bg-blue-50 dark:bg-blue-900/30",
+        "type-change": "bg-amber-50 dark:bg-amber-900/30",
+        changed: "bg-amber-50 dark:bg-amber-900/30",
+      };
+      const colored = lines.map((line, i) => {
+        const diffInfo = diffHighlightMap?.get(i);
+        const bgClass = diffInfo ? diffBgColors[diffInfo.type] || "" : "";
+        const isActive = activeHighlight === i;
+        const style = isActive
+          ? { backgroundColor: "rgba(251,191,36,0.5)", borderTop: "1px solid rgba(245,158,11,0.7)", borderBottom: "1px solid rgba(245,158,11,0.7)", display: "block", minWidth: "100%" }
+          : { display: "block", minWidth: "100%" };
+        return (
+          <div key={i} className={bgClass} style={style}>
+            {colorizeJsonLine(line)}
+          </div>
+        );
+      });
+      setHighlightedLines(colored);
+    }, { timeout: 2000 });
+
+    return () => cancelIdleCallback(id);
+  }, [value, lines, diffHighlightMap, activeHighlight]);
 
   // Drag counter to handle nested drag events
   const dragCounter = useRef(0);
@@ -283,12 +288,6 @@ export default function SpecInput({
       setIsFetching(false);
     }
   }, [fetchUrl, onChange]);
-
-  // ── Line numbers ──
-  const lines = useMemo(() => {
-    if (!value) return [];
-    return value.split("\n");
-  }, [value]);
 
   const lineCount = lines.length || 1;
 
