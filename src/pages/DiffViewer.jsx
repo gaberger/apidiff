@@ -160,13 +160,12 @@ export default function DiffViewer() {
   };
 
   const handleLoadSpecs = async (v1, v2, label) => {
-    // Drop the textareas to a tiny placeholder immediately so React's
-    // controlled-input render of the previous (potentially multi-MB) value
-    // doesn't compound with the new one. JSON.stringify of the new specs
-    // and the corresponding textarea repaints are deferred to a microtask
-    // after the worker completes — see the setTimeout below.
-    setBefore("");
-    setAfter("");
+    // Keep the current editor content visible under the spinner. Previously we
+    // called setBefore("")/setAfter("") here to avoid re-rendering a large
+    // textarea, but that showed a blank window under the spinner during the
+    // entire worker run — worse UX than keeping stale content visible.
+    // JSON.stringify of the resolved specs is deferred to a setTimeout after
+    // the worker completes so it doesn't compete with the spinner.
     setResults(null);
     setGuide(null);
     setError(null);
