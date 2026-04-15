@@ -101,22 +101,17 @@ export default function DiffViewer() {
           }
           setFetchStages(stages.map((s) => ({ ...s })));
         },
-        // Two-pass: structural results land here first so the UI can paint
-        // added/removed/changed badges in <1s on multi-MB specs. The full
-        // enriched results (with rename + move detection) replace these
-        // when the second pass completes.
-        onPartial: (partialResults) => {
-          setResults(partialResults);
-        },
+        // onPartial is removed — showing partial structural results mid-fuzzy-pass
+        // triggers expensive DiffResults re-renders that compete with the spinner.
+        // Keep the spinner covering both editors until the fuzzy pass (the longest
+        // step) is fully done, then show results in one shot.
       });
 
       stages[3].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // Final enriched results: replaces the partial set in place. React
-      // reconciles the diff list — added/removed entries that became
-      // renames/moves swap their rendered row without remounting (stable
-      // keys on path in DiffResults make this work).
+      // All worker stages done — safe to show results. setResults triggers the
+      // first render of DiffResults (single paint, no competing spinner).
       setResults(workerResults);
       setRefsResolved(rr);
 
@@ -201,16 +196,14 @@ export default function DiffViewer() {
             return s;
           }));
         },
-        onPartial: (partialResults) => {
-          setResults(partialResults);
-        },
+        // onPartial removed — same reasoning as handleCompare: spinner covers
+        // editors through all worker stages; show results only when fully done.
       });
       setFetchStages((prev) => prev.map((s) =>
         s.id === "diff-structural" || s.id === "diff-fuzzy" || s.id === "deref"
           ? { ...s, status: "complete" }
           : s,
       ));
-      // Final enriched results — replaces partial set in place.
       setResults(workerResults);
       // Capture scroll before replacing textarea content so the user
       // doesn't lose their navigation context, then restore after React
