@@ -139,7 +139,9 @@ export function useDiffWorker() {
     }
 
     return {
-      results: JSON.parse(diffResult.resultsJson),
+      // Return the raw JSON string — caller parses it lazily (e.g. inside a
+      // setTimeout) so this parse never blocks the main thread on the hot path.
+      resultsJson: diffResult.resultsJson,
       summaryCounts: diffResult.summaryCounts,
       oldStringified,
       newStringified,

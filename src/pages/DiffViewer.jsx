@@ -77,7 +77,7 @@ export default function DiffViewer() {
     setFetchStages(stages.map((s) => ({ ...s })));
 
     try {
-      const { results: workerResults, summaryCounts: workerCounts, oldResolved, newResolved, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
+      const { resultsJson: workerResultsJson, summaryCounts: workerCounts, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
         onProgress: (evt) => {
           if (evt.stage === "dereferencing" || evt.stage === "stringifying") {
             stages[0].status = "complete";
@@ -118,7 +118,9 @@ export default function DiffViewer() {
       if (oldStringified) setBefore(oldStringified);
       if (newStringified) setAfter(newStringified);
       setResolving(false);
-      setTimeout(() => { setResults(workerResults); }, 0);
+      // JSON.parse deferred here — runs after the browser paints spinner-dismissal.
+      // Parsing 30k diff objects synchronously before this point would block that paint.
+      setTimeout(() => { setResults(JSON.parse(workerResultsJson)); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -165,7 +167,7 @@ export default function DiffViewer() {
       // structured cloning at the postMessage boundary — for already-parsed
       // API responses, this avoids a redundant main-thread JSON.stringify
       // followed by JSON.parse inside the worker.
-      const { results: workerResults, summaryCounts: workerCounts, oldResolved, newResolved, oldStringified, newStringified } = await runDiff(v1, v2, {
+      const { resultsJson: workerResultsJson, summaryCounts: workerCounts, oldStringified, newStringified } = await runDiff(v1, v2, {
         onProgress: (evt) => {
           setFetchStages((prev) => prev.map((s) => {
             if ((s.id === "process") && (evt.stage === "dereferencing" || evt.stage === "stringifying")) {
@@ -190,7 +192,7 @@ export default function DiffViewer() {
       if (oldStringified) setBefore(oldStringified);
       if (newStringified) setAfter(newStringified);
       setResolving(false);
-      setTimeout(() => { setResults(workerResults); }, 0);
+      setTimeout(() => { setResults(JSON.parse(workerResultsJson)); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
