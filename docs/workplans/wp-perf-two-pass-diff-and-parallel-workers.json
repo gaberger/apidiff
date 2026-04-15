@@ -1,0 +1,108 @@
+{
+  "id": "wp-perf-two-pass-diff-and-parallel-workers",
+  "title": "Perf: two-pass diff (structural-first → fuzzy-rename second) + parallel-worker dereference",
+  "adr": "ADR-014",
+  "created": "2026-04-15",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~30000 tokens",
+  "prior_work": {
+    "done": [
+      "Commit 84240f1 moved spec parsing + ref-collection into the diff-worker; click-handler violation cleared.",
+      "Commit eb7d029 + c3eed71 + 0aa8694 hardened the worker pipeline ($RefParser pre-bundle, Buffer polyfill, real error surfacing).",
+      "Commit 3af08da fixed two quadratic hot paths in computeDiff.",
+      "Audit 2026-04-15: switching diff engine to Atlassian openapi-diff or oasdiff was rejected because both lack fuzzy-rename + move detection that buildGuide depends on. Slowness is data-size, not algorithm quality."
+    ]
+  },
+  "problem": "Even with diff in a Web Worker, multi-MB resolved specs take 5-15s wall-clock to dereference + diff. The user sees a spinner the whole time and can't interact with partial results. Two correctable inefficiencies: (1) the worker dereferences old → THEN new sequentially when they're independent; (2) computeDiff runs the expensive fuzzy-rename + value-similarity matching pass before posting any results, even though the cheap structural diff (added/removed by exact path) is enough to render a useful first paint.",
+  "design_notes": [
+    "Two-pass: split computeDiff into computeStructuralDiff (exact-path adds/removes/value-changes only — fast O(n)) and enrichWithFuzzyMatches (the matchScore + Levenshtein pass that detects renames and moves — currently the dominant cost). Worker posts {type:'partial-results'} after pass 1, then {type:'done'} after pass 2 with the rename-merged superset. DiffViewer renders pass-1 immediately and merges pass-2 in place when it arrives.",
+    "Parallel workers: spawn TWO additional workers for dereference. Old goes to worker-A, new to worker-B, while the existing diff-worker (or main coordinator) waits on Promise.all. After both resolve, postMessage one of the resolved specs into the diff-worker for the actual diff. Net: dereference wall-clock halves (deref is the dominant cost on most specs).",
+    "Compatibility: the partial-results path must be opt-in via a runDiff option so callers that need the merged result can wait. Default: stream both. DiffViewer.handleCompare and handleLoadSpecs both opt into streaming.",
+    "Cancellation interaction: cancelDiff() must terminate the deref worker pool too, not just the diff worker. Worker pool lives in use-diff-worker.js."
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Split src/lib/domain/diff-algorithm.js into two exported functions: computeStructuralDiff(a, b) — fast pass producing only 'added', 'removed', and 'changed' (exact path match) results — and enrichDiffWithRenames(structuralResults, a, b) — the existing fuzzy-rename + move detection pass that mutates added+removed entries into 'renamed'/'moved' where matches are found. The existing computeDiff stays as a convenience wrapper that calls both. This is a refactor with zero behavior change in the wrapper; new exports are the surface area for two-pass callers.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "files": ["src/lib/domain/diff-algorithm.js", "src/core/domain/diff-algorithm.ts"],
+      "done_condition": "computeStructuralDiff + enrichDiffWithRenames exported; existing computeDiff still passes its current tests (`bun test`); type signatures match between .js and .ts copies (sync:lib script runs clean)"
+    },
+    {
+      "id": "step-2",
+      "description": "Update src/workers/diff-worker.js to post a 'partial-results' message after computeStructuralDiff, then run enrichDiffWithRenames and post 'done' with the enriched results. Both messages include the same id; the consumer merges by replacing partial with final. Add a 'fuzzy-matching' progress stage between dereferencing and diffing for the banner.",
+      "layer": "adapters/primary",
+      "adapter": "web-worker",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 0,
+      "files": ["src/workers/diff-worker.js"],
+      "done_condition": "worker posts {type:'partial-results', results} then {type:'done', results, oldResolved, newResolved, refsResolved}; manual postMessage roundtrip on a sample spec returns both messages with the partial subset of the final"
+    },
+    {
+      "id": "step-3",
+      "description": "Update src/hooks/use-diff-worker.js to handle the new message types. runDiff signature gains an optional onPartial(results) callback. When the worker posts 'partial-results', invoke onPartial. When it posts 'done', resolve the promise with the final results. Without onPartial, the partial message is dropped (legacy callers see no behavior change).",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": ["step-2"],
+      "tier": 1,
+      "files": ["src/hooks/use-diff-worker.js"],
+      "done_condition": "runDiff(spec1, spec2, {onPartial}) calls onPartial with structural-only results before resolving with full results; onPartial-less callers see no change"
+    },
+    {
+      "id": "step-4",
+      "description": "Wire the partial pass into DiffViewer.jsx. Both handleCompare and handleLoadSpecs pass onPartial: (partial) => setResults(partial). The user sees added/removed paths within ~1-2s on big specs; renames + moves merge in when the second pass completes. Update FetchProgress stages to show 'Computing structural diff' → 'Detecting renames' → 'Done'.",
+      "layer": "adapters/primary",
+      "adapter": "react-components",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 2,
+      "files": ["src/pages/DiffViewer.jsx"],
+      "done_condition": "loading a multi-MB spec pair shows added/removed paths first, then DiffResults visibly updates with rename badges seconds later; no flicker (React reconciles in place)"
+    },
+    {
+      "id": "step-5",
+      "description": "Add a parallel dereference worker pool in src/workers/. Either (a) spawn a second instance of diff-worker.js and have it run a 'dereference-only' command, or (b) add src/workers/dereference-worker.js with a single responsibility. Option (b) keeps the diff-worker focused. The pool lives in use-diff-worker.js — when runDiff fires, it dispatches old→workerA, new→workerB in parallel, awaits Promise.all, then dispatches the resolved pair to the existing diff-worker for the diff.",
+      "layer": "adapters/primary",
+      "adapter": "web-worker",
+      "port": "",
+      "dependencies": ["step-3"],
+      "tier": 2,
+      "files": ["src/workers/dereference-worker.js", "src/hooks/use-diff-worker.js"],
+      "done_condition": "wall-clock from runDiff invocation to onPartial fire is ≤55% of pre-change baseline on a Stripe-sized pair (rough: 8s → ~4s for the deref-bound step)"
+    },
+    {
+      "id": "step-6",
+      "description": "Cancellation propagation: useDiffWorker.cancel() must terminate the dereference worker pool too. Add a workerPoolRef array; cancel() iterates and terminates each. Pool re-spawns on next runDiff via the same ensureWorker idiom.",
+      "layer": "adapters/primary",
+      "adapter": "react-hooks",
+      "port": "",
+      "dependencies": ["step-5"],
+      "tier": 3,
+      "files": ["src/hooks/use-diff-worker.js"],
+      "done_condition": "clicking Reset mid-dereference terminates all 3 workers; next compare spawns fresh pool; no zombie worker reports in DevTools Application > Service Workers"
+    },
+    {
+      "id": "step-7",
+      "description": "Validation: bun test passes; manual smoke test on three spec pairs of different sizes (small <500KB, medium ~3MB, large >10MB resolved). Record before/after wall-clock for each. Update wp-perf-two-pass-diff-and-parallel-workers status=done with measurements in resolution_note.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-4", "step-6"],
+      "tier": 4,
+      "files": [],
+      "done_condition": "bun test green; perf measurements logged in workplan; commit message includes the measurements"
+    }
+  ],
+  "non_goals": [
+    "Replacing the diff engine with Atlassian openapi-diff or oasdiff — losing fuzzy-rename + move detection is a regression (see prior_work).",
+    "Server-side diff (ADR-019 / wp-adr-019-server-diff) — separate workplan, durable cache win is a different axis.",
+    "Virtualizing the spec textareas — a different bottleneck (controlled-input render) tracked separately if it surfaces."
+  ]
+}
