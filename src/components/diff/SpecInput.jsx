@@ -7,6 +7,36 @@ import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 const VISIBLE_LINE_BUFFER = 2;
 const LINE_HEIGHT_PX = 20.8;
 
+function PathHighlightOverlay({ activeHighlight, taRef, containerHeight }) {
+  const [scrollTop, setScrollTop] = useState(0);
+
+  useEffect(() => {
+    const ta = taRef?.current;
+    if (!ta) return;
+    const onScroll = () => setScrollTop(ta.scrollTop);
+    ta.addEventListener("scroll", onScroll, { passive: true });
+    return () => ta.removeEventListener("scroll", onScroll);
+  }, [taRef]);
+
+  const PY = 14;
+  const top = PY + (activeHighlight - 1) * LINE_HEIGHT_PX - scrollTop;
+
+  if (top < -LINE_HEIGHT_PX || top > containerHeight + LINE_HEIGHT_PX) return null;
+
+  return (
+    <div
+      className="absolute left-0 right-0 pointer-events-none z-[5]"
+      style={{
+        top,
+        height: LINE_HEIGHT_PX,
+        backgroundColor: "rgba(251,191,36,0.4)",
+        borderTop: "1px solid rgba(245,158,11,0.7)",
+        borderBottom: "1px solid rgba(245,158,11,0.7)",
+      }}
+    />
+  );
+}
+
 function LineGutter({ lineCount, scrollSyncRef }) {
   const innerRef = useRef(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -455,6 +485,15 @@ const SpecInputRaw = React.memo(function SpecInput({
             >
               <div style={{minWidth: "max-content"}}>{highlightedLines}</div>
             </pre>
+
+            {/* Highlight overlay for path-click — separate from pre rendering, works on large specs */}
+            {activeHighlight != null && isLargeSpec && (
+              <PathHighlightOverlay
+                activeHighlight={activeHighlight}
+                taRef={taRef}
+                containerHeight={520}
+              />
+            )}
 
             {/* Textarea on top — transparent text, visible caret */}
             <textarea
