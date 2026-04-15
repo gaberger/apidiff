@@ -79,22 +79,22 @@ export default function ProviderSidebar({
 
   return (
     <motion.aside
-      className={`flex flex-col border-r border-stone-200 bg-stone-100 overflow-hidden ${
+      className={`flex flex-col border-r border-border bg-secondary overflow-hidden ${
         collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl'
       }`}
       animate={{ width: collapsed ? 48 : 260 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-stone-200">
+      <div className="flex items-center justify-between px-3 py-3 border-b border-border">
         {!collapsed && (
-          <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Integrations
           </span>
         )}
         <button
           onClick={onToggleCollapse}
-          className="p-1 rounded hover:bg-stone-200 text-stone-500 transition-colors"
+          className="p-1 rounded hover:bg-accent text-muted-foreground transition-colors"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? (
@@ -106,9 +106,9 @@ export default function ProviderSidebar({
       </div>
 
       {/* Scrollable provider list */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-stone-300">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-border">
         {!collapsed && (
-          <p className="px-4 py-2 text-[11px] leading-snug text-stone-400">
+          <p className="px-4 py-2 text-[11px] leading-snug text-muted-foreground/70">
             Based on documented migration patterns. Load real specs via URL for
             exact diffs.
           </p>
@@ -122,7 +122,7 @@ export default function ProviderSidebar({
               {/* Provider header */}
               <button
                 onClick={() => !collapsed && toggleProvider(provider.id)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 hover:bg-stone-200/70 transition-colors"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-accent/70 transition-colors"
                 style={{
                   borderLeft: `3px solid ${provider.color}`,
                 }}
@@ -139,9 +139,9 @@ export default function ProviderSidebar({
                   <>
                     <span className="flex-1 truncate">{provider.name}</span>
                     {isExpanded ? (
-                      <ChevronDown className="h-3.5 w-3.5 text-stone-400" />
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70" />
                     ) : (
-                      <ChevronRight className="h-3.5 w-3.5 text-stone-400" />
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/70" />
                     )}
                   </>
                 )}
@@ -169,7 +169,7 @@ export default function ProviderSidebar({
                    {/* Pre-built comparisons */}
                    {provider.comparisons.length > 0 && (
                      <div className="px-3 pl-6 pb-1">
-                       <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1">
+                       <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-1">
                          Saved comparisons
                        </div>
                      </div>
@@ -186,14 +186,14 @@ export default function ProviderSidebar({
                            flex w-full items-center gap-2 px-4 pl-9 py-1.5 text-left text-xs transition-colors
                            ${
                              isActive
-                               ? "bg-indigo-50 text-indigo-700 font-semibold border-r-2 border-indigo-500"
-                               : "text-stone-500 hover:bg-stone-50 hover:text-stone-700"
+                               ? "bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold border-r-2 border-indigo-500 dark:border-indigo-400"
+                               : "text-muted-foreground hover:bg-muted hover:text-foreground"
                            }
                          `}
                        >
                          <span className="flex-1 truncate">{comp.label}</span>
                          {loadingKey === key && (
-                           <Loader2 className="w-3 h-3 animate-spin text-stone-400" />
+                           <Loader2 className="w-3 h-3 animate-spin text-muted-foreground/70" />
                          )}
                        </button>
                      );
@@ -206,10 +206,10 @@ export default function ProviderSidebar({
         })}
         {/* Settings link */}
         {!collapsed && (
-          <div className="border-t border-stone-200 mt-auto">
+          <div className="border-t border-border mt-auto">
             <Link
               to="/settings"
-              className="flex items-center gap-2 px-3 py-2.5 text-xs text-stone-500 hover:bg-stone-200/70 hover:text-stone-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground hover:bg-accent/70 hover:text-foreground transition-colors"
             >
               <Settings className="h-3.5 w-3.5" />
               Manage integrations

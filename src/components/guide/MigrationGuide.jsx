@@ -29,16 +29,16 @@ const BORDER_COLOR = {
 };
 
 const BADGE_STYLE = {
-  breaking: "bg-red-50 text-red-600",
-  deprecated: "bg-amber-50 text-amber-600",
-  "non-breaking": "bg-green-50 text-green-600",
+  breaking: "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300",
+  deprecated: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-300",
+  "non-breaking": "bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-300",
 };
 
 // ── Timeline Dot ──
 
 function TimelineDot({ status }) {
   if (status === "past") {
-    return <div className="w-4 h-4 rounded-full bg-stone-400 border-2 border-stone-400" />;
+    return <div className="w-4 h-4 rounded-full bg-muted-foreground border-2 border-muted-foreground" />;
   }
   if (status === "current") {
     return (
@@ -46,7 +46,7 @@ function TimelineDot({ status }) {
     );
   }
   // future
-  return <div className="w-4 h-4 rounded-full bg-white border-2 border-stone-300" />;
+  return <div className="w-4 h-4 rounded-full bg-background border-2 border-input" />;
 }
 
 // ── Timeline Section ──
@@ -55,7 +55,7 @@ function Timeline({ steps }) {
   return (
     <div className="relative flex items-start justify-between mb-6 overflow-x-auto pb-2">
       {/* Connecting line */}
-      <div className="absolute top-2 left-0 right-0 h-0.5 bg-stone-200" />
+      <div className="absolute top-2 left-0 right-0 h-0.5 bg-border" />
 
       {steps.map((step, i) => (
         <motion.div
@@ -68,8 +68,8 @@ function Timeline({ steps }) {
           <div className="relative z-10 mb-2">
             <TimelineDot status={step.status} />
           </div>
-          <span className="text-sm font-semibold text-stone-800">{step.label}</span>
-          <span className="text-xs text-stone-500 mt-0.5">{step.description}</span>
+          <span className="text-sm font-semibold text-foreground">{step.label}</span>
+          <span className="text-xs text-muted-foreground mt-0.5">{step.description}</span>
           {step.date && (
             <span className="text-xs font-semibold text-amber-600 mt-0.5">{step.date}</span>
           )}
@@ -86,10 +86,10 @@ function ProgressBar({ done, total }) {
 
   return (
     <div className="mb-6">
-      <div className="text-sm font-medium text-stone-500 mb-2">
+      <div className="text-sm font-medium text-muted-foreground mb-2">
         {done} of {total} complete ({pct}%)
       </div>
-      <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
+      <div className="h-2 bg-secondary rounded-full overflow-hidden">
         <motion.div
           className="h-full rounded-full bg-gradient-to-r from-amber-500 to-purple-500"
           initial={{ width: 0 }}
@@ -121,8 +121,8 @@ function CodeExamples({ examples }) {
             onClick={() => setActive(lang)}
             className={`px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
               active === lang
-                ? "bg-stone-800 text-white"
-                : "bg-stone-100 text-stone-500 hover:bg-stone-200"
+                ? "bg-foreground text-background"
+                : "bg-secondary text-muted-foreground hover:bg-accent"
             }`}
           >
             {lang}
@@ -134,18 +134,18 @@ function CodeExamples({ examples }) {
       {current && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
           <div>
-            <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1">
+            <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-1">
               Before
             </div>
-            <pre className="bg-stone-50 border border-stone-200 rounded-md p-3 overflow-x-auto whitespace-pre-wrap text-red-700">
+            <pre className="bg-muted/40 border border-border rounded-md p-3 overflow-x-auto whitespace-pre-wrap text-red-700 dark:text-red-300">
               {current.before}
             </pre>
           </div>
           <div>
-            <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider mb-1">
+            <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider mb-1">
               After
             </div>
-            <pre className="bg-stone-50 border border-stone-200 rounded-md p-3 overflow-x-auto whitespace-pre-wrap text-green-700">
+            <pre className="bg-muted/40 border border-border rounded-md p-3 overflow-x-auto whitespace-pre-wrap text-green-700 dark:text-green-300">
               {current.after}
             </pre>
           </div>
@@ -161,14 +161,14 @@ function ChecklistRow({ item, checked, onToggle }) {
   return (
     <label
       className={`flex items-center gap-3 py-1.5 cursor-pointer group ${
-        checked ? "line-through text-stone-400" : "text-stone-600"
+        checked ? "line-through text-muted-foreground/70" : "text-foreground/80"
       }`}
     >
       <div
         className={`w-4 h-4 min-w-[16px] rounded border-2 flex items-center justify-center transition-all ${
           checked
             ? "bg-amber-500 border-amber-500"
-            : "border-stone-300 group-hover:border-stone-400 bg-white"
+            : "border-input group-hover:border-border bg-background"
         }`}
         onClick={(e) => {
           e.preventDefault();
@@ -189,7 +189,7 @@ function ChecklistRow({ item, checked, onToggle }) {
 function ChangeCard({ change, checkState, onCheck }) {
   return (
     <motion.div
-      className={`bg-white border border-stone-200 rounded-lg p-4 mb-3 border-l-4 ${BORDER_COLOR[change.severity]}`}
+      className={`bg-card border border-border rounded-lg p-4 mb-3 border-l-4 ${BORDER_COLOR[change.severity]}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
@@ -201,7 +201,7 @@ function ChangeCard({ change, checkState, onCheck }) {
         >
           {change.severity}
         </span>
-        <span className="text-sm text-stone-600">{change.summary}</span>
+        <span className="text-sm text-foreground/80">{change.summary}</span>
       </div>
 
       {/* Code examples with language tabs */}
@@ -209,7 +209,7 @@ function ChangeCard({ change, checkState, onCheck }) {
 
       {/* Checklist */}
       {change.checklistItems.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-stone-100">
+        <div className="mt-3 pt-3 border-t border-border/60">
           {change.checklistItems.map((item) => (
             <ChecklistRow
               key={item.id}
@@ -306,10 +306,10 @@ export default function MigrationGuide({ guide, onClose }) {
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-stone-800">
+            <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-foreground">
               {guide.title}
             </h2>
-            <p className="text-sm text-stone-500 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {guide.versions.base} &rarr; {guide.versions.revision}
               {guide.sunsetDate && (
                 <span className="ml-2 text-amber-600 font-semibold">
@@ -320,7 +320,7 @@ export default function MigrationGuide({ guide, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md hover:bg-secondary/80 text-muted-foreground/70 hover:text-foreground/90 transition-colors cursor-pointer"
             aria-label="Close migration guide"
           >
             <X className="w-5 h-5" />
@@ -329,7 +329,7 @@ export default function MigrationGuide({ guide, onClose }) {
 
         {/* ── Timeline ── */}
         <section>
-          <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
+          <h3 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-3">
             Timeline
           </h3>
           <Timeline steps={guide.timeline} />
@@ -337,7 +337,7 @@ export default function MigrationGuide({ guide, onClose }) {
 
         {/* ── Progress ── */}
         <section>
-          <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
+          <h3 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-3">
             Progress
           </h3>
           <ProgressBar done={done} total={total} />
@@ -345,11 +345,11 @@ export default function MigrationGuide({ guide, onClose }) {
 
         {/* ── Changes ── */}
         <section>
-          <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3">
+          <h3 className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-3">
             Changes
           </h3>
           {guide.changes.length === 0 ? (
-            <p className="text-sm text-stone-400">No changes — nothing to migrate.</p>
+            <p className="text-sm text-muted-foreground/70">No changes — nothing to migrate.</p>
           ) : (
             guide.changes.map((change, i) => (
               <ChangeCard
@@ -366,7 +366,7 @@ export default function MigrationGuide({ guide, onClose }) {
         <div className="pt-2">
           <button
             onClick={() => exportMarkdown(guide, checkState)}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-stone-300 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground/80 bg-card border border-border rounded-lg hover:bg-muted hover:border-border transition-colors cursor-pointer"
           >
             <Download className="w-4 h-4" />
             Export as Markdown

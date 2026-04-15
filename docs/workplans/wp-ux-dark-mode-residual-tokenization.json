@@ -1,0 +1,51 @@
+{
+  "id": "wp-ux-dark-mode-residual-tokenization",
+  "title": "Replace bare stone-* classes with semantic shadcn tokens in 8 remaining components",
+  "adr": "ADR-012",
+  "created": "2026-04-15",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~20000 tokens",
+  "prior_work": {
+    "done": [
+      "feat-ux-dark-mode closed: ProviderSidebar + MigrationGuide migrated; tailwind config + useTheme + toggle all in place.",
+      "Pattern established: `bg-stone-100 → bg-secondary`, `bg-stone-50 → bg-muted/40`, `text-stone-{500,400} → text-muted-foreground{,/70}`, `text-stone-{800,700,600} → text-foreground{,,/80}`, `border-stone-{200,300} → border-{border,input}`, `hover:bg-stone-200{/X} → hover:bg-accent{/X}`, `bg-white → bg-background`, colored severity classes get `dark:bg-{color}-950/40 dark:text-{color}-300`."
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Migrate src/pages/Settings.jsx (29 stone refs).",
+      "files": ["src/pages/Settings.jsx"],
+      "tier": 0,
+      "done_condition": "grep stone- returns 0 in this file; visual check in dark mode shows readable text and bordered surfaces"
+    },
+    {
+      "id": "step-2",
+      "description": "Migrate src/components/settings/DiscoveryPanel.jsx (24 stone refs).",
+      "files": ["src/components/settings/DiscoveryPanel.jsx"],
+      "tier": 0,
+      "done_condition": "grep stone- returns 0 in this file"
+    },
+    {
+      "id": "step-3",
+      "description": "Migrate src/components/diff/DiffItem.jsx (12 stone refs). DiffItem is the central row renderer — visual regression check on diff badges + monospace value rendering required after migration.",
+      "files": ["src/components/diff/DiffItem.jsx"],
+      "tier": 0,
+      "done_condition": "grep stone- returns 0; manual smoke test of a diff in both themes shows readable rows with intact badges"
+    },
+    {
+      "id": "step-4",
+      "description": "Migrate the four small files: src/components/sidebar/IntegrationList.jsx (10), src/pages/DiffViewer.jsx (9 — already mostly token-based; these are residual), src/components/diff/SpecInput.jsx (8), src/components/sidebar/VersionPicker.jsx (7), src/components/diff/DiffResults.jsx (7). Single batch — same pattern.",
+      "files": [
+        "src/components/sidebar/IntegrationList.jsx",
+        "src/pages/DiffViewer.jsx",
+        "src/components/diff/SpecInput.jsx",
+        "src/components/sidebar/VersionPicker.jsx",
+        "src/components/diff/DiffResults.jsx"
+      ],
+      "tier": 1,
+      "done_condition": "`grep -rn 'stone-' src/components src/pages` returns zero matches"
+    }
+  ]
+}

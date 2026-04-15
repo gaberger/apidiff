@@ -3,7 +3,9 @@
   "title": "Feature: Dark mode + theme toggle for React primary adapter",
   "adr": "ADR-012",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "resolution_note": "Audit on 2026-04-15: tailwind.config.js had `darkMode:['class']` already, useTheme hook + theme-toggle button shipped via earlier ADR-014 work, and 49 dark: variants are in active use. The remaining gap was components written before tokenization that still used bare stone-* classes. This session migrated the two flagged files (ProviderSidebar, MigrationGuide) to semantic shadcn tokens (border-border, bg-secondary, text-foreground, text-muted-foreground, bg-card, etc.) plus added dark variants to the colored severity palette (red/amber/green for breaking/deprecated/non-breaking badges). Eight other files still have bare stone-* references — captured in wp-ux-dark-mode-residual-tokenization for a focused follow-up.",
   "topology": "pipeline",
   "budget": "~40000 tokens",
   "prior_work": {
