@@ -137,27 +137,29 @@ export default function SpecInput({
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
 
-  // Deferred colorization: when value changes, render plain text immediately so
-  // the textarea is usable right away, then compute JSON syntax coloring in the
-  // background and swap it in. This keeps the main thread unblocked during the
-  // setBefore/setAfter calls after a large spec loads.
+  // Deferred colorization: for large specs (>2k lines) skip the pre overlay entirely —
+  // the raw textarea already shows the content and is instantly scrollable. Colorize
+  // in background for smaller specs; large specs show unstyled text.
+  const LARGE_LINE_COUNT = 2000;
   const lines = useMemo(() => value ? value.split("\n") : [], [value]);
-  const editorHeight = 520;
 
   useEffect(() => {
     if (!value) { setHighlightedLines(null); return; }
 
-    // Render plain text immediately — zero computation, instant paint.
+    // Large spec: skip pre overlay entirely — textarea shows raw content, user can
+    // scroll immediately. Zero React element creation on the main thread.
+    if (lines.length > LARGE_LINE_COUNT) {
+      setHighlightedLines(null);
+      return;
+    }
+
+    // Small spec: render plain text immediately.
     const plainLines = lines.map((line, i) => (
       <div key={i} style={{ display: "block", minWidth: "100%" }}>{line}</div>
     ));
     setHighlightedLines(plainLines);
 
-    // Colorize in the background using requestIdleCallback. For specs >5k lines
-    // skip colorizing entirely to avoid blocking the main thread for seconds.
-    const LINE_LIMIT = 5000;
-    if (lines.length > LINE_LIMIT) return;
-
+    // Then colorize in background.
     const id = requestIdleCallback(() => {
       const diffBgColors = {
         removed: "bg-red-50 dark:bg-red-900/30",
