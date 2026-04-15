@@ -17,31 +17,11 @@ import { useSyncedScroll } from "@/hooks/use-synced-scroll";
 import { useDiffWorker } from "@/hooks/use-diff-worker.js";
 import { computeDiff } from "@/lib/domain/diff-algorithm.js";
 import { buildGuide } from "@/lib/domain/guide-builder.js";
-import YAML from "yaml";
 
-// Parse an OpenAPI spec text as JSON, then YAML as a fallback. Throws with a
-// descriptive error if neither parser accepts it. Accepting both formats means
-// discovery can surface *.yaml|*.yml files from repos without forcing users to
-// convert them manually.
-function parseSpec(text, sideLabel) {
-  const trimmed = text.trim();
-  if (!trimmed) throw new Error(`${sideLabel} spec is empty`);
-  // Heuristic: JSON specs start with { or [; everything else → YAML.
-  const looksJson = trimmed[0] === "{" || trimmed[0] === "[";
-  if (looksJson) {
-    try { return JSON.parse(trimmed); }
-    catch (jsonErr) {
-      // Fall through to YAML — some JSON-looking specs have trailing commas or
-      // comments that YAML's superset parser accepts.
-      try { return YAML.parse(trimmed); }
-      catch { throw new Error(`${sideLabel}: not valid JSON — ${jsonErr.message}`); }
-    }
-  }
-  try { return YAML.parse(trimmed); }
-  catch (yamlErr) {
-    throw new Error(`${sideLabel}: not valid JSON or YAML — ${yamlErr.message}`);
-  }
-}
+// Parsing (JSON + YAML fallback) lives in src/workers/diff-worker.js so it
+// runs off the main thread. handleGenerateGuide does its own JSON.parse on
+// the already-resolved spec text — bounded cost since by then the user has
+// seen a successful diff.
 
 export default function DiffViewer() {
   // Editor state
@@ -82,85 +62,60 @@ export default function DiffViewer() {
     setGuide(null);
     setError(null);
     setActiveFilter("all");
+    setResolving(true);
+
+    const stages = [
+      { id: "parse", label: "Parsing specs", status: "in-progress", cacheHit: false },
+      { id: "deref", label: "Dereferencing $refs", status: "pending", cacheHit: false },
+      { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+    ];
+    setFetchStages(stages.map((s) => ({ ...s })));
 
     try {
-      let oldSpec = parseSpec(before, "Original spec");
-      let newSpec = parseSpec(after, "Updated spec");
-
-      // Collect $ref locations before resolving, then annotate after
-      const collectRefs = (obj, prefix = "") => {
-        const refs = [];
-        if (obj && typeof obj === "object") {
-          if (obj["$ref"]) refs.push({ path: prefix, target: obj["$ref"] });
-          for (const [k, v] of Object.entries(obj)) {
-            if (k === "$ref") continue;
-            refs.push(...collectRefs(v, prefix ? prefix + "." + k : k));
+      // Hand raw strings to the worker — parsing, cloning, dereferencing,
+      // and diff all happen off the main thread. Previously parseSpec +
+      // collectRefs + structuredClone-via-postMessage ran here and pushed
+      // the click handler past 7s for multi-MB specs.
+      const { results: workerResults, oldResolved, newResolved, refsResolved: rr } = await runDiff(before, after, {
+        onProgress: (evt) => {
+          if (evt.stage === "parsing") stages[0].status = "in-progress";
+          if (evt.stage === "dereferencing") {
+            stages[0].status = "complete";
+            stages[1].status = "in-progress";
           }
-        }
-        return refs;
-      };
-      const oldRefs = collectRefs(oldSpec);
-      const newRefs = collectRefs(newSpec);
-
-      // Offload dereference + diff to a Web Worker so the main thread
-      // stays responsive on large specs. The worker returns the resolved
-      // specs and the diff; we apply $ref annotation here (fast on main).
-      setResolving(true);
-      try {
-        const stages = [
-          { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
-          { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
-        ];
-        setFetchStages(stages.map((s) => ({ ...s })));
-
-        const { results: workerResults, oldResolved, newResolved, refsResolved: rr } = await runDiff(oldSpec, newSpec, {
-          onProgress: (evt) => {
-            if (evt.stage === "dereferencing") stages[0].status = "in-progress";
-            if (evt.stage === "diffing") {
-              stages[0].status = "complete";
-              stages[1].status = "in-progress";
-            }
-            setFetchStages(stages.map((s) => ({ ...s })));
-          },
-        });
-
-        stages[1].status = "complete";
-        setFetchStages(stages.map((s) => ({ ...s })));
-
-        const annotate = (obj, refs) => {
-          for (const ref of refs) {
-            const parts = ref.path.split(".");
-            let node = obj;
-            for (let i = 0; i < parts.length - 1; i++) {
-              if (node && typeof node === "object") node = node[parts[i]];
-            }
-            const lastKey = parts[parts.length - 1];
-            if (node && typeof node === "object" && node[lastKey] && typeof node[lastKey] === "object") {
-              node[lastKey]["__$ref"] = ref.target;
-            }
+          if (evt.stage === "diffing") {
+            stages[1].status = "complete";
+            stages[2].status = "in-progress";
           }
-        };
-        if (oldRefs.length > 0) annotate(oldResolved, oldRefs);
-        if (newRefs.length > 0) annotate(newResolved, newRefs);
+          setFetchStages(stages.map((s) => ({ ...s })));
+        },
+      });
 
-        if (rr) {
+      stages[2].status = "complete";
+      setFetchStages(stages.map((s) => ({ ...s })));
+
+      // Show diff results immediately — that's what the user cares about.
+      setResults(workerResults);
+      setRefsResolved(rr);
+
+      // Defer the heavy JSON.stringify of resolved specs and the textarea
+      // re-renders to a microtask so they don't extend this click handler.
+      // The user sees the diff first; the resolved-spec view fills in
+      // moments later. setTimeout(0) yields to the browser between the
+      // diff paint and the textarea reflow.
+      if (rr) {
+        setTimeout(() => {
           setBefore(JSON.stringify(oldResolved, null, 2));
           setAfter(JSON.stringify(newResolved, null, 2));
-          setRefsResolved(rr);
-        } else {
-          setRefsResolved(null);
-        }
-
-        setResults(workerResults);
-      } finally {
-        setResolving(false);
+        }, 0);
       }
     } catch (e) {
-      setResolving(false);
       // Swallow user-initiated cancellations — Reset rejected the in-flight
       // diff on purpose; surfacing that as an error confuses users.
       if (e?.message === "cancelled") return;
       setError(e.message || "Invalid JSON — paste valid JSON specs");
+    } finally {
+      setResolving(false);
     }
   };
 
@@ -179,54 +134,62 @@ export default function DiffViewer() {
   };
 
   const handleLoadSpecs = async (v1, v2, label) => {
-    const v1Str = typeof v1 === 'string' ? v1 : JSON.stringify(v1, null, 2);
-    const v2Str = typeof v2 === 'string' ? v2 : JSON.stringify(v2, null, 2);
-    setBefore(v1Str);
-    setAfter(v2Str);
+    // Drop the textareas to a tiny placeholder immediately so React's
+    // controlled-input render of the previous (potentially multi-MB) value
+    // doesn't compound with the new one. JSON.stringify of the new specs
+    // and the corresponding textarea repaints are deferred to a microtask
+    // after the worker completes — see the setTimeout below.
+    setBefore("");
+    setAfter("");
     setResults(null);
     setGuide(null);
     setError(null);
     setActiveFilter("all");
     setActiveTab("compare");
+    setResolving(true);
+
+    setFetchStages((prev) => [
+      ...prev,
+      { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
+      { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+    ]);
+
     try {
-      const oldSpec = typeof v1 === 'string' ? JSON.parse(v1) : structuredClone(v1);
-      const newSpec = typeof v2 === 'string' ? JSON.parse(v2) : structuredClone(v2);
-
-      // Append compute stages to the existing fetchStages so the banner
-      // keeps animating through the post-fetch dereference + diff pipeline.
-      setFetchStages((prev) => [
-        ...prev,
-        { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
-        { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
-      ]);
-
-      setResolving(true);
-      try {
-        const { results: workerResults, oldResolved, newResolved } = await runDiff(oldSpec, newSpec, {
-          onProgress: (evt) => {
-            setFetchStages((prev) => prev.map((s) => {
-              if (s.id === "deref" && evt.stage === "diffing") return { ...s, status: "complete" };
-              if (s.id === "diff" && evt.stage === "diffing") return { ...s, status: "in-progress" };
-              return s;
-            }));
-          },
-        });
-        setFetchStages((prev) => prev.map((s) =>
-          s.id === "diff" || s.id === "deref" ? { ...s, status: "complete" } : s,
-        ));
+      // Pass v1/v2 directly. The worker takes either string or object via
+      // structured cloning at the postMessage boundary — for already-parsed
+      // API responses, this avoids a redundant main-thread JSON.stringify
+      // followed by JSON.parse inside the worker.
+      const { results: workerResults, oldResolved, newResolved } = await runDiff(v1, v2, {
+        onProgress: (evt) => {
+          setFetchStages((prev) => prev.map((s) => {
+            if (s.id === "deref" && evt.stage === "diffing") return { ...s, status: "complete" };
+            if (s.id === "diff" && evt.stage === "diffing") return { ...s, status: "in-progress" };
+            return s;
+          }));
+        },
+      });
+      setFetchStages((prev) => prev.map((s) =>
+        s.id === "diff" || s.id === "deref" ? { ...s, status: "complete" } : s,
+      ));
+      // Show diff results immediately — that's what the user clicked for.
+      setResults(workerResults);
+      // Defer the JSON.stringify + setBefore/setAfter of the resolved specs
+      // so the diff results paint first. JSON.stringify on a multi-MB
+      // resolved spec is multi-second sync work; running it in a microtask
+      // after the diff-results paint keeps the click handler from extending
+      // past the worker await.
+      setTimeout(() => {
         setBefore(JSON.stringify(oldResolved, null, 2));
         setAfter(JSON.stringify(newResolved, null, 2));
-        setResults(workerResults);
-      } finally {
-        setResolving(false);
-      }
+      }, 0);
     } catch (e) {
-      setResolving(false);
       if (e?.message === "cancelled") return;
       setError(e.message);
       setFetchStages((prev) => prev.map((s) =>
         s.status === "in-progress" ? { ...s, status: "error", error: e.message } : s,
       ));
+    } finally {
+      setResolving(false);
     }
   };
 

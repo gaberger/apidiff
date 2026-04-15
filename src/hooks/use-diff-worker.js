@@ -38,12 +38,18 @@ export function useDiffWorker() {
     return workerRef.current;
   }, []);
 
-  const runDiff = useCallback((oldSpec, newSpec, { onProgress } = {}) => {
+  const runDiff = useCallback((oldSpecOrText, newSpecOrText, { onProgress } = {}) => {
     const w = ensureWorker();
     const id = ++seqRef.current;
     return new Promise((resolve, reject) => {
       pendingRef.current.set(id, { resolve, reject, onProgress });
-      w.postMessage({ id, oldSpec, newSpec });
+      // Strings → worker parses (parsing + structuredClone-via-postMessage
+      // both stay off the main thread). Objects → legacy path for callers
+      // that already have parsed data.
+      const payload = typeof oldSpecOrText === "string" && typeof newSpecOrText === "string"
+        ? { id, oldText: oldSpecOrText, newText: newSpecOrText }
+        : { id, oldSpec: oldSpecOrText, newSpec: newSpecOrText };
+      w.postMessage(payload);
     });
   }, [ensureWorker]);
 
