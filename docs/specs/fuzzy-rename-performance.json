@@ -1,0 +1,88 @@
+{
+  "feature": "fuzzy-rename-performance",
+  "description": "Fix O(n²) freeze in enrichDiffWithRenames by adding removed-count early exit, lowering size gates, and pre-filtering Levenshtein candidates",
+  "specs": [
+    {
+      "id": "S01",
+      "category": "Performance",
+      "description": "Fuzzy rename pass is skipped when bKeys.length > 500 (exact rename/move still runs)",
+      "given": "A spec pair with 6000 keys total and 200 removed fields",
+      "when": "computeDiff(old, new) is called",
+      "then": "enrichDiffWithRenames completes in <1s; no Levenshtein is called; removed fields stay as 'removed' type",
+      "negative_spec": true,
+      "domain_conventions": {
+        "FUZZY_SIZE_LIMIT": "Upper bound on spec size for fuzzy matching. Exact rename/move (by serialized value) always runs regardless of size."
+      }
+    },
+    {
+      "id": "S02",
+      "category": "Performance",
+      "description": "Fuzzy rename pass is skipped when removed entries > 100 regardless of spec size",
+      "given": "A spec pair with 200 removed fields and 500 total keys",
+      "when": "computeDiff(old, new) is called",
+      "then": "enrichDiffWithRenames completes in <1s; no Levenshtein is called; removed fields stay as 'removed' type",
+      "negative_spec": true,
+      "domain_conventions": {
+        "REMOVED_SIZE_SKIP": "Early-exit threshold: if removed entries exceed this, fuzzy pass is skipped entirely. Most API diffs have <50 genuine renames."
+      }
+    },
+    {
+      "id": "S03",
+      "category": "Performance",
+      "description": "Fuzzy move pass is skipped when removed entries > 50 regardless of spec size",
+      "given": "A spec pair with 100 removed fields and 500 total keys",
+      "when": "computeDiff(old, new) is called",
+      "then": "enrichDiffWithRenames completes in <1s; no Levenshtein is called for move detection",
+      "negative_spec": true,
+      "domain_conventions": {
+        "FUZZY_MOVE_SIZE_LIMIT": "Even lower threshold for fuzzy move: moves are rarer than renames and the loop iterates all bKeys per removed entry. Set to 200 (same as FUZZY_SIZE_LIMIT)."
+      }
+    },
+    {
+      "id": "S04",
+      "category": "Performance",
+      "description": "Pre-filtered candidate pool: only fbOnly keys that pass isRelated() are scored with Levenshtein",
+      "given": "A spec pair where exact rename misses and fuzzy rename is triggered (removed=20, total keys=400)",
+      "when": "matchScore is called during enrichDiffWithRenames",
+      "then": "matchScore is called at most 20 * 20 = 400 times (only on isRelated candidates), not 20 * 400 = 8000 times",
+      "negative_spec": true,
+      "domain_conventions": {
+        "pre_filter": "isRelated() is O(depth) string split — much cheaper than Levenshtein. Call isRelated() first; only call matchScore (which calls levenshtein) on candidates that pass."
+      }
+    },
+    {
+      "id": "S05",
+      "category": "HappyPath",
+      "description": "Exact rename detection (same serialized value, sibling or related path) always runs regardless of size limits",
+      "given": "A spec pair with 10,000 keys where 5 fields were renamed with identical values",
+      "when": "computeDiff(old, new) is called",
+      "then": "Those 5 fields are detected as 'renamed' type; exact rename uses fbOnlyByValue index (O(1) lookup per removed entry)",
+      "negative_spec": false,
+      "domain_conventions": {
+        "exact_rename": "Looks up removed value in fbOnlyByValue Map, then filters by isSibling/isRelated. No fuzzy loop needed for these cases."
+      }
+    },
+    {
+      "id": "S06",
+      "category": "EdgeCase",
+      "description": "Empty spec pair returns empty results with no errors",
+      "given": "Two empty OpenAPI specs",
+      "when": "computeDiff({}, {}) is called",
+      "then": "Returns empty array [] without errors; all size-limit checks pass trivially",
+      "negative_spec": false,
+      "domain_conventions": {}
+    },
+    {
+      "id": "S07",
+      "category": "Performance",
+      "description": "AbortSignal cancels an in-flight diff worker mid-computation",
+      "given": "A diff worker is running enrichDiffWithRenames on a large spec pair",
+      "when": "The caller's AbortSignal is aborted mid-run",
+      "then": "Worker posts {type:'cancelled', id} and terminates cleanly; no further messages are posted; worker is respawnable",
+      "negative_spec": false,
+      "domain_conventions": {
+        "worker_cancellation": "diff-worker.js receives AbortSignal via postMessage; checks it at loop boundaries; posts 'cancelled' message and returns early"
+      }
+    }
+  ]
+}

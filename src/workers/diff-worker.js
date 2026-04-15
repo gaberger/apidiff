@@ -9,18 +9,32 @@
 import { computeStructuralDiff, enrichDiffWithRenames } from "../lib/domain/diff-algorithm.js";
 import { flatten } from "../lib/domain/flatten.js";
 
+function isAborted(signal) {
+  return signal && signal.aborted;
+}
+
 self.addEventListener("message", (e) => {
-  const { id, oldResolved, newResolved } = e.data || {};
+  const { id, oldResolved, newResolved, signal } = e.data || {};
   try {
     self.postMessage({ id, type: "progress", stage: "diffing-structural" });
     const fa = flatten(oldResolved);
     const fb = flatten(newResolved);
     const structural = computeStructuralDiff(fa, fb);
 
+    if (isAborted(signal)) {
+      self.postMessage({ id, type: "cancelled" });
+      return;
+    }
+
     self.postMessage({ id, type: "partial-results", results: structural });
 
     self.postMessage({ id, type: "progress", stage: "diffing-fuzzy" });
-    const enriched = enrichDiffWithRenames(structural, fa, fb);
+    const enriched = enrichDiffWithRenames(structural, fa, fb, signal);
+
+    if (isAborted(signal)) {
+      self.postMessage({ id, type: "cancelled" });
+      return;
+    }
 
     self.postMessage({ id, type: "done", results: enriched });
   } catch (err) {

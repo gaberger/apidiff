@@ -171,7 +171,9 @@ function isRelated(a, b) {
   const required = depth <= 3 ? 1 : depth <= 6 ? 2 : Math.max(3, Math.ceil(depth * 0.4));
   return shared >= required;
 }
-var FUZZY_SIZE_LIMIT = 5000;
+var FUZZY_SIZE_LIMIT = 500;
+var FUZZY_MOVE_SIZE_LIMIT = 200;
+var REMOVED_SIZE_SKIP = 100;
 function computeStructuralDiff(fa, fb) {
   const results = [];
   const aKeys = Object.keys(fa);
@@ -205,10 +207,12 @@ function computeStructuralDiff(fa, fb) {
   }
   return results;
 }
-function enrichDiffWithRenames(structural, fa, fb) {
+function enrichDiffWithRenames(structural, fa, fb, signal) {
   const aKeys = Object.keys(fa);
   const bKeys = Object.keys(fb);
-  const fuzzyEnabled = bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
+  const removedCount = structural.filter((e) => e.type === "removed").length;
+  const fuzzyRenameEnabled = removedCount <= REMOVED_SIZE_SKIP && bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
+  const fuzzyMoveEnabled = removedCount <= REMOVED_SIZE_SKIP && bKeys.length <= FUZZY_MOVE_SIZE_LIMIT && aKeys.length <= FUZZY_MOVE_SIZE_LIMIT;
   const fbOnlyByValue = new Map;
   const fbOnlyByLeafValue = new Map;
   for (const fbKey of bKeys) {
@@ -232,7 +236,9 @@ function enrichDiffWithRenames(structural, fa, fb) {
   }
   const consumedAdditions = new Set;
   const enriched = [];
-  for (const entry of structural) {
+  let aborted = false;
+  for (let i = 0;i < structural.length && !aborted; i++) {
+    const entry = structural[i];
     if (entry.type === "added")
       continue;
     if (entry.type !== "removed") {
@@ -263,10 +269,14 @@ function enrichDiffWithRenames(structural, fa, fb) {
         }
       }
     }
-    if (!renamedTo && fuzzyEnabled) {
+    if (!renamedTo && fuzzyRenameEnabled) {
       let bestScore = -1;
       let bestKey = null;
       for (const fbKey of bKeys) {
+        if (signal?.aborted) {
+          aborted = true;
+          break;
+        }
         if (fbKey in fa || consumedAdditions.has(fbKey))
           continue;
         if (leafName(fbKey) === leaf)
@@ -318,13 +328,19 @@ function enrichDiffWithRenames(structural, fa, fb) {
         }
       }
     }
-    if (!movedTo) {
+    if (!movedTo && fuzzyMoveEnabled) {
       let bestScore = -1;
       let bestKey = null;
       for (const fbKey of bKeys) {
+        if (signal?.aborted) {
+          aborted = true;
+          break;
+        }
         if (fbKey in fa || consumedAdditions.has(fbKey))
           continue;
         if (leafName(fbKey) !== leaf)
+          continue;
+        if (!isRelated(key, fbKey))
           continue;
         const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
         if (score >= FUZZY_THRESHOLD && score > bestScore) {

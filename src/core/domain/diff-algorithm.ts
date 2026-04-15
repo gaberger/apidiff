@@ -50,10 +50,20 @@ function isRelated(a: string, b: string): boolean {
   return shared >= required;
 }
 
-// Upper bound on fb size before fuzzy-rename fallback is skipped. Fuzzy matching
-// is O(removes × bKeys × pathLen²) due to Levenshtein; on Twilio-scale specs
-// it freezes the UI. Exact rename/move detection still runs for any size.
-const FUZZY_SIZE_LIMIT = 5000;
+// Upper bound on fb/aKeys size before fuzzy-rename fallback is skipped. Fuzzy
+// matching is O(removes × candidates × pathLen²) due to Levenshtein; on large
+// specs it freezes the UI. Exact rename/move detection (by value index) always
+// runs regardless of size.
+const FUZZY_SIZE_LIMIT = 500;
+
+// Upper bound for the move fuzzy pass (even tighter — moves are rarer than renames
+// and the loop iterates all bKeys per removed entry).
+const FUZZY_MOVE_SIZE_LIMIT = 200;
+
+// If structural diff has more than this many removed entries, skip both fuzzy
+// passes entirely. Most API diffs have <50 genuine renames; a high removed count
+// signals a large breaking change where fuzzy matching won't help anyway.
+const REMOVED_SIZE_SKIP = 100;
 
 /**
  * Pass 1 — fast, exact-path-only diff. Produces added / removed / changed /
@@ -114,10 +124,20 @@ export function enrichDiffWithRenames(
   structural: DiffResult[],
   fa: FlatMap,
   fb: FlatMap,
+  signal?: { aborted: boolean },
 ): DiffResult[] {
   const aKeys = Object.keys(fa);
   const bKeys = Object.keys(fb);
-  const fuzzyEnabled = bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
+
+  const removedCount = structural.filter(e => e.type === "removed").length;
+  const fuzzyRenameEnabled =
+    removedCount <= REMOVED_SIZE_SKIP &&
+    bKeys.length <= FUZZY_SIZE_LIMIT &&
+    aKeys.length <= FUZZY_SIZE_LIMIT;
+  const fuzzyMoveEnabled =
+    removedCount <= REMOVED_SIZE_SKIP &&
+    bKeys.length <= FUZZY_MOVE_SIZE_LIMIT &&
+    aKeys.length <= FUZZY_MOVE_SIZE_LIMIT;
 
   // Build the fb-only indexes (paths that exist in fb but not fa) keyed
   // by serialized value and by (leaf+value). These are the candidate pools
@@ -144,11 +164,13 @@ export function enrichDiffWithRenames(
   // from the structural results when re-emitting.
   const consumedAdditions = new Set<string>();
   const enriched: DiffResult[] = [];
+  let aborted = false;
 
   // Two-pass over structural: first emit unchanged/changed/type-change as-is,
   // and rewrite removed → renamed/moved when a match is found. We defer
   // emission of added entries until we know which ones got consumed.
-  for (const entry of structural) {
+  for (let i = 0; i < structural.length && !aborted; i++) {
+    const entry = structural[i]!;
     if (entry.type === "added") continue;            // re-emitted at the end
     if (entry.type !== "removed") {                  // unchanged / changed / type-change
       enriched.push(entry);
@@ -175,11 +197,13 @@ export function enrichDiffWithRenames(
       }
     }
 
-    // Fuzzy rename fallback (small specs only — Levenshtein is the slow part).
-    if (!renamedTo && fuzzyEnabled) {
+    // Fuzzy rename fallback — only on small specs with few removed entries.
+    // Pre-filters to fbOnly keys related to `key` before calling matchScore.
+    if (!renamedTo && fuzzyRenameEnabled) {
       let bestScore = -1;
       let bestKey: string | null = null;
       for (const fbKey of bKeys) {
+        if (signal?.aborted) { aborted = true; break; }
         if (fbKey in fa || consumedAdditions.has(fbKey)) continue;
         if (leafName(fbKey) === leaf) continue;
         if (!isRelated(key, fbKey)) continue;
@@ -225,13 +249,15 @@ export function enrichDiffWithRenames(
       }
     }
 
-    // Fuzzy move fallback.
-    if (!movedTo) {
+    // Fuzzy move fallback — tighter size gate than rename; pre-filter by isRelated.
+    if (!movedTo && fuzzyMoveEnabled) {
       let bestScore = -1;
       let bestKey: string | null = null;
       for (const fbKey of bKeys) {
+        if (signal?.aborted) { aborted = true; break; }
         if (fbKey in fa || consumedAdditions.has(fbKey)) continue;
         if (leafName(fbKey) !== leaf) continue;
+        if (!isRelated(key, fbKey)) continue;
         const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
         if (score >= FUZZY_THRESHOLD && score > bestScore) {
           bestScore = score;

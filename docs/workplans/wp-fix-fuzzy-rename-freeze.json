@@ -1,0 +1,103 @@
+{
+  "id": "wp-fix-fuzzy-rename-freeze",
+  "title": "Fix: O(n²) freeze in enrichDiffWithRenames — size gates, early exits, pre-filtered Levenshtein candidates",
+  "specs": "docs/specs/fuzzy-rename-performance.json",
+  "adr": "ADR-011",
+  "created": "2026-04-15",
+  "status": "in_progress",
+  "topology": "pipeline",
+  "budget": "~25000 tokens",
+  "prior_work": {
+    "done": [
+      "wp-perf-two-pass-diff-and-parallel-workers shipped computeStructuralDiff + enrichDiffWithRenames split (38ff3b3)",
+      "wp-fix-diff-worker-cancel-affordance shipped worker.terminate() on Reset (2026-04-15)",
+      "Root cause identified: enrichDiffWithRenames lines 182-191 and 229-240 iterate ALL bKeys per removed entry, calling matchScore + levenshtein on each — O(removes × allKeys)"
+    ]
+  },
+  "notes": [
+    "FUZZY_SIZE_LIMIT=5000 only gates whether fuzzy runs at all, not the cost within it",
+    "rename loop (diff-algorithm.ts:182-191): worst case 200 removed × 5000 keys = 1M levenshtein calls",
+    "move loop (diff-algorithm.ts:229-240): same pattern for move detection",
+    "Fix 1: lower limits + removed-count early exit (S01, S02, S03)",
+    "Fix 2: pre-filter with isRelated() before matchScore so Levenshtein only runs on related candidates (S04)",
+    "Fix 3: propagate AbortSignal into worker for mid-run cancellation (S07)",
+    "Exact rename/move (by serialized value index) always runs regardless of limits"
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Tighten size gates and add removed-count early exit in enrichDiffWithRenames. Changes in src/core/domain/diff-algorithm.ts: (1) FUZZY_SIZE_LIMIT 5000→500. (2) Add FUZZY_MOVE_SIZE_LIMIT=200 (same as FUZZY_SIZE_LIMIT — moves are rarer). (3) Add REMOVED_SIZE_SKIP=100 — compute removed count from structural before entering fuzzy loops; if >100, skip both fuzzy passes entirely (exact rename/move still runs). (4) Apply bKeys.length <= FUZZY_MOVE_SIZE_LIMIT gate to the move fuzzy loop. Sync updated file to src/lib/domain/diff-algorithm.js via bun run sync:lib.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": [],
+      "tier": 0,
+      "specs": ["S01", "S02", "S03"],
+      "done_condition": "FUZZY_SIZE_LIMIT=500, FUZZY_MOVE_SIZE_LIMIT=200, REMOVED_SIZE_SKIP=100 in diff-algorithm.ts; all size-limit constants documented; sync:lib succeeds; bun run typecheck clean"
+    },
+    {
+      "id": "step-2",
+      "description": "Pre-filter Levenshtein candidates in enrichDiffWithRenames. Changes in src/core/domain/diff-algorithm.ts: (1) Rename fuzzy loop: iterate fbOnly keys (not all bKeys), call isRelated() first, only call matchScore if isRelated passes. (2) Move fuzzy loop: same — iterate fbOnly, call isRelated() first, then matchScore. This reduces worst case from removes×allKeys to removes×relatedCandidates (typically much smaller). Sync to src/lib/domain/diff-algorithm.js via bun run sync:lib.",
+      "layer": "domain",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 0,
+      "specs": ["S04"],
+      "done_condition": "Both fuzzy loops iterate only fbOnly keys; isRelated() called before matchScore in both loops; sync:lib succeeds; bun run typecheck clean"
+    },
+    {
+      "id": "step-3",
+      "description": "Propagate AbortSignal into diff-worker for mid-run cancellation. Changes: (1) src/hooks/use-diff-worker.js: add runDiff accepts optional {signal} options; pass signal.aborted flag in postMessage. (2) src/workers/diff-worker.js: read signal from e.data.signal; add isAborted() helper; check at top of fuzzy loops; if aborted post {type:'cancelled',id} and return early; do NOT post further messages. (3) src/pages/DiffViewer.jsx: wire existing cancel() mechanism to the signal-aware runDiff call (use AbortController in the compare handler).",
+      "layer": "adapters/primary",
+      "adapter": "web-worker",
+      "port": "",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "specs": ["S07"],
+      "done_condition": "Worker checks signal.aborted in both fuzzy loops; posts 'cancelled' message and returns early when set; clicking Reset mid-run produces no stale results, no console errors"
+    },
+    {
+      "id": "step-4",
+      "description": "Add unit tests for size-limit behavior and pre-filtered candidate pool. (1) Test: spec with >500 keys total → fuzzy rename/move skipped (removed stays as 'removed'). (2) Test: spec with 200 removed, 400 total keys → fuzzy skipped (removed stays). (3) Test: spec with 20 removed, 400 total keys → fuzzy runs and finds renames. (4) Test: empty specs return []. (5) Verify exact rename detection still works regardless of size limits. Run: bun test src/core/domain/diff-algorithm.test.ts (create if missing), bun test src/core/domain/levenshtein.test.ts. bun run typecheck && bun run lint clean.",
+      "layer": "validation",
+      "adapter": "",
+      "port": "",
+      "dependencies": ["step-1", "step-2", "step-3"],
+      "tier": 2,
+      "specs": ["S01", "S02", "S03", "S04", "S05", "S06", "S07"],
+      "done_condition": "bun test src/core/domain/ — all pass; bun run typecheck clean; bun run lint clean"
+    }
+  ],
+  "dependencies": {
+    "npm": []
+  },
+  "mergeOrder": [
+    "step-1 → step-2 (both domain, sequential to ensure size gates exist before pre-filter uses them)",
+    "step-3 parallel with step-2",
+    "step-4 after step-1, step-2, step-3"
+  ],
+  "riskRegister": [
+    {
+      "risk": "Lowering FUZZY_SIZE_LIMIT from 5000→500 breaks fuzzy rename detection on mid-size specs that legitimately benefit from it",
+      "impact": "medium",
+      "mitigation": "Exact rename/move (by value index) always runs regardless of size; fuzzy is a bonus. Users with >500-key specs still get exact-match rename detection."
+    },
+    {
+      "risk": "Pre-filter with isRelated() might exclude valid fuzzy candidates (fields moved across unrelated subtrees)",
+      "impact": "low",
+      "mitigation": "isRelated allows up to 40% depth divergence which is generous for API field renames. Can be relaxed later if needed."
+    },
+    {
+      "risk": "AbortSignal propagation adds complexity to the worker contract",
+      "impact": "medium",
+      "mitigation": "Check is a 2-line guard at loop top; does not change the message protocol for non-cancelled runs."
+    }
+  ],
+  "successCriteria": [
+    "A spec pair with 200 removed fields and 500 total keys completes enrichDiffWithRenames in <1s with no UI freeze",
+    "Exact rename detection still works on specs of any size",
+    "Worker can be cancelled mid-computation with no stale results and no console errors",
+    "bun test passes for all diff-algorithm and levenshtein tests"
+  ]
+}

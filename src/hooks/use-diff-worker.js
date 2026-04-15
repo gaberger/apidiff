@@ -39,6 +39,7 @@ function runOnce(worker, payload, { onProgress, onPartial } = {}) {
       worker.removeEventListener("messageerror", onMessageError);
       if (data.type === "done") resolve(data);
       else if (data.type === "error") reject(new Error(data.message));
+      else if (data.type === "cancelled") reject(new DOMException("cancelled", "AbortError"));
       else reject(new Error(`unexpected message type: ${data.type}`));
     };
     const onError = (ev) => {
@@ -84,7 +85,7 @@ export function useDiffWorker() {
     if (diffRef.current) { diffRef.current.terminate(); diffRef.current = null; }
   }, []);
 
-  const runDiff = useCallback(async (oldSpecOrText, newSpecOrText, { onProgress, onPartial } = {}) => {
+  const runDiff = useCallback(async (oldSpecOrText, newSpecOrText, { onProgress, onPartial, signal } = {}) => {
     const { derefOld, derefNew, diff } = ensureWorkers();
     const id = ++seqRef.current;
 
@@ -124,7 +125,7 @@ export function useDiffWorker() {
       throw new Error("cancelled");
     }
 
-    const diffResult = await runOnce(diff, { id, oldResolved, newResolved }, { onProgress, onPartial });
+    const diffResult = await runOnce(diff, { id, oldResolved, newResolved, signal }, { onProgress, onPartial });
 
     if (cancelledIdsRef.current.has(id)) {
       cancelledIdsRef.current.delete(id);
