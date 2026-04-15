@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon, HelpCircle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -37,6 +37,7 @@ export default function DiffViewer() {
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [fetchStages, setFetchStages] = useState([]);
   const { runDiff, cancel: cancelDiff } = useDiffWorker();
+  const handleFetchProgressDismiss = useCallback(() => setFetchStages([]), []);
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -105,7 +106,10 @@ export default function DiffViewer() {
         },
       });
 
-      stages[2].status = "complete";
+      // Mark all stages complete — onProgress may not have fired for every
+      // stage (e.g. if the worker was fast or events arrived out of order).
+      // handleLoadSpecs already does this; match the pattern here.
+      stages.forEach((s) => { s.status = "complete"; });
       setFetchStages(stages.map((s) => ({ ...s })));
 
       // Defer setResults to the next frame. This lets the current batch finish
@@ -434,7 +438,7 @@ export default function DiffViewer() {
       <FetchProgress
         stages={fetchStages}
         accentColor={selectedIntegration?.color ?? "hsl(var(--primary))"}
-        onDismiss={() => setFetchStages([])}
+        onDismiss={handleFetchProgressDismiss}
       />
 
       {/* Sidebar + Main */}
