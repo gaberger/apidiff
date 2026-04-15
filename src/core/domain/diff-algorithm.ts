@@ -54,11 +54,15 @@ function isRelated(a: string, b: string): boolean {
 // matching is O(removes × candidates × pathLen²) due to Levenshtein; on large
 // specs it freezes the UI. Exact rename/move detection (by value index) always
 // runs regardless of size.
-const FUZZY_SIZE_LIMIT = 500;
+//
+// TEMP: Set to 0 while the fuzzy pass is being reworked to use an incremental/
+// web-worker-friendly algorithm (see wp-fix-fuzzy-rename-freeze). With 0, fuzzy
+// is skipped entirely; renamed fields with identical values are still detected
+// by exact-match via the value-index map.
+const FUZZY_SIZE_LIMIT = 0;
 
-// Upper bound for the move fuzzy pass (even tighter — moves are rarer than renames
-// and the loop iterates all bKeys per removed entry).
-const FUZZY_MOVE_SIZE_LIMIT = 200;
+// Upper bound for the move fuzzy pass.
+const FUZZY_MOVE_SIZE_LIMIT = 0;
 
 // If structural diff has more than this many removed entries, skip both fuzzy
 // passes entirely. Most API diffs have <50 genuine renames; a high removed count

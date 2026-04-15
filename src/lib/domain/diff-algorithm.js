@@ -171,8 +171,8 @@ function isRelated(a, b) {
   const required = depth <= 3 ? 1 : depth <= 6 ? 2 : Math.max(3, Math.ceil(depth * 0.4));
   return shared >= required;
 }
-var FUZZY_SIZE_LIMIT = 500;
-var FUZZY_MOVE_SIZE_LIMIT = 200;
+var FUZZY_SIZE_LIMIT = 0;
+var FUZZY_MOVE_SIZE_LIMIT = 0;
 var REMOVED_SIZE_SKIP = 100;
 function computeStructuralDiff(fa, fb) {
   const results = [];
