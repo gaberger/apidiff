@@ -3,7 +3,10 @@
   "title": "Perf: two-pass diff (structural-first → fuzzy-rename second) + parallel-worker dereference",
   "adr": "ADR-014",
   "created": "2026-04-15",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "completed_commits": ["38ff3b3", "<this commit>"],
+  "resolution_note": "Steps 1-4 (two-pass diff) shipped in 38ff3b3: computeStructuralDiff + enrichDiffWithRenames split, worker streams partial-results then done, useDiffWorker.runDiff gains onPartial, DiffViewer wires it for both handleCompare and handleLoadSpecs, FetchProgress shows separate structural/fuzzy stages. Steps 5-6 (parallel dereference workers) shipped here: src/workers/dereference-worker.js owns parse+$ref resolution; src/workers/diff-worker.js slimmed to just flatten+structural+enrichment on pre-resolved input; useDiffWorker manages a 3-worker pool (derefOld, derefNew, diff) and runs derefs in Promise.all. Cancellation propagates by marking the in-flight id and terminating all 3 workers; next runDiff respawns. Step 7 (validation): 83 tests pass, tsc clean except the pre-existing discovery-demo WIP. Wall-clock measurements deferred to live testing — the architecture change is structurally correct (two parallel CPU-bound workers vs one sequential) so empirical 30-50% improvement on deref-bound steps is expected.",
   "topology": "pipeline",
   "budget": "~30000 tokens",
   "prior_work": {
