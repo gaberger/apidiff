@@ -4,93 +4,6 @@ import { Upload, FileText, X, Globe, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 
-const VISIBLE_LINE_BUFFER = 2;
-const LINE_HEIGHT_PX = 20.8;
-
-function PathHighlightOverlay({ activeHighlight, taRef, containerHeight }) {
-  const [scrollTop, setScrollTop] = useState(0);
-
-  useEffect(() => {
-    const ta = taRef?.current;
-    if (!ta) return;
-    const onScroll = () => setScrollTop(ta.scrollTop);
-    ta.addEventListener("scroll", onScroll, { passive: true });
-    return () => ta.removeEventListener("scroll", onScroll);
-  }, [taRef]);
-
-  const PY = 14;
-  const top = PY + (activeHighlight - 1) * LINE_HEIGHT_PX - scrollTop;
-
-  if (top < -LINE_HEIGHT_PX || top > containerHeight + LINE_HEIGHT_PX) return null;
-
-  return (
-    <div
-      className="absolute left-0 right-0 pointer-events-none z-[5]"
-      style={{
-        top,
-        height: LINE_HEIGHT_PX,
-        backgroundColor: "rgba(251,191,36,0.4)",
-        borderTop: "1px solid rgba(245,158,11,0.7)",
-        borderBottom: "1px solid rgba(245,158,11,0.7)",
-      }}
-    />
-  );
-}
-
-function LineGutter({ lineCount, scrollSyncRef }) {
-  const innerRef = useRef(null);
-  const [scrollTop, setScrollTop] = useState(0);
-
-  useEffect(() => {
-    const ta = scrollSyncRef?.current;
-    if (!ta) return;
-    const onScroll = () => setScrollTop(ta.scrollTop);
-    ta.addEventListener("scroll", onScroll, { passive: true });
-    return () => ta.removeEventListener("scroll", onScroll);
-  }, [scrollSyncRef]);
-
-  const containerH = 520;
-  const totalH = lineCount * LINE_HEIGHT_PX;
-  const startLine = Math.max(1, Math.floor(scrollTop / LINE_HEIGHT_PX) - VISIBLE_LINE_BUFFER);
-  const endLine = Math.min(lineCount, Math.ceil((scrollTop + containerH) / LINE_HEIGHT_PX) + VISIBLE_LINE_BUFFER);
-
-  return (
-    <div
-      ref={innerRef}
-      className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
-      style={{ height: containerH, position: "relative" }}
-      aria-hidden="true"
-    >
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH }}>
-        {Array.from({ length: endLine - startLine + 1 }, (_, i) => {
-          const n = startLine + i;
-          return (
-            <div
-              key={n}
-              className="text-stone-400 dark:text-stone-500"
-              style={{
-                position: "absolute",
-                top: (n - 1) * LINE_HEIGHT_PX,
-                left: 0,
-                right: 0,
-                height: LINE_HEIGHT_PX,
-                paddingRight: 8,
-                textAlign: "right",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                fontSize: 11,
-                lineHeight: `${LINE_HEIGHT_PX}px`,
-                userSelect: "none",
-              }}
-            >
-              {n}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 /**
  * Format byte size to human-readable string.
  */
@@ -214,6 +127,9 @@ const SpecInputRaw = React.memo(function SpecInput({
   const [error, setError] = useState("");
   const [activeHighlight, setActiveHighlight] = useState(null);
   const [highlightedLines, setHighlightedLines] = useState(null);
+  const [taLineHeight, setTaLineHeight] = useState(20);
+  const [taPaddingTop, setTaPaddingTop] = useState(8);
+  const [taScrollTop, setTaScrollTop] = useState(0);
 
   // Track active highlight line (no timeout — stays until new click)
   useEffect(() => {
@@ -221,12 +137,32 @@ const SpecInputRaw = React.memo(function SpecInput({
     setActiveHighlight(highlightLine);
   }, [highlightLine]);
 
+  // Read computed lineHeight and paddingTop from the textarea so PathHighlightOverlay
+  // positions the yellow bar accurately regardless of responsive font-size breakpoints.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const update = () => {
+      const cs = window.getComputedStyle(ta);
+      setTaLineHeight(parseFloat(cs.lineHeight) || 20);
+      setTaPaddingTop(parseFloat(cs.paddingTop) || 8);
+    };
+    const onScroll = () => setTaScrollTop(ta.scrollTop);
+    update();
+    ta.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(ta);
+    return () => {
+      ta.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, [taRef]);
+
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
 
   // Deferred colorization: for large specs (>2k lines) render plain text only
-  // in the pre (single div with textContent — zero per-line React elements).
-  // Colorize in background for smaller specs.
+  // (zero per-line React elements). Colorize in background for smaller specs.
   const LARGE_LINE_COUNT = 2000;
   const lines = useMemo(() => value ? value.split("\n") : [], [value]);
   const isLargeSpec = lines.length > LARGE_LINE_COUNT;
@@ -234,8 +170,8 @@ const SpecInputRaw = React.memo(function SpecInput({
   useEffect(() => {
     if (!value) { setHighlightedLines(null); return; }
 
-    // Large spec: render raw text as a single div (not 30k divs). The textarea
-    // text becomes visible so the pre's plain text shows through the textarea.
+    // Large spec: render raw text as a single div (zero per-line elements). The
+    // PathHighlightOverlay component handles the path-click highlight independently.
     if (isLargeSpec) {
       setHighlightedLines([<div key="plain" className="text-stone-700 dark:text-stone-300" style={{ whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>{value}</div>]);
       return;
@@ -469,11 +405,18 @@ const SpecInputRaw = React.memo(function SpecInput({
             </div>
           )}
 
-          {/* Line number gutter — virtual renders only visible lines (~30 divs instead of 30k) */}
-          <LineGutter
-            lineCount={lineCount}
-            scrollSyncRef={taRef}
-          />
+          {/* Line number gutter */}
+          <div
+            ref={lineGutterRef}
+            className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
+            aria-hidden="true"
+          >
+            <div className="py-2 sm:py-3 pr-2 text-right font-mono text-[10px] sm:text-[11px] leading-[1.6] text-stone-400">
+              {Array.from({ length: Math.max(lineCount, 1) }, (_, i) => (
+                <div key={i + 1}>{i + 1}</div>
+              ))}
+            </div>
+          </div>
 
           {/* Editor area: textarea visible for input, pre overlay for syntax colors */}
           <div className="flex-1 relative">
@@ -486,12 +429,17 @@ const SpecInputRaw = React.memo(function SpecInput({
               <div style={{minWidth: "max-content"}}>{highlightedLines}</div>
             </pre>
 
-            {/* Highlight overlay for path-click — separate from pre rendering, works on large specs */}
+            {/* Highlight overlay for large specs — positioned dynamically from computed textarea styles */}
             {activeHighlight != null && isLargeSpec && (
-              <PathHighlightOverlay
-                activeHighlight={activeHighlight}
-                taRef={taRef}
-                containerHeight={520}
+              <div
+                className="absolute left-0 right-0 pointer-events-none z-[5]"
+                style={{
+                  height: taLineHeight,
+                  backgroundColor: "rgba(251,191,36,0.4)",
+                  borderTop: "1px solid rgba(245,158,11,0.7)",
+                  borderBottom: "1px solid rgba(245,158,11,0.7)",
+                  top: taPaddingTop + (activeHighlight - 1) * taLineHeight - taScrollTop,
+                }}
               />
             )}
 
