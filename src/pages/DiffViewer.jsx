@@ -55,7 +55,7 @@ export default function DiffViewer() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
   const [selectedIntegration, setSelectedIntegration] = useState(null);
   const [fetchStages, setFetchStages] = useState([]);
-  const { runDiff } = useDiffWorker();
+  const { runDiff, cancel: cancelDiff } = useDiffWorker();
   const [activeTab, setActiveTab] = useState("compare"); // "compare" | "guide"
   const [guide, setGuide] = useState(null);
   const [guideForm, setGuideForm] = useState({ baseVersion: "v1", revisionVersion: "v2", sunsetDate: "" });
@@ -157,6 +157,9 @@ export default function DiffViewer() {
       }
     } catch (e) {
       setResolving(false);
+      // Swallow user-initiated cancellations — Reset rejected the in-flight
+      // diff on purpose; surfacing that as an error confuses users.
+      if (e?.message === "cancelled") return;
       setError(e.message || "Invalid JSON — paste valid JSON specs");
     }
   };
@@ -219,6 +222,7 @@ export default function DiffViewer() {
       }
     } catch (e) {
       setResolving(false);
+      if (e?.message === "cancelled") return;
       setError(e.message);
       setFetchStages((prev) => prev.map((s) =>
         s.status === "in-progress" ? { ...s, status: "error", error: e.message } : s,
@@ -227,6 +231,11 @@ export default function DiffViewer() {
   };
 
   const handleReset = () => {
+    // Terminate any in-flight diff so its result can't land after Reset and
+    // overwrite the cleared state. cancelDiff() rejects pending promises
+    // with Error("cancelled"); the catch sites below filter those out so
+    // the user doesn't see a "compare failed" toast for their own action.
+    cancelDiff();
     setBefore("");
     setAfter("");
     setResults(null);
@@ -234,6 +243,7 @@ export default function DiffViewer() {
     setActiveFilter("all");
     setError(null);
     setRefsResolved(null);
+    setResolving(false);
     setActiveTab("compare");
   };
 

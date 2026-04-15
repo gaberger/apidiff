@@ -3,7 +3,9 @@
   "title": "Terminate diff-worker on Reset / unmount to drop stale results",
   "adr": "ADR-014",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "resolution_note": "Stale-read in original workplan: cancel() was already implemented in src/hooks/use-diff-worker.js (lines 50-57: terminate worker, null the ref, reject all pending promises with Error('cancelled')) and the unmount cleanup was already in place (lines 59-63). What was actually missing was the WIRING: DiffViewer didn't destructure cancel and didn't call it from handleReset, and handleCompare/handleLoadSpecs surfaced the synthetic 'cancelled' error as a user-facing toast. Fixed by destructuring cancel as cancelDiff, calling cancelDiff() at the top of handleReset (also resets resolving=false), and filtering e.message === 'cancelled' out of the catch blocks.",
   "topology": "pipeline",
   "budget": "~8000 tokens",
   "prior_work": {
