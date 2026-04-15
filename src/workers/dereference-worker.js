@@ -29,17 +29,16 @@ function parseSpec(text, sideLabel) {
 }
 
 self.addEventListener("message", async (e) => {
-  const { id, text, spec, sideLabel } = e.data || {};
+  const { id, text, sideLabel } = e.data || {};
   try {
     self.postMessage({ id, type: "progress", stage: "parsing" });
-    const parsed = text !== undefined ? parseSpec(text, sideLabel || "spec") : spec;
+    // `text` is always a string — use-diff-worker.js stringifies object inputs
+    // before sending so we never receive raw objects here.
+    const parsed = parseSpec(text, sideLabel || "spec");
 
     self.postMessage({ id, type: "progress", stage: "dereferencing" });
-    // Count refs on the raw text string when available — avoids a full JSON.stringify
-    // of the parsed object just to count occurrences (B2 fix).
-    const refCount = text !== undefined
-      ? (text.match(/"\$ref"\s*:/g) || []).length
-      : (() => { try { return (JSON.stringify(parsed).match(/"\$ref"/g) || []).length; } catch { return 0; } })();
+    // Regex on the raw text string — O(text.length), no JSON.stringify needed.
+    const refCount = (text.match(/"\$ref"\s*:/g) || []).length;
     // $RefParser.dereference does not mutate an exclusively-owned input; the
     // worker owns `parsed` so structuredClone is unnecessary here (B3 fix).
     const resolved = refCount > 0

@@ -37,8 +37,13 @@ self.addEventListener("message", (e) => {
 
     self.postMessage({ id, type: "partial-results", results: structural });
 
+    // Skip O(n²) fuzzy rename pass for very large change sets — above this
+    // threshold rename detection is too slow to be worth blocking results.
+    const FUZZY_SIZE_LIMIT = 2000;
     self.postMessage({ id, type: "progress", stage: "diffing-fuzzy" });
-    const enriched = enrichDiffWithRenames(structural, fa, fb, signal);
+    const enriched = structural.length <= FUZZY_SIZE_LIMIT
+      ? enrichDiffWithRenames(structural, fa, fb, signal)
+      : structural;
 
     if (isAborted(signal)) {
       self.postMessage({ id, type: "cancelled" });

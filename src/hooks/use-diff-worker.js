@@ -89,12 +89,19 @@ export function useDiffWorker() {
     const { derefOld, derefNew, diff } = ensureWorkers();
     const id = ++seqRef.current;
 
-    const oldPayload = typeof oldSpecOrText === "string"
-      ? { id, text: oldSpecOrText, sideLabel: "Original spec" }
-      : { id, spec: oldSpecOrText, sideLabel: "Original spec" };
-    const newPayload = typeof newSpecOrText === "string"
-      ? { id, text: newSpecOrText, sideLabel: "Updated spec" }
-      : { id, spec: newSpecOrText, sideLabel: "Updated spec" };
+    // Always send text strings — never raw objects. Object inputs are
+    // JSON.stringified here so the deref worker always uses the fast
+    // regex ref-count path and never falls back to JSON.stringify(parsed).
+    const oldPayload = {
+      id,
+      text: typeof oldSpecOrText === "string" ? oldSpecOrText : JSON.stringify(oldSpecOrText),
+      sideLabel: "Original spec",
+    };
+    const newPayload = {
+      id,
+      text: typeof newSpecOrText === "string" ? newSpecOrText : JSON.stringify(newSpecOrText),
+      sideLabel: "Updated spec",
+    };
 
     // Forward dereference progress; combine the two into a single
     // "dereferencing" stage for the consumer. We don't know which side
@@ -108,7 +115,10 @@ export function useDiffWorker() {
         parsingEmitted = true;
         onProgress?.({ stage: "parsing" });
       }
-      if (evt.stage === "dereferencing" && !derefEmitted) {
+      // Emit on either "dereferencing" OR "stringifying" — whichever arrives
+      // first triggers the stage-0→complete update. "stringifying" acts as a
+      // guaranteed fallback since it always fires after $RefParser completes.
+      if ((evt.stage === "dereferencing" || evt.stage === "stringifying") && !derefEmitted) {
         derefEmitted = true;
         onProgress?.({ stage: "dereferencing" });
       }
