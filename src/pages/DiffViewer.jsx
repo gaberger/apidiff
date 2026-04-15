@@ -108,19 +108,17 @@ export default function DiffViewer() {
       stages[2].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // Deferred rendering strategy: Frame 1 shows spinner gone + DiffResults (20 rows).
-      // Frame 2 (requestAnimationFrame) updates the editor content. This separates the
-      // SpecInput re-renders (which re-parse the diff highlight map on a 30k-line string)
-      // from the DiffResults paint, preventing both from blocking simultaneously.
-      const doUpdate = () => {
-        setResults(workerResults);
-        setSummaryCounts(workerCounts || null);
-        setRefsResolved(rr);
-        if (oldStringified) setBefore(oldStringified);
-        if (newStringified) setAfter(newStringified);
-      };
-      requestAnimationFrame(doUpdate);
+      // Defer setResults to the next frame. This lets the current batch finish
+      // (spinner dismissal + SpecInput re-render with raw text) before DiffResults
+      // paints. Without this defer, setResults triggers useDiffHighlight's
+      // buildLinePathMap (O(n) on 30k lines) in the same frame as the SpecInputs'
+      // own useDiffHighlight calls — three simultaneous heavy recomputes freeze the page.
+      setSummaryCounts(workerCounts || null);
+      setRefsResolved(rr);
+      if (oldStringified) setBefore(oldStringified);
+      if (newStringified) setAfter(newStringified);
       setResolving(false);
+      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -188,16 +186,11 @@ export default function DiffViewer() {
           ? { ...s, status: "complete" }
           : s,
       ));
-      // Same as handleCompare: pre-stringified specs come from the worker, no
-      // Same defer pattern as handleCompare.
-      const doUpdate = () => {
-        setResults(workerResults);
-        setSummaryCounts(workerCounts || null);
-        if (oldStringified) setBefore(oldStringified);
-        if (newStringified) setAfter(newStringified);
-      };
-      requestAnimationFrame(doUpdate);
+      setSummaryCounts(workerCounts || null);
+      if (oldStringified) setBefore(oldStringified);
+      if (newStringified) setAfter(newStringified);
       setResolving(false);
+      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
