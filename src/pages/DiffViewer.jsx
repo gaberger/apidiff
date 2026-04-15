@@ -110,37 +110,33 @@ export default function DiffViewer() {
       stages[3].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // All worker stages done — safe to show results. setResults triggers the
-      // first render of DiffResults (single paint, no competing spinner).
-      setResults(workerResults);
-      setRefsResolved(rr);
-
-      // Defer the heavy JSON.stringify of resolved specs and the textarea
-      // re-renders to a microtask so they don't extend this click handler.
-      // Capture scroll positions beforehand so setBefore/setAfter doesn't
-      // yank the user out of whatever endpoint they were reading — the
-      // dereferenced content has different line counts but the user was
-      // likely navigating by proximity, so clamping scrollTop to the new
-      // max is the least-surprising behavior.
-      if (rr) {
-        const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
-        const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
-        setTimeout(() => {
+      // All worker stages done. Capture scroll before updating editors, then
+      // defer both the resolved spec updates AND the spinner dismiss to the same
+      // setTimeout — this keeps the spinner up until all post-processing is done.
+      // Previously setResolving(false) was in finally/, which removed the spinner
+      // before JSON.stringify + colorization finished on large specs, leaving
+      // the browser hanging.
+      const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
+      const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
+      setTimeout(() => {
+        setResults(workerResults);
+        setRefsResolved(rr);
+        if (rr) {
           setBefore(JSON.stringify(oldResolved, null, 2));
           setAfter(JSON.stringify(newResolved, null, 2));
-          // Restore after React commits the new textarea content.
           requestAnimationFrame(() => {
             if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
             if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
           });
-        }, 0);
-      }
+        } else {
+          setResults(workerResults);
+        }
+        // Dismiss spinner only after all post-processing (stringify + colorize) completes.
+        setResolving(false);
+      }, 0);
     } catch (e) {
-      // Swallow user-initiated cancellations — Reset rejected the in-flight
-      // diff on purpose; surfacing that as an error confuses users.
-      if (e?.message === "cancelled") return;
+      if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
-    } finally {
       setResolving(false);
     }
   };
@@ -203,28 +199,26 @@ export default function DiffViewer() {
           ? { ...s, status: "complete" }
           : s,
       ));
-      setResults(workerResults);
-      // Capture scroll before replacing textarea content so the user
-      // doesn't lose their navigation context, then restore after React
-      // commits. JSON.stringify is deferred to a microtask so the diff
-      // results paint first (see handleCompare for the same pattern).
+      // Same pattern as handleCompare: defer all post-processing to setTimeout
+      // so the spinner covers the entire update (stringify + colorize).
       const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
       const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
       setTimeout(() => {
+        setResults(workerResults);
         setBefore(JSON.stringify(oldResolved, null, 2));
         setAfter(JSON.stringify(newResolved, null, 2));
         requestAnimationFrame(() => {
           if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
           if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
         });
+        setResolving(false);
       }, 0);
     } catch (e) {
-      if (e?.message === "cancelled") return;
+      if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
       setFetchStages((prev) => prev.map((s) =>
         s.status === "in-progress" ? { ...s, status: "error", error: e.message } : s,
       ));
-    } finally {
       setResolving(false);
     }
   };
