@@ -153,7 +153,7 @@ function PathBreadcrumb({ segs, highlightFrom = segs.length - 1, side, onPathCli
   );
 }
 
-export default function DiffItem({ result, onPathClick }) {
+function DiffItem({ result, onPathClick }) {
   const config = typeConfig[result.type] || typeConfig.changed;
   const isRenamed = (result.type === "renamed" || result.type === "moved") && result.newPath;
   const split = isRenamed ? splitCommonPrefix(result.path, result.newPath) : null;
@@ -243,3 +243,17 @@ export default function DiffItem({ result, onPathClick }) {
     </tr>
   );
 }
+
+// Memoize with default shallow comparison on { result, onPathClick }.
+// enrichDiffWithRenames preserves object references for entries that didn't
+// change across the pass-1 → pass-2 transition (unchanged / changed /
+// type-change rows come through as the same JS objects), so only the rows
+// that actually became renames/moves re-render. Cuts the pass-2 message-
+// handler cost from ~1.7s to a small fraction for large tables.
+//
+// Also side-steps a Fast Refresh / HMR stack-overflow bug that fires when
+// editing DiffResults while a long table is mounted: React Refresh's
+// scheduleFibersWithFamiliesRecursively walks the fiber tree and blows the
+// stack on deep tables, but memoized components are treated differently and
+// the recursion stays bounded.
+export default React.memo(DiffItem);
