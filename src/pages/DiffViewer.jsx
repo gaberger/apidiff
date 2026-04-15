@@ -107,15 +107,16 @@ export default function DiffViewer() {
       stages[2].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // All worker stages done. The resolved specs were already stringified inside
-      // the dereference workers so the main thread never touches large strings.
-      // DiffResults colorization is unavoidable on the main thread (DOM), but with
-      // spinner dismissed immediately after setResults the user sees results right away.
-      setResults(workerResults);
-      setRefsResolved(rr);
+      // Defer setResults to the next frame. This lets the current batch finish
+      // (spinner dismissal + SpecInput re-render with raw text) before DiffResults
+      // paints. Without this defer, setResults triggers useDiffHighlight's
+      // buildLinePathMap (O(n) on 30k lines) in the same frame as the SpecInputs'
+      // own useDiffHighlight calls — three simultaneous heavy recomputes freeze the page.
       setBefore(oldStringified || before);
       setAfter(newStringified || after);
+      setRefsResolved(rr);
       setResolving(false);
+      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -184,11 +185,12 @@ export default function DiffViewer() {
           : s,
       ));
       // Same as handleCompare: pre-stringified specs come from the worker, no
-      // main-thread JSON.stringify needed.
-      setResults(workerResults);
+      // Same defer pattern as handleCompare: show spinner gone + editors first,
+      // results paint in next frame to avoid simultaneous useDiffHighlight recomputes.
       setBefore(oldStringified || before);
       setAfter(newStringified || after);
       setResolving(false);
+      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
