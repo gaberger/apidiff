@@ -134,7 +134,7 @@ export function useDiffWorker() {
     }
 
     return {
-      results: diffResult.results,
+      results: JSON.parse(diffResult.resultsJson),
       summaryCounts: diffResult.summaryCounts,
       oldResolved,
       newResolved,

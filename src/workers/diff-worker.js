@@ -49,7 +49,10 @@ self.addEventListener("message", (e) => {
       if (BREAKING_TYPES.has(r.type)) summaryCounts.breaking++;
     }
 
-    self.postMessage({ id, type: "done", results: enriched, summaryCounts });
+    // Send results as a JSON string — JSON.parse on the main thread is ~3-5× faster
+    // than the structured clone that postMessage uses by default. The structured
+    // clone of 30k complex objects can freeze the browser for 1-3 seconds.
+    self.postMessage({ id, type: "done", resultsJson: JSON.stringify(enriched), summaryCounts });
   } catch (err) {
     self.postMessage({
       id,
