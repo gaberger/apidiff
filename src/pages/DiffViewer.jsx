@@ -84,9 +84,16 @@ export default function DiffViewer() {
             stages[0].status = "complete";
             stages[1].status = "in-progress";
           }
-          if (evt.stage === "diffing-structural") {
+          if (evt.stage === "flattening-old") {
             stages[1].status = "complete";
             stages[2].status = "in-progress";
+            stages[2].label = "Flattening old spec";
+          }
+          if (evt.stage === "flattening-new") {
+            stages[2].label = "Flattening new spec";
+          }
+          if (evt.stage === "diffing-structural") {
+            stages[2].label = "Computing structural diff";
           }
           if (evt.stage === "diffing-fuzzy") {
             stages[2].status = "complete";
@@ -519,6 +526,7 @@ export default function DiffViewer() {
                     results={results}
                     textareaRef={leftEditorRef}
                     highlightLine={leftHighlight}
+                    loading={resolving}
                   />
                   <SpecInput
                     label="Updated Spec"
@@ -529,6 +537,7 @@ export default function DiffViewer() {
                     results={results}
                     textareaRef={rightEditorRef}
                     highlightLine={rightHighlight}
+                    loading={resolving}
                   />
                 </div>
                 </div>

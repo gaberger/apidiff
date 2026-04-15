@@ -16,9 +16,13 @@ function isAborted(signal) {
 self.addEventListener("message", (e) => {
   const { id, oldResolved, newResolved, signal } = e.data || {};
   try {
-    self.postMessage({ id, type: "progress", stage: "diffing-structural" });
+    self.postMessage({ id, type: "progress", stage: "flattening-old" });
     const fa = flatten(oldResolved);
+
+    self.postMessage({ id, type: "progress", stage: "flattening-new" });
     const fb = flatten(newResolved);
+
+    self.postMessage({ id, type: "progress", stage: "diffing-structural" });
     const structural = computeStructuralDiff(fa, fb);
 
     if (isAborted(signal)) {

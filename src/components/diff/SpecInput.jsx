@@ -112,6 +112,7 @@ export default function SpecInput({
   results,
   textareaRef,
   highlightLine,
+  loading = false,
 }) {
   const fileRef = useRef(null);
   const lineGutterRef = useRef(null);
@@ -370,7 +371,15 @@ export default function SpecInput({
         )}
 
         {/* Line numbers + textarea wrapper */}
-        <div className="flex w-full h-[520px] rounded-xl border border-border bg-card shadow-e2 overflow-hidden focus-within:shadow-e3 focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all duration-base ease-standard">
+        <div className="relative flex w-full h-[520px] rounded-xl border border-border bg-card shadow-e2 overflow-hidden focus-within:shadow-e3 focus-within:ring-2 focus-within:ring-ring/20 focus-within:border-ring/40 transition-all duration-base ease-standard">
+          {/* Loading overlay */}
+          {loading && (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <span className="text-xs font-medium text-muted-foreground">Computing…</span>
+            </div>
+          )}
+
           {/* Line number gutter */}
           <div
             ref={lineGutterRef}
