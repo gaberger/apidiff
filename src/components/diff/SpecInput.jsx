@@ -4,6 +4,63 @@ import { Upload, FileText, X, Globe, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 
+const VISIBLE_LINE_BUFFER = 2;
+const LINE_HEIGHT_PX = 20.8;
+
+function LineGutter({ lineCount, scrollSyncRef }) {
+  const innerRef = useRef(null);
+  const [scrollTop, setScrollTop] = useState(0);
+
+  useEffect(() => {
+    const ta = scrollSyncRef?.current;
+    if (!ta) return;
+    const onScroll = () => setScrollTop(ta.scrollTop);
+    ta.addEventListener("scroll", onScroll, { passive: true });
+    return () => ta.removeEventListener("scroll", onScroll);
+  }, [scrollSyncRef]);
+
+  const containerH = 520;
+  const totalH = lineCount * LINE_HEIGHT_PX;
+  const startLine = Math.max(1, Math.floor(scrollTop / LINE_HEIGHT_PX) - VISIBLE_LINE_BUFFER);
+  const endLine = Math.min(lineCount, Math.ceil((scrollTop + containerH) / LINE_HEIGHT_PX) + VISIBLE_LINE_BUFFER);
+
+  return (
+    <div
+      ref={innerRef}
+      className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
+      style={{ height: containerH, position: "relative" }}
+      aria-hidden="true"
+    >
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH }}>
+        {Array.from({ length: endLine - startLine + 1 }, (_, i) => {
+          const n = startLine + i;
+          return (
+            <div
+              key={n}
+              style={{
+                position: "absolute",
+                top: (n - 1) * LINE_HEIGHT_PX,
+                left: 0,
+                right: 0,
+                height: LINE_HEIGHT_PX,
+                paddingRight: 8,
+                textAlign: "right",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                fontSize: 11,
+                lineHeight: `${LINE_HEIGHT_PX}px`,
+                color: "#a8a29e",
+                userSelect: "none",
+              }}
+            >
+              {n}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Format byte size to human-readable string.
  */
@@ -381,18 +438,11 @@ const SpecInputRaw = React.memo(function SpecInput({
             </div>
           )}
 
-          {/* Line number gutter */}
-          <div
-            ref={lineGutterRef}
-            className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
-            aria-hidden="true"
-          >
-            <div className="py-2 sm:py-3 pr-2 text-right font-mono text-[10px] sm:text-[11px] leading-[1.6] text-stone-400">
-              {Array.from({ length: Math.max(lineCount, 1) }, (_, i) => (
-                <div key={i + 1}>{i + 1}</div>
-              ))}
-            </div>
-          </div>
+          {/* Line number gutter — virtual renders only visible lines (~30 divs instead of 30k) */}
+          <LineGutter
+            lineCount={lineCount}
+            scrollSyncRef={taRef}
+          />
 
           {/* Editor area: textarea visible for input, pre overlay for syntax colors */}
           <div className="flex-1 relative">
