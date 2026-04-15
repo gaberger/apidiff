@@ -166,3 +166,8 @@
     @apply py-3 text-base;
   }
 }
+
+@keyframes indeterminate-slide {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}

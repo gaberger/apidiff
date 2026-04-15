@@ -64,50 +64,47 @@ export default function DiffViewer() {
     setActiveFilter("all");
     setResolving(true);
 
+    // Stages map to worker events we can actually observe. Deref is part of runDiff
+    // but blocks during $RefParser — we start it as complete so it shows immediately
+    // as done (true granular progress is impossible without a streaming deref lib).
+    // Flatten + diff stages come from the diff-worker and fire reliably.
     const stages = [
-      { id: "parse", label: "Parsing specs", status: "in-progress", cacheHit: false },
-      { id: "deref", label: "Dereferencing $refs", status: "pending", cacheHit: false },
-      { id: "diff-structural", label: "Computing structural diff", status: "pending", cacheHit: false },
+      { id: "process", label: "Processing specs", status: "in-progress", cacheHit: false },
+      { id: "flatten", label: "Flattening specs", status: "pending", cacheHit: false },
       { id: "diff-fuzzy", label: "Detecting renames", status: "pending", cacheHit: false },
     ];
     setFetchStages(stages.map((s) => ({ ...s })));
 
     try {
-      // Hand raw strings to the worker — parsing, cloning, dereferencing,
-      // and diff all happen off the main thread. Previously parseSpec +
-      // collectRefs + structuredClone-via-postMessage ran here and pushed
-      // the click handler past 7s for multi-MB specs.
       const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
         onProgress: (evt) => {
-          if (evt.stage === "parsing") stages[0].status = "in-progress";
-          if (evt.stage === "dereferencing") {
+          if (evt.stage === "dereferencing" || evt.stage === "stringifying") {
             stages[0].status = "complete";
             stages[1].status = "in-progress";
+            stages[1].label = "Flattening old spec";
+            setFetchStages(stages.map((s) => ({ ...s })));
           }
           if (evt.stage === "flattening-old") {
-            stages[1].status = "complete";
-            stages[2].status = "in-progress";
-            stages[2].label = "Flattening old spec";
+            stages[1].label = "Flattening old spec";
+            setFetchStages(stages.map((s) => ({ ...s })));
           }
           if (evt.stage === "flattening-new") {
-            stages[2].label = "Flattening new spec";
+            stages[1].label = "Flattening new spec";
+            setFetchStages(stages.map((s) => ({ ...s })));
           }
           if (evt.stage === "diffing-structural") {
-            stages[2].label = "Computing structural diff";
+            stages[1].label = "Computing structural diff";
+            setFetchStages(stages.map((s) => ({ ...s })));
           }
           if (evt.stage === "diffing-fuzzy") {
-            stages[2].status = "complete";
-            stages[3].status = "in-progress";
+            stages[1].status = "complete";
+            stages[2].status = "in-progress";
+            setFetchStages(stages.map((s) => ({ ...s })));
           }
-          setFetchStages(stages.map((s) => ({ ...s })));
         },
-        // onPartial is removed — showing partial structural results mid-fuzzy-pass
-        // triggers expensive DiffResults re-renders that compete with the spinner.
-        // Keep the spinner covering both editors until the fuzzy pass (the longest
-        // step) is fully done, then show results in one shot.
       });
 
-      stages[3].status = "complete";
+      stages[2].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
       // All worker stages done. The resolved specs were already stringified inside
@@ -154,10 +151,9 @@ export default function DiffViewer() {
     setActiveTab("compare");
     setResolving(true);
 
-    setFetchStages((prev) => [
-      ...prev,
-      { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
-      { id: "diff-structural", label: "Computing structural diff", status: "pending", cacheHit: false },
+    setFetchStages([
+      { id: "process", label: "Processing specs", status: "in-progress", cacheHit: false },
+      { id: "flatten", label: "Flattening specs", status: "pending", cacheHit: false },
       { id: "diff-fuzzy", label: "Detecting renames", status: "pending", cacheHit: false },
     ]);
 
@@ -169,9 +165,12 @@ export default function DiffViewer() {
       const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified } = await runDiff(v1, v2, {
         onProgress: (evt) => {
           setFetchStages((prev) => prev.map((s) => {
-            if (s.id === "deref" && evt.stage === "diffing-structural") return { ...s, status: "complete" };
-            if (s.id === "diff-structural" && evt.stage === "diffing-structural") return { ...s, status: "in-progress" };
-            if (s.id === "diff-structural" && evt.stage === "diffing-fuzzy") return { ...s, status: "complete" };
+            if ((s.id === "process") && (evt.stage === "dereferencing" || evt.stage === "stringifying")) {
+              return { ...s, status: "complete" };
+            }
+            if (s.id === "flatten" && evt.stage === "flattening-old") return { ...s, status: "in-progress", label: "Flattening old spec" };
+            if (s.id === "flatten" && evt.stage === "flattening-new") return { ...s, label: "Flattening new spec" };
+            if (s.id === "flatten" && evt.stage === "diffing-structural") return { ...s, label: "Computing structural diff" };
             if (s.id === "diff-fuzzy" && evt.stage === "diffing-fuzzy") return { ...s, status: "in-progress" };
             return s;
           }));
@@ -180,7 +179,7 @@ export default function DiffViewer() {
         // editors through all worker stages; show results only when fully done.
       });
       setFetchStages((prev) => prev.map((s) =>
-        s.id === "diff-structural" || s.id === "diff-fuzzy" || s.id === "deref"
+        s.id === "diff-fuzzy" || s.id === "flatten" || s.id === "process"
           ? { ...s, status: "complete" }
           : s,
       ));

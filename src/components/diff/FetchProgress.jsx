@@ -9,6 +9,8 @@ export default function FetchProgress({ stages, accentColor = "hsl(var(--primary
   const hasError = stages.some((s) => s.status === "error");
   const anyCacheHit = stages.some((s) => s.cacheHit);
 
+  const isIndeterminate = hasActive && ["process", "deref"].includes(stages.find(s => s.status === "in-progress")?.id ?? "");
+
   useEffect(() => {
     if (stages.length > 0 && (hasActive || hasError || allDone)) {
       setVisible(true);
@@ -66,23 +68,39 @@ export default function FetchProgress({ stages, accentColor = "hsl(var(--primary
           </div>
         </div>
         <div className="relative h-1 w-full overflow-hidden rounded-full bg-secondary">
-          <div
-            className="absolute inset-y-0 left-0 transition-all duration-base ease-standard"
-            style={{
-              width: `${percent}%`,
-              background: hasError
-                ? "hsl(var(--destructive))"
-                : `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`,
-            }}
-          />
-          {hasActive && !hasError && (
+          {hasError ? (
             <div
-              className="absolute inset-y-0 w-1/4 animate-pulse"
+              className="absolute inset-0"
+              style={{ background: "hsl(var(--destructive))" }}
+            />
+          ) : isIndeterminate ? (
+            <div
+              className="absolute inset-y-0 animate-pulse opacity-60"
               style={{
-                left: `${Math.max(0, percent - 15)}%`,
-                background: `linear-gradient(90deg, transparent, ${accentColor}55, transparent)`,
+                width: "40%",
+                background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
+                animation: "indeterminate-slide 1.2s ease-in-out infinite",
               }}
             />
+          ) : (
+            <>
+              <div
+                className="absolute inset-y-0 left-0 transition-all duration-base ease-standard"
+                style={{
+                  width: `${percent}%`,
+                  background: `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)`,
+                }}
+              />
+              {hasActive && (
+                <div
+                  className="absolute inset-y-0 w-1/4 animate-pulse"
+                  style={{
+                    left: `${Math.max(0, percent - 15)}%`,
+                    background: `linear-gradient(90deg, transparent, ${accentColor}55, transparent)`,
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
       </div>
