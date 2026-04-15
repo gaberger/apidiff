@@ -45,7 +45,11 @@ self.addEventListener("message", async (e) => {
       ? await $RefParser.dereference(structuredClone(parsed))
       : parsed;
 
-    self.postMessage({ id, type: "done", resolved, refCount });
+    // Stringify in the worker so the main thread never touches large spec strings.
+    self.postMessage({ id, type: "progress", stage: "stringifying" });
+    const stringified = JSON.stringify(resolved, null, 2);
+
+    self.postMessage({ id, type: "done", resolved, stringified, refCount });
   } catch (err) {
     self.postMessage({
       id,

@@ -114,7 +114,8 @@ export function useDiffWorker() {
       }
     };
 
-    const [{ resolved: oldResolved, refCount: oldRefs }, { resolved: newResolved, refCount: newRefs }] =
+    const [{ resolved: oldResolved, stringified: oldStringified, refCount: oldRefs },
+           { resolved: newResolved, stringified: newStringified, refCount: newRefs }] =
       await Promise.all([
         runOnce(derefOld, oldPayload, { onProgress: forward }),
         runOnce(derefNew, newPayload, { onProgress: forward }),
@@ -136,6 +137,8 @@ export function useDiffWorker() {
       results: diffResult.results,
       oldResolved,
       newResolved,
+      oldStringified,
+      newStringified,
       refsResolved: (oldRefs + newRefs) > 0 ? { old: oldRefs, new: newRefs } : null,
     };
   }, [ensureWorkers]);

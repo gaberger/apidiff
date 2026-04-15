@@ -77,7 +77,7 @@ export default function DiffViewer() {
       // and diff all happen off the main thread. Previously parseSpec +
       // collectRefs + structuredClone-via-postMessage ran here and pushed
       // the click handler past 7s for multi-MB specs.
-      const { results: workerResults, oldResolved, newResolved, refsResolved: rr } = await runDiff(before, after, {
+      const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
         onProgress: (evt) => {
           if (evt.stage === "parsing") stages[0].status = "in-progress";
           if (evt.stage === "dereferencing") {
@@ -110,30 +110,15 @@ export default function DiffViewer() {
       stages[3].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // All worker stages done. Capture scroll before updating editors, then
-      // defer both the resolved spec updates AND the spinner dismiss to the same
-      // setTimeout — this keeps the spinner up until all post-processing is done.
-      // Previously setResolving(false) was in finally/, which removed the spinner
-      // before JSON.stringify + colorization finished on large specs, leaving
-      // the browser hanging.
-      const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
-      const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
-      setTimeout(() => {
-        setResults(workerResults);
-        setRefsResolved(rr);
-        if (rr) {
-          setBefore(JSON.stringify(oldResolved, null, 2));
-          setAfter(JSON.stringify(newResolved, null, 2));
-          requestAnimationFrame(() => {
-            if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
-            if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
-          });
-        } else {
-          setResults(workerResults);
-        }
-        // Dismiss spinner only after all post-processing (stringify + colorize) completes.
-        setResolving(false);
-      }, 0);
+      // All worker stages done. The resolved specs were already stringified inside
+      // the dereference workers so the main thread never touches large strings.
+      // DiffResults colorization is unavoidable on the main thread (DOM), but with
+      // spinner dismissed immediately after setResults the user sees results right away.
+      setResults(workerResults);
+      setRefsResolved(rr);
+      setBefore(oldStringified || before);
+      setAfter(newStringified || after);
+      setResolving(false);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -181,7 +166,7 @@ export default function DiffViewer() {
       // structured cloning at the postMessage boundary — for already-parsed
       // API responses, this avoids a redundant main-thread JSON.stringify
       // followed by JSON.parse inside the worker.
-      const { results: workerResults, oldResolved, newResolved } = await runDiff(v1, v2, {
+      const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified } = await runDiff(v1, v2, {
         onProgress: (evt) => {
           setFetchStages((prev) => prev.map((s) => {
             if (s.id === "deref" && evt.stage === "diffing-structural") return { ...s, status: "complete" };
@@ -199,20 +184,12 @@ export default function DiffViewer() {
           ? { ...s, status: "complete" }
           : s,
       ));
-      // Same pattern as handleCompare: defer all post-processing to setTimeout
-      // so the spinner covers the entire update (stringify + colorize).
-      const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
-      const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
-      setTimeout(() => {
-        setResults(workerResults);
-        setBefore(JSON.stringify(oldResolved, null, 2));
-        setAfter(JSON.stringify(newResolved, null, 2));
-        requestAnimationFrame(() => {
-          if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
-          if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
-        });
-        setResolving(false);
-      }, 0);
+      // Same as handleCompare: pre-stringified specs come from the worker, no
+      // main-thread JSON.stringify needed.
+      setResults(workerResults);
+      setBefore(oldStringified || before);
+      setAfter(newStringified || after);
+      setResolving(false);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
