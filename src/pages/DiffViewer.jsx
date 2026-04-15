@@ -67,7 +67,8 @@ export default function DiffViewer() {
     const stages = [
       { id: "parse", label: "Parsing specs", status: "in-progress", cacheHit: false },
       { id: "deref", label: "Dereferencing $refs", status: "pending", cacheHit: false },
-      { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+      { id: "diff-structural", label: "Computing structural diff", status: "pending", cacheHit: false },
+      { id: "diff-fuzzy", label: "Detecting renames", status: "pending", cacheHit: false },
     ];
     setFetchStages(stages.map((s) => ({ ...s })));
 
@@ -83,18 +84,31 @@ export default function DiffViewer() {
             stages[0].status = "complete";
             stages[1].status = "in-progress";
           }
-          if (evt.stage === "diffing") {
+          if (evt.stage === "diffing-structural") {
             stages[1].status = "complete";
             stages[2].status = "in-progress";
           }
+          if (evt.stage === "diffing-fuzzy") {
+            stages[2].status = "complete";
+            stages[3].status = "in-progress";
+          }
           setFetchStages(stages.map((s) => ({ ...s })));
+        },
+        // Two-pass: structural results land here first so the UI can paint
+        // added/removed/changed badges in <1s on multi-MB specs. The full
+        // enriched results (with rename + move detection) replace these
+        // when the second pass completes.
+        onPartial: (partialResults) => {
+          setResults(partialResults);
         },
       });
 
-      stages[2].status = "complete";
+      stages[3].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // Show diff results immediately — that's what the user cares about.
+      // Final enriched results: replaces the partial set in place. React
+      // reconciles the diff list — added/removed entries that became
+      // renames/moves swap their rendered row without remounting.
       setResults(workerResults);
       setRefsResolved(rr);
 
@@ -151,7 +165,8 @@ export default function DiffViewer() {
     setFetchStages((prev) => [
       ...prev,
       { id: "deref", label: "Dereferencing $refs", status: "in-progress", cacheHit: false },
-      { id: "diff", label: "Computing diff", status: "pending", cacheHit: false },
+      { id: "diff-structural", label: "Computing structural diff", status: "pending", cacheHit: false },
+      { id: "diff-fuzzy", label: "Detecting renames", status: "pending", cacheHit: false },
     ]);
 
     try {
@@ -162,16 +177,23 @@ export default function DiffViewer() {
       const { results: workerResults, oldResolved, newResolved } = await runDiff(v1, v2, {
         onProgress: (evt) => {
           setFetchStages((prev) => prev.map((s) => {
-            if (s.id === "deref" && evt.stage === "diffing") return { ...s, status: "complete" };
-            if (s.id === "diff" && evt.stage === "diffing") return { ...s, status: "in-progress" };
+            if (s.id === "deref" && evt.stage === "diffing-structural") return { ...s, status: "complete" };
+            if (s.id === "diff-structural" && evt.stage === "diffing-structural") return { ...s, status: "in-progress" };
+            if (s.id === "diff-structural" && evt.stage === "diffing-fuzzy") return { ...s, status: "complete" };
+            if (s.id === "diff-fuzzy" && evt.stage === "diffing-fuzzy") return { ...s, status: "in-progress" };
             return s;
           }));
         },
+        onPartial: (partialResults) => {
+          setResults(partialResults);
+        },
       });
       setFetchStages((prev) => prev.map((s) =>
-        s.id === "diff" || s.id === "deref" ? { ...s, status: "complete" } : s,
+        s.id === "diff-structural" || s.id === "diff-fuzzy" || s.id === "deref"
+          ? { ...s, status: "complete" }
+          : s,
       ));
-      // Show diff results immediately — that's what the user clicked for.
+      // Final enriched results — replaces partial set in place.
       setResults(workerResults);
       // Defer the JSON.stringify + setBefore/setAfter of the resolved specs
       // so the diff results paint first. JSON.stringify on a multi-MB

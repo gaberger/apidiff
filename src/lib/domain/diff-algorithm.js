@@ -171,18 +171,43 @@ function isRelated(a, b) {
   const required = depth <= 3 ? 1 : depth <= 6 ? 2 : Math.max(3, Math.ceil(depth * 0.4));
   return shared >= required;
 }
-function computeDiff(a, b) {
-  const fa = flatten(a);
-  const fb = flatten(b);
-  return diffFlatMaps(fa, fb);
-}
 var FUZZY_SIZE_LIMIT = 5000;
-function diffFlatMaps(fa, fb) {
+function computeStructuralDiff(fa, fb) {
   const results = [];
   const aKeys = Object.keys(fa);
   const bKeys = Object.keys(fb);
   const allKeys = new Set([...aKeys, ...bKeys]);
-  const processed = new Set;
+  for (const key of allKeys) {
+    const inA = key in fa;
+    const inB = key in fb;
+    if (inA && inB) {
+      const oldVal = fa[key];
+      const newVal = fb[key];
+      if (serialize2(oldVal) === serialize2(newVal)) {
+        results.push({ type: "unchanged", path: key, old: oldVal, new: newVal });
+      } else if (describeType(oldVal) !== describeType(newVal)) {
+        results.push({
+          type: "type-change",
+          path: key,
+          old: oldVal,
+          new: newVal,
+          oldType: describeType(oldVal),
+          newType: describeType(newVal)
+        });
+      } else {
+        results.push({ type: "changed", path: key, old: oldVal, new: newVal });
+      }
+    } else if (inA && !inB) {
+      results.push({ type: "removed", path: key, old: fa[key] });
+    } else {
+      results.push({ type: "added", path: key, new: fb[key] });
+    }
+  }
+  return results;
+}
+function enrichDiffWithRenames(structural, fa, fb) {
+  const aKeys = Object.keys(fa);
+  const bKeys = Object.keys(fb);
   const fuzzyEnabled = bKeys.length <= FUZZY_SIZE_LIMIT && aKeys.length <= FUZZY_SIZE_LIMIT;
   const fbOnlyByValue = new Map;
   const fbOnlyByLeafValue = new Map;
@@ -205,136 +230,153 @@ function diffFlatMaps(fa, fb) {
     }
     byLeaf.push(fbKey);
   }
-  for (const key of allKeys) {
-    if (processed.has(key))
+  const consumedAdditions = new Set;
+  const enriched = [];
+  for (const entry of structural) {
+    if (entry.type === "added")
       continue;
-    const inA = key in fa;
-    const inB = key in fb;
-    if (inA && inB) {
-      const oldVal = fa[key];
-      const newVal = fb[key];
-      if (serialize2(oldVal) === serialize2(newVal)) {
-        results.push({ type: "unchanged", path: key, old: oldVal, new: newVal });
-      } else if (describeType(oldVal) !== describeType(newVal)) {
-        results.push({
-          type: "type-change",
-          path: key,
-          old: oldVal,
-          new: newVal,
-          oldType: describeType(oldVal),
-          newType: describeType(newVal)
-        });
-      } else {
-        results.push({ type: "changed", path: key, old: oldVal, new: newVal });
-      }
-    } else if (inA && !inB) {
-      const ser = serialize2(fa[key]);
-      const leaf = leafName(key);
-      const renamePool = fbOnlyByValue.get(ser);
-      let renamedTo = null;
-      let fuzzyConfidence = null;
-      if (renamePool) {
-        const keyParent = parentPath(key);
-        for (const fbKey of renamePool) {
-          if (processed.has(fbKey))
-            continue;
-          if (leafName(fbKey) === leaf)
-            continue;
-          if (parentPath(fbKey) === keyParent) {
-            renamedTo = fbKey;
-            break;
-          }
-          if (isRelated(key, fbKey)) {
-            renamedTo = fbKey;
-            break;
-          }
-        }
-      }
-      if (!renamedTo && fuzzyEnabled) {
-        let bestScore = -1;
-        let bestKey = null;
-        for (const fbKey of bKeys) {
-          if (fbKey in fa || processed.has(fbKey))
-            continue;
-          if (leafName(fbKey) === leaf)
-            continue;
-          if (!isRelated(key, fbKey))
-            continue;
-          const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
-          if (score >= FUZZY_THRESHOLD && score > bestScore) {
-            bestScore = score;
-            bestKey = fbKey;
-          }
-        }
-        if (bestKey !== null) {
-          renamedTo = bestKey;
-          fuzzyConfidence = Math.round(bestScore * 100) / 100;
-        }
-      }
-      if (renamedTo) {
-        const shared = sharedAncestorDepth(key, renamedTo);
-        const maxDepth = Math.max(key.split(".").length, renamedTo.split(".").length);
-        const confidence = maxDepth > 0 ? shared / maxDepth : 1;
-        const isSibling = parentPath(key) === parentPath(renamedTo);
-        const finalConfidence = fuzzyConfidence ?? (isSibling ? Math.max(confidence, 0.9) : confidence);
-        results.push({ type: "renamed", path: key, newPath: renamedTo, old: fa[key], new: fb[renamedTo], confidence: Math.round(finalConfidence * 100) / 100 });
-        processed.add(renamedTo);
-      } else {
-        const movePool = fbOnlyByLeafValue.get(leaf + "\x00" + ser);
-        let movedTo = null;
-        if (movePool) {
-          const keyDepth = key.split(".").length;
-          for (const fbKey of movePool) {
-            if (processed.has(fbKey))
-              continue;
-            if (keyDepth <= 3 && fbKey.split(".").length === keyDepth) {
-              movedTo = fbKey;
-              break;
-            }
-            if (isRelated(key, fbKey)) {
-              movedTo = fbKey;
-              break;
-            }
-          }
-        }
-        if (!movedTo) {
-          let bestScore = -1;
-          let bestKey = null;
-          for (const fbKey of Object.keys(fb)) {
-            if (fbKey in fa || processed.has(fbKey))
-              continue;
-            if (leafName(fbKey) !== leaf)
-              continue;
-            const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
-            if (score >= FUZZY_THRESHOLD && score > bestScore) {
-              bestScore = score;
-              bestKey = fbKey;
-            }
-          }
-          if (bestKey !== null)
-            movedTo = bestKey;
-        }
-        if (movedTo) {
-          const shared = sharedAncestorDepth(key, movedTo);
-          const maxDepth = Math.max(key.split(".").length, movedTo.split(".").length);
-          const moveConfidence = maxDepth > 0 ? shared / maxDepth : 1;
-          results.push({ type: "moved", path: key, newPath: movedTo, old: fa[key], new: fb[movedTo], confidence: Math.round(moveConfidence * 100) / 100 });
-          processed.add(movedTo);
-        } else {
-          results.push({ type: "removed", path: key, old: fa[key] });
-        }
-      }
-    } else {
-      results.push({ type: "added", path: key, new: fb[key] });
+    if (entry.type !== "removed") {
+      enriched.push(entry);
+      continue;
     }
-    processed.add(key);
+    const key = entry.path;
+    const oldVal = fa[key];
+    const ser = serialize2(oldVal);
+    const leaf = leafName(key);
+    let renamedTo = null;
+    let fuzzyConfidence = null;
+    const renamePool = fbOnlyByValue.get(ser);
+    if (renamePool) {
+      const keyParent = parentPath(key);
+      for (const fbKey of renamePool) {
+        if (consumedAdditions.has(fbKey))
+          continue;
+        if (leafName(fbKey) === leaf)
+          continue;
+        if (parentPath(fbKey) === keyParent) {
+          renamedTo = fbKey;
+          break;
+        }
+        if (isRelated(key, fbKey)) {
+          renamedTo = fbKey;
+          break;
+        }
+      }
+    }
+    if (!renamedTo && fuzzyEnabled) {
+      let bestScore = -1;
+      let bestKey = null;
+      for (const fbKey of bKeys) {
+        if (fbKey in fa || consumedAdditions.has(fbKey))
+          continue;
+        if (leafName(fbKey) === leaf)
+          continue;
+        if (!isRelated(key, fbKey))
+          continue;
+        const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
+        if (score >= FUZZY_THRESHOLD && score > bestScore) {
+          bestScore = score;
+          bestKey = fbKey;
+        }
+      }
+      if (bestKey !== null) {
+        renamedTo = bestKey;
+        fuzzyConfidence = Math.round(bestScore * 100) / 100;
+      }
+    }
+    if (renamedTo) {
+      const shared = sharedAncestorDepth(key, renamedTo);
+      const maxDepth = Math.max(key.split(".").length, renamedTo.split(".").length);
+      const confidence = maxDepth > 0 ? shared / maxDepth : 1;
+      const isSibling = parentPath(key) === parentPath(renamedTo);
+      const finalConfidence = fuzzyConfidence ?? (isSibling ? Math.max(confidence, 0.9) : confidence);
+      enriched.push({
+        type: "renamed",
+        path: key,
+        newPath: renamedTo,
+        old: fa[key],
+        new: fb[renamedTo],
+        confidence: Math.round(finalConfidence * 100) / 100
+      });
+      consumedAdditions.add(renamedTo);
+      continue;
+    }
+    const movePool = fbOnlyByLeafValue.get(leaf + "\x00" + ser);
+    let movedTo = null;
+    if (movePool) {
+      const keyDepth = key.split(".").length;
+      for (const fbKey of movePool) {
+        if (consumedAdditions.has(fbKey))
+          continue;
+        if (keyDepth <= 3 && fbKey.split(".").length === keyDepth) {
+          movedTo = fbKey;
+          break;
+        }
+        if (isRelated(key, fbKey)) {
+          movedTo = fbKey;
+          break;
+        }
+      }
+    }
+    if (!movedTo) {
+      let bestScore = -1;
+      let bestKey = null;
+      for (const fbKey of bKeys) {
+        if (fbKey in fa || consumedAdditions.has(fbKey))
+          continue;
+        if (leafName(fbKey) !== leaf)
+          continue;
+        const score = matchScore(key, fbKey, fa[key], fb[fbKey]);
+        if (score >= FUZZY_THRESHOLD && score > bestScore) {
+          bestScore = score;
+          bestKey = fbKey;
+        }
+      }
+      if (bestKey !== null)
+        movedTo = bestKey;
+    }
+    if (movedTo) {
+      const shared = sharedAncestorDepth(key, movedTo);
+      const maxDepth = Math.max(key.split(".").length, movedTo.split(".").length);
+      const moveConfidence = maxDepth > 0 ? shared / maxDepth : 1;
+      enriched.push({
+        type: "moved",
+        path: key,
+        newPath: movedTo,
+        old: fa[key],
+        new: fb[movedTo],
+        confidence: Math.round(moveConfidence * 100) / 100
+      });
+      consumedAdditions.add(movedTo);
+      continue;
+    }
+    enriched.push(entry);
   }
-  return results;
+  for (const entry of structural) {
+    if (entry.type !== "added")
+      continue;
+    if (consumedAdditions.has(entry.path))
+      continue;
+    enriched.push(entry);
+  }
+  return enriched;
+}
+function computeDiff(a, b) {
+  const fa = flatten(a);
+  const fb = flatten(b);
+  const structural = computeStructuralDiff(fa, fb);
+  return enrichDiffWithRenames(structural, fa, fb);
+}
+function diffFlatMaps(fa, fb) {
+  const structural = computeStructuralDiff(fa, fb);
+  return enrichDiffWithRenames(structural, fa, fb);
 }
 function serialize2(value) {
   return JSON.stringify(value);
 }
 export {
+  enrichDiffWithRenames,
   diffFlatMaps,
+  computeStructuralDiff,
   computeDiff
 };

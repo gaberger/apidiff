@@ -3,15 +3,14 @@ globalThis.Buffer = Buffer;
 
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import YAML from "yaml";
-import { computeDiff } from "../lib/domain/diff-algorithm.js";
+import { computeStructuralDiff, enrichDiffWithRenames } from "../lib/domain/diff-algorithm.js";
+import { flatten } from "../lib/domain/flatten.js";
 
 function countRefs(obj) {
   try { return (JSON.stringify(obj).match(/"\$ref"/g) || []).length; }
   catch { return 0; }
 }
 
-// Mirrors src/pages/DiffViewer.jsx's parseSpec: JSON-first when the input
-// looks like JSON, YAML otherwise, with a YAML fallback for JSON-with-comments.
 function parseSpec(text, sideLabel) {
   const trimmed = text.trim();
   if (!trimmed) throw new Error(`${sideLabel} spec is empty`);
@@ -34,10 +33,6 @@ self.addEventListener("message", async (e) => {
   try {
     self.postMessage({ id, type: "progress", stage: "parsing" });
 
-    // Prefer raw-text payloads — parsing here keeps the main thread free of
-    // the multi-second JSON.parse + structuredClone-via-postMessage cost.
-    // Object payloads still work for callers that already have parsed data
-    // (e.g. cached resolved specs from the sidebar).
     const oldSpec = oldText !== undefined ? parseSpec(oldText, "Original spec") : oldObj;
     const newSpec = newText !== undefined ? parseSpec(newText, "Updated spec") : newObj;
 
@@ -57,13 +52,27 @@ self.addEventListener("message", async (e) => {
       newResolved = await $RefParser.dereference(structuredClone(newSpec));
     }
 
-    self.postMessage({ id, type: "progress", stage: "diffing" });
-    const results = computeDiff(oldResolved, newResolved);
+    // Two-pass diff. Pass 1 (structural — exact path membership only) is
+    // O(n) and runs in well under a second even on multi-MB resolved specs.
+    // We post it as 'partial-results' so the UI can paint added/removed/
+    // changed badges immediately. Pass 2 (rename + move detection) is the
+    // expensive Levenshtein-based pass; consumers see it land moments later
+    // as enriched DiffResult entries replacing the matched added/removed
+    // pairs in place.
+    self.postMessage({ id, type: "progress", stage: "diffing-structural" });
+    const fa = flatten(oldResolved);
+    const fb = flatten(newResolved);
+    const structural = computeStructuralDiff(fa, fb);
+
+    self.postMessage({ id, type: "partial-results", results: structural });
+
+    self.postMessage({ id, type: "progress", stage: "diffing-fuzzy" });
+    const enriched = enrichDiffWithRenames(structural, fa, fb);
 
     self.postMessage({
       id,
       type: "done",
-      results,
+      results: enriched,
       oldResolved,
       newResolved,
       refsResolved: (oldHadRefs + newHadRefs) > 0

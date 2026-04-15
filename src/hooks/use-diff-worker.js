@@ -17,6 +17,11 @@ export function useDiffWorker() {
         if (!p) return;
         if (type === "progress") {
           p.onProgress?.(e.data);
+        } else if (type === "partial-results") {
+          // Two-pass diff: structural (added/removed/changed) lands here
+          // first, then full enriched results land via "done". onPartial-less
+          // callers silently drop this — safe legacy behavior.
+          p.onPartial?.(e.data.results);
         } else if (type === "done") {
           pendingRef.current.delete(id);
           p.resolve(e.data);
@@ -38,11 +43,11 @@ export function useDiffWorker() {
     return workerRef.current;
   }, []);
 
-  const runDiff = useCallback((oldSpecOrText, newSpecOrText, { onProgress } = {}) => {
+  const runDiff = useCallback((oldSpecOrText, newSpecOrText, { onProgress, onPartial } = {}) => {
     const w = ensureWorker();
     const id = ++seqRef.current;
     return new Promise((resolve, reject) => {
-      pendingRef.current.set(id, { resolve, reject, onProgress });
+      pendingRef.current.set(id, { resolve, reject, onProgress, onPartial });
       // Strings → worker parses (parsing + structuredClone-via-postMessage
       // both stay off the main thread). Objects → legacy path for callers
       // that already have parsed data.
