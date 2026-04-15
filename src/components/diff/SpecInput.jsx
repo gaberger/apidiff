@@ -37,6 +37,7 @@ function LineGutter({ lineCount, scrollSyncRef }) {
           return (
             <div
               key={n}
+              className="text-stone-400 dark:text-stone-500"
               style={{
                 position: "absolute",
                 top: (n - 1) * LINE_HEIGHT_PX,
@@ -48,7 +49,6 @@ function LineGutter({ lineCount, scrollSyncRef }) {
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                 fontSize: 11,
                 lineHeight: `${LINE_HEIGHT_PX}px`,
-                color: "#a8a29e",
                 userSelect: "none",
               }}
             >
@@ -156,7 +156,7 @@ function colorizeJsonLine(line) {
   }
 
   // Fallback — plain text
-  tokens.push(<span key={key++} className="text-stone-700">{rest}</span>);
+  tokens.push(<span key={key++} className="text-stone-700 dark:text-stone-300">{rest}</span>);
   return tokens;
 }
 
@@ -194,19 +194,20 @@ const SpecInputRaw = React.memo(function SpecInput({
   // Diff-aware line highlighting
   const diffHighlightMap = useDiffHighlight(value, results);
 
-  // Deferred colorization: for large specs (>2k lines) skip the pre overlay entirely —
-  // the raw textarea already shows the content and is instantly scrollable. Colorize
-  // in background for smaller specs; large specs show unstyled text.
+  // Deferred colorization: for large specs (>2k lines) render plain text only
+  // in the pre (single div with textContent — zero per-line React elements).
+  // Colorize in background for smaller specs.
   const LARGE_LINE_COUNT = 2000;
   const lines = useMemo(() => value ? value.split("\n") : [], [value]);
+  const isLargeSpec = lines.length > LARGE_LINE_COUNT;
 
   useEffect(() => {
     if (!value) { setHighlightedLines(null); return; }
 
-    // Large spec: skip pre overlay entirely — textarea shows raw content, user can
-    // scroll immediately. Zero React element creation on the main thread.
-    if (lines.length > LARGE_LINE_COUNT) {
-      setHighlightedLines(null);
+    // Large spec: render raw text as a single div (not 30k divs). The textarea
+    // text becomes visible so the pre's plain text shows through the textarea.
+    if (isLargeSpec) {
+      setHighlightedLines([<div key="plain" className="text-stone-700 dark:text-stone-300" style={{ whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>{value}</div>]);
       return;
     }
 
@@ -449,7 +450,7 @@ const SpecInputRaw = React.memo(function SpecInput({
             {/* Syntax-highlighted + diff-colored pre (behind textarea) */}
             <pre
               ref={preRef}
-              className="absolute inset-0 py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0"
+              className="absolute inset-0 py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0 text-stone-700 dark:text-stone-300"
               aria-hidden="true"
             >
               <div style={{minWidth: "max-content"}}>{highlightedLines}</div>
