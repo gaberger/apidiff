@@ -24,10 +24,12 @@ export const AuthProvider = ({ children }) => {
       
       // First, check app public settings (with token if available)
       // This will tell us if auth is required, user not registered, etc.
+      const apiKey = import.meta.env.VITE_BASE44_API_KEY;
       const appClient = createAxiosClient({
         baseURL: `/api/apps/public`,
         headers: {
-          'X-App-Id': appParams.appId
+          'X-App-Id': appParams.appId,
+          ...(apiKey ? { api_key: apiKey } : {}),
         },
         token: appParams.token, // Include token if available
         interceptResponses: true

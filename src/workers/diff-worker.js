@@ -40,7 +40,16 @@ self.addEventListener("message", (e) => {
       return;
     }
 
-    self.postMessage({ id, type: "done", results: enriched });
+    // Compute summary counts in the worker so DiffSummary doesn't iterate 30k results 8
+    // times on the main thread after await runDiff() returns.
+    const summaryCounts = { removed: 0, added: 0, changed: 0, "type-change": 0, renamed: 0, moved: 0, unchanged: 0, breaking: 0 };
+    const BREAKING_TYPES = new Set(["removed", "type-change", "renamed", "moved"]);
+    for (const r of enriched) {
+      if (r.type in summaryCounts) summaryCounts[r.type]++;
+      if (BREAKING_TYPES.has(r.type)) summaryCounts.breaking++;
+    }
+
+    self.postMessage({ id, type: "done", results: enriched, summaryCounts });
   } catch (err) {
     self.postMessage({
       id,

@@ -183,17 +183,47 @@ function toRawUrl(url) {
 }
 
 // ─── Helpers ────────────────────────────────────────────────
+// Extract a group key from a label so that only comparable versions
+// (same product/sub-API) get paired together. Strips version numbers
+// and dates so `twilio_accounts_v1` and `twilio_accounts_v2` match,
+// but `twilio_accounts_v1` and `twilio_api_v2010` do not.
+//
+// Uses the leaf (last path segment) only, so `spec3` and `latest/spec3`
+// are treated as the same spec at different stability tiers.
+function groupKey(label) {
+  const leaf = label.split('/').pop() || label;
+  return leaf
+    .replace(/\.(json|yaml|yml)$/i, '')
+    // version numbers: v1, v2010, 1.2.3, etc.
+    .replace(/v?\d+(\.\d+)*/gi, '#')
+    // ISO dates
+    .replace(/\d{4}-\d{2}(-\d{2})?/g, '#')
+    .toLowerCase();
+}
+
 function buildPairs(versions) {
-  const sorted = [...versions].sort((a, b) =>
-    a.label.localeCompare(b.label, undefined, { numeric: true })
-  );
+  // Group by normalized key — only pair versions within the same group.
+  const groups = new Map();
+  for (const v of versions) {
+    const key = groupKey(v.label);
+    const arr = groups.get(key);
+    if (arr) arr.push(v);
+    else groups.set(key, [v]);
+  }
+
   const pairs = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    pairs.push({
-      label: `${sorted[i].label} > ${sorted[i + 1].label}`,
-      v1_url: sorted[i].url,
-      v2_url: sorted[i + 1].url,
-    });
+  for (const group of groups.values()) {
+    if (group.length < 2) continue; // nothing to compare
+    const sorted = [...group].sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { numeric: true })
+    );
+    for (let i = 0; i < sorted.length - 1; i++) {
+      pairs.push({
+        label: `${sorted[i].label} > ${sorted[i + 1].label}`,
+        v1_url: sorted[i].url,
+        v2_url: sorted[i + 1].url,
+      });
+    }
   }
   return pairs;
 }

@@ -1,8 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 
-const BREAKING_TYPES = ["removed", "type-change", "renamed", "moved"];
-
 const chipConfig = [
   { key: "removed",     label: "Removed",     bg: "bg-red-100",    text: "text-red-600",    border: "border-red-200",    hoverBg: "hover:bg-red-200" },
   { key: "renamed",     label: "Renamed",     bg: "bg-purple-100", text: "text-purple-600", border: "border-purple-200", hoverBg: "hover:bg-purple-200" },
@@ -13,14 +11,7 @@ const chipConfig = [
   { key: "breaking",    label: "Breaking",    bg: "bg-red-50",     text: "text-red-700",    border: "border-red-300",    hoverBg: "hover:bg-red-100" },
 ];
 
-function countForKey(results, key) {
-  if (key === "breaking") {
-    return results.filter((r) => BREAKING_TYPES.includes(r.type)).length;
-  }
-  return results.filter((r) => r.type === key).length;
-}
-
-export default function DiffSummary({ results, activeFilter, onFilterChange }) {
+export default function DiffSummary({ results, summaryCounts, activeFilter, onFilterChange }) {
   return (
     <motion.div
       initial="hidden"
@@ -45,13 +36,15 @@ export default function DiffSummary({ results, activeFilter, onFilterChange }) {
         >
           All
           <span className="tabular-nums">
-            {results.filter((r) => r.type !== "unchanged").length}
+            {summaryCounts
+              ? summaryCounts.removed + summaryCounts.added + summaryCounts.changed + summaryCounts["type-change"] + summaryCounts.renamed + summaryCounts.moved
+              : results.filter((r) => r.type !== "unchanged").length}
           </span>
         </button>
       </motion.div>
 
       {chipConfig.map((chip) => {
-        const count = countForKey(results, chip.key);
+        const count = summaryCounts ? (summaryCounts[chip.key] ?? 0) : results.filter((r) => r.type === chip.key).length;
         if (count === 0) return null;
 
         const isActive = activeFilter === chip.key;

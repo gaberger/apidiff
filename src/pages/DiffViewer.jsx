@@ -28,6 +28,7 @@ export default function DiffViewer() {
   const [before, setBefore] = useState("");
   const [after, setAfter] = useState("");
   const [results, setResults] = useState(null);
+  const [summaryCounts, setSummaryCounts] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [error, setError] = useState(null);
 
@@ -76,7 +77,7 @@ export default function DiffViewer() {
     setFetchStages(stages.map((s) => ({ ...s })));
 
     try {
-      const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
+      const { results: workerResults, summaryCounts: workerCounts, oldResolved, newResolved, oldStringified, newStringified, refsResolved: rr } = await runDiff(before, after, {
         onProgress: (evt) => {
           if (evt.stage === "dereferencing" || evt.stage === "stringifying") {
             stages[0].status = "complete";
@@ -107,16 +108,19 @@ export default function DiffViewer() {
       stages[2].status = "complete";
       setFetchStages(stages.map((s) => ({ ...s })));
 
-      // Defer setResults to the next frame. This lets the current batch finish
-      // (spinner dismissal + SpecInput re-render with raw text) before DiffResults
-      // paints. Without this defer, setResults triggers useDiffHighlight's
-      // buildLinePathMap (O(n) on 30k lines) in the same frame as the SpecInputs'
-      // own useDiffHighlight calls — three simultaneous heavy recomputes freeze the page.
-      setBefore(oldStringified || before);
-      setAfter(newStringified || after);
-      setRefsResolved(rr);
+      // Deferred rendering strategy: Frame 1 shows spinner gone + DiffResults (20 rows).
+      // Frame 2 (requestAnimationFrame) updates the editor content. This separates the
+      // SpecInput re-renders (which re-parse the diff highlight map on a 30k-line string)
+      // from the DiffResults paint, preventing both from blocking simultaneously.
+      const doUpdate = () => {
+        setResults(workerResults);
+        setSummaryCounts(workerCounts || null);
+        setRefsResolved(rr);
+        if (oldStringified) setBefore(oldStringified);
+        if (newStringified) setAfter(newStringified);
+      };
+      requestAnimationFrame(doUpdate);
       setResolving(false);
-      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message || "Invalid JSON — paste valid JSON specs");
@@ -163,7 +167,7 @@ export default function DiffViewer() {
       // structured cloning at the postMessage boundary — for already-parsed
       // API responses, this avoids a redundant main-thread JSON.stringify
       // followed by JSON.parse inside the worker.
-      const { results: workerResults, oldResolved, newResolved, oldStringified, newStringified } = await runDiff(v1, v2, {
+      const { results: workerResults, summaryCounts: workerCounts, oldResolved, newResolved, oldStringified, newStringified } = await runDiff(v1, v2, {
         onProgress: (evt) => {
           setFetchStages((prev) => prev.map((s) => {
             if ((s.id === "process") && (evt.stage === "dereferencing" || evt.stage === "stringifying")) {
@@ -185,12 +189,15 @@ export default function DiffViewer() {
           : s,
       ));
       // Same as handleCompare: pre-stringified specs come from the worker, no
-      // Same defer pattern as handleCompare: show spinner gone + editors first,
-      // results paint in next frame to avoid simultaneous useDiffHighlight recomputes.
-      setBefore(oldStringified || before);
-      setAfter(newStringified || after);
+      // Same defer pattern as handleCompare.
+      const doUpdate = () => {
+        setResults(workerResults);
+        setSummaryCounts(workerCounts || null);
+        if (oldStringified) setBefore(oldStringified);
+        if (newStringified) setAfter(newStringified);
+      };
+      requestAnimationFrame(doUpdate);
       setResolving(false);
-      setTimeout(() => { setResults(workerResults); }, 0);
     } catch (e) {
       if (e?.message === "cancelled") { setResolving(false); return; }
       setError(e.message);
@@ -210,6 +217,7 @@ export default function DiffViewer() {
     setBefore("");
     setAfter("");
     setResults(null);
+    setSummaryCounts(null);
     setGuide(null);
     setActiveFilter("all");
     setError(null);
@@ -536,11 +544,12 @@ export default function DiffViewer() {
                     className="space-y-6"
                   >
                     <h2 className="text-base sm:text-lg font-bold text-stone-800">
-                      {results.filter((r) => r.type !== "unchanged").length} changes detected
+                      {summaryCounts ? summaryCounts.breaking : results.filter((r) => r.type !== "unchanged").length} changes detected
                     </h2>
 
                     <DiffResults
                       results={results}
+                      summaryCounts={summaryCounts}
                       activeFilter={activeFilter}
                       onFilterChange={setActiveFilter}
                       onPathClick={handlePathClick}

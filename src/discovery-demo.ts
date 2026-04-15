@@ -7,23 +7,10 @@
 //   npx tsx src/discovery-demo.ts --category payments # discover all payment APIs
 //   npx tsx src/discovery-demo.ts --search twilio     # search APIs.guru
 
-import { GitHubDiscoveryAdapter } from "./adapters/secondary/github-discovery-adapter.js";
-import { ApisGuruDiscoveryAdapter } from "./adapters/secondary/apisguru-discovery-adapter.js";
-import { UrlDiscoveryAdapter } from "./adapters/secondary/url-discovery-adapter.js";
-import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
-import { DiscoveryService } from "./core/usecases/discovery-service.js";
 import { allCategories } from "./core/domain/provider-registry.js";
+import { createDiscoveryApp } from "./composition-root.js";
 
-// ── Wire up adapters (composition root pattern) ─────────────
-const githubAdapter = new GitHubDiscoveryAdapter(process.env.GITHUB_TOKEN);
-const apisGuruAdapter = new ApisGuruDiscoveryAdapter();
-const urlAdapter = new UrlDiscoveryAdapter();
-const changelogParser = new ChangelogParserAdapter();
-
-const discovery = new DiscoveryService(
-  [githubAdapter, apisGuruAdapter, urlAdapter],
-  changelogParser,
-);
+const { discovery, apisGuruAdapter } = createDiscoveryApp();
 
 // ── CLI ─────────────────────────────────────────────────────
 const args = process.argv.slice(2);

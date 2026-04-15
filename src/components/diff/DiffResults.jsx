@@ -11,7 +11,7 @@ function filterResults(results, filter) {
   return nonUnchanged.filter((r) => r.type === filter);
 }
 
-export default function DiffResults({ results, activeFilter, onFilterChange, onPathClick }) {
+export default function DiffResults({ results, summaryCounts, activeFilter, onFilterChange, onPathClick }) {
   const [activeFilter_, setActiveFilter] = useState(activeFilter || "all");
   const [visibleCount, setVisibleCount] = useState(20);
 
@@ -33,6 +33,7 @@ export default function DiffResults({ results, activeFilter, onFilterChange, onP
     <div className="space-y-4">
       <DiffSummary
         results={results}
+        summaryCounts={summaryCounts}
         activeFilter={activeFilter_}
         onFilterChange={handleFilterChange}
       />
