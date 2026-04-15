@@ -108,19 +108,29 @@ export default function DiffViewer() {
 
       // Final enriched results: replaces the partial set in place. React
       // reconciles the diff list — added/removed entries that became
-      // renames/moves swap their rendered row without remounting.
+      // renames/moves swap their rendered row without remounting (stable
+      // keys on path in DiffResults make this work).
       setResults(workerResults);
       setRefsResolved(rr);
 
       // Defer the heavy JSON.stringify of resolved specs and the textarea
       // re-renders to a microtask so they don't extend this click handler.
-      // The user sees the diff first; the resolved-spec view fills in
-      // moments later. setTimeout(0) yields to the browser between the
-      // diff paint and the textarea reflow.
+      // Capture scroll positions beforehand so setBefore/setAfter doesn't
+      // yank the user out of whatever endpoint they were reading — the
+      // dereferenced content has different line counts but the user was
+      // likely navigating by proximity, so clamping scrollTop to the new
+      // max is the least-surprising behavior.
       if (rr) {
+        const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
+        const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
         setTimeout(() => {
           setBefore(JSON.stringify(oldResolved, null, 2));
           setAfter(JSON.stringify(newResolved, null, 2));
+          // Restore after React commits the new textarea content.
+          requestAnimationFrame(() => {
+            if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
+            if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
+          });
         }, 0);
       }
     } catch (e) {
@@ -195,14 +205,19 @@ export default function DiffViewer() {
       ));
       // Final enriched results — replaces partial set in place.
       setResults(workerResults);
-      // Defer the JSON.stringify + setBefore/setAfter of the resolved specs
-      // so the diff results paint first. JSON.stringify on a multi-MB
-      // resolved spec is multi-second sync work; running it in a microtask
-      // after the diff-results paint keeps the click handler from extending
-      // past the worker await.
+      // Capture scroll before replacing textarea content so the user
+      // doesn't lose their navigation context, then restore after React
+      // commits. JSON.stringify is deferred to a microtask so the diff
+      // results paint first (see handleCompare for the same pattern).
+      const leftScroll = leftEditorRef.current?.scrollTop ?? 0;
+      const rightScroll = rightEditorRef.current?.scrollTop ?? 0;
       setTimeout(() => {
         setBefore(JSON.stringify(oldResolved, null, 2));
         setAfter(JSON.stringify(newResolved, null, 2));
+        requestAnimationFrame(() => {
+          if (leftEditorRef.current) leftEditorRef.current.scrollTop = leftScroll;
+          if (rightEditorRef.current) rightEditorRef.current.scrollTop = rightScroll;
+        });
       }, 0);
     } catch (e) {
       if (e?.message === "cancelled") return;

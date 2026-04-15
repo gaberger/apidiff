@@ -62,9 +62,17 @@ export default function DiffResults({ results, activeFilter, onFilterChange, onP
               </tr>
             </thead>
             <tbody>
-              {visible.map((result, i) => (
+              {visible.map((result) => (
+                // Key by `path` alone — paths are unique within a results set.
+                // The previous `${type}-${path}-${i}` key caused React to
+                // unmount+remount rows during the pass-1 → pass-2 transition
+                // (a `removed` entry becoming `renamed` changed the key, and
+                // the `i` suffix shifted all keys below the first rename).
+                // Stable keys let React reconcile in place: the row updates
+                // its type + content, but the DOM node stays put — no layout
+                // churn, no scroll jump.
                 <DiffItem
-                  key={`${result.type}-${result.path}-${i}`}
+                  key={result.path}
                   result={result}
                   onPathClick={onPathClick}
                 />
