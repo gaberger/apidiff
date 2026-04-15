@@ -3,7 +3,18 @@
   "title": "Cleanup: triage 7 stale hex worktrees (feat-managed-agents-autonomy/t0.1..t0.6 + feat-workplan-file-scaffolding/t1.1)",
   "adr": "",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "resolution_note": "Per-branch `git log main..<branch>` audit confirmed all 7 branches had ZERO unique commits — they were either never started or fully merged into main. Removed via `git worktree remove <path>` + `git branch -D <branch>` for each. No archive/* renames needed because there was no work to preserve. Final `git worktree list` shows only the main checkout.",
+  "audit_evidence": {
+    "feat/feat-managed-agents-autonomy/t0.1": "0 unique commits @ cb8350c",
+    "feat/feat-managed-agents-autonomy/t0.2": "0 unique commits @ cb8350c",
+    "feat/feat-managed-agents-autonomy/t0.3": "0 unique commits @ cb8350c",
+    "feat/feat-managed-agents-autonomy/t0.4": "0 unique commits @ cb8350c",
+    "feat/feat-managed-agents-autonomy/t0.5": "0 unique commits @ cb8350c",
+    "feat/feat-managed-agents-autonomy/t0.6": "0 unique commits @ cb8350c",
+    "feat/feat-workplan-file-scaffolding/t1.1": "0 unique commits @ cb8350c"
+  },
   "topology": "pipeline",
   "budget": "~8000 tokens",
   "prior_work": {
