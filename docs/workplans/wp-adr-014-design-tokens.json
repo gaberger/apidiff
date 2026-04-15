@@ -3,7 +3,10 @@
   "title": "ADR-014: Design system refinement — elevation, motion, density, typography tokens",
   "adr": "ADR-014",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "completed_commits": ["22e896c", "c2d7a64"],
+  "resolution_note": "Audit on 2026-04-15: tailwind.config.js exports `darkMode: ['class']` and registers shadow-e0..e4, motion-fast/base/slow durations, ease-standard/emphasized/decel curves. Commit 22e896c shipped the token definitions; c2d7a64 wired DiffViewer header + SpecInput panels to consume them. Typography rhythm classes (.t-display/h1/h2/body/meta) and density classes are usable globally.",
   "topology": "pipeline",
   "budget": "~35000 tokens",
   "prior_work": {

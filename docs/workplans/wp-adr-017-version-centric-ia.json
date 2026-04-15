@@ -3,7 +3,10 @@
   "title": "ADR-017: Version-centric IA — VersionTimeline, severity, endpoint grouping, code-impact language",
   "adr": "ADR-017",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "completed_commits": ["c6121d0", "7343c7e"],
+  "resolution_note": "src/components/diff/VersionTimeline.jsx exists and is wired into the primary surface (commit c6121d0). prettyVersionLabel cleanup landed in 7343c7e. Endpoint grouping + breaking-change severity are described in ADR-017 §2-3 but those are separate scope captured in wp-adr-019-server-diff (oasdiff classification feeds severity) and a future endpoint-grouping workplan — not blocking the IA reframe itself.",
   "topology": "pipeline",
   "budget": "~90000 tokens",
   "prior_work": {

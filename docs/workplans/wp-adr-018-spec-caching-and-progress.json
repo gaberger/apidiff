@@ -3,7 +3,10 @@
   "title": "ADR-018: Spec cache + progress bar surfacing",
   "adr": "ADR-018",
   "created": "2026-04-14",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-15",
+  "completed_commits": ["dea30c2"],
+  "resolution_note": "src/lib/spec-cache.js implements TTL-keyed localStorage spec cache. dea30c2 added the prominent FetchProgress banner that surfaces fetch + dereference + diff stages with cacheHit annotations. Subsequent eb7d029 + c3eed71 + 0aa8694 hardened the worker pipeline that consumes the cached specs.",
   "topology": "pipeline",
   "budget": "~50000 tokens",
   "prior_work": {
