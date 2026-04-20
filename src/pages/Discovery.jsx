@@ -104,12 +104,19 @@ function DiffBullets({ diff }) {
   );
 }
 
-function SpecRow({ spec, diff, onRemove }) {
+function SpecRow({ spec, diff, onRemove, selected, onToggleSelect }) {
   const [open, setOpen] = useState(false);
   const v = shortVersion(spec.label) || shortVersion(spec.url);
   return (
     <div className="border border-slate-100 dark:border-slate-900 rounded p-2">
       <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(spec.id)}
+          aria-label={`Select ${spec.label || spec.url}`}
+          className="cursor-pointer"
+        />
         <button
           onClick={() => setOpen((x) => !x)}
           className="inline-flex items-center gap-1 text-xs font-medium text-slate-900 dark:text-slate-50"
@@ -211,41 +218,62 @@ function DiscoverInput({ onSuccess }) {
   );
 }
 
-function ProviderGroup({ host, provider, specs, initiallyOpen, onRemove }) {
+function ProviderGroup({ host, provider, specs, initiallyOpen, onRemove, selectedIds, onToggleSelect, onToggleGroup }) {
   const [open, setOpen] = useState(!!initiallyOpen);
   const name = provider?.name || host || "Unknown provider";
   const changelogUrl = provider?.changelogUrl;
+  const selectedInGroup = specs.filter((s) => selectedIds.has(s.id)).length;
+  const allSelected = selectedInGroup === specs.length && specs.length > 0;
+  const someSelected = selectedInGroup > 0 && !allSelected;
   return (
     <div className="border border-slate-200 dark:border-slate-800 rounded-md mb-3">
-      <button
-        onClick={() => setOpen((x) => !x)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800/50"
-        aria-expanded={open}
-      >
-        {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-        <span className="font-semibold text-sm text-slate-900 dark:text-slate-50">{name}</span>
-        <span className="text-xs text-slate-500">{host}</span>
-        <span className="ml-auto text-xs text-slate-500">
-          {specs.length} spec{specs.length !== 1 ? "s" : ""}
-        </span>
+      <div className="w-full flex items-center gap-2 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          ref={(el) => { if (el) el.indeterminate = someSelected; }}
+          onChange={() => onToggleGroup(specs)}
+          aria-label={`Select all ${specs.length} specs for ${name}`}
+          className="cursor-pointer"
+        />
+        <button
+          onClick={() => setOpen((x) => !x)}
+          aria-expanded={open}
+          className="flex-1 flex items-center gap-2 text-left"
+        >
+          {open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+          <span className="font-semibold text-sm text-slate-900 dark:text-slate-50">{name}</span>
+          <span className="text-xs text-slate-500">{host}</span>
+          <span className="ml-auto text-xs text-slate-500">
+            {specs.length} spec{specs.length !== 1 ? "s" : ""}
+          </span>
+        </button>
         {changelogUrl ? (
           <a
             href={changelogUrl}
             target="_blank"
             rel="noreferrer noopener"
-            onClick={(e) => e.stopPropagation()}
             className="text-xs inline-flex items-center gap-1 text-blue-600 hover:underline"
           >
             <FileText className="w-3 h-3" /> changelog
           </a>
         ) : null}
-      </button>
+      </div>
       {open ? (
         <div className="px-3 pb-3 space-y-2">
           {specs.map((s) => {
             const v = shortVersion(s.label) || shortVersion(s.url);
             const diff = host === FWD_HOST && v ? FWD_DIFFS_BY_VERSION.get(v) : null;
-            return <SpecRow key={s.id} spec={s} diff={diff} onRemove={onRemove} />;
+            return (
+              <SpecRow
+                key={s.id}
+                spec={s}
+                diff={diff}
+                onRemove={onRemove}
+                selected={selectedIds.has(s.id)}
+                onToggleSelect={onToggleSelect}
+              />
+            );
           })}
         </div>
       ) : null}
@@ -258,6 +286,7 @@ export default function Discovery() {
   const [cacheStats, setCacheStats] = useState({ count: 0, totalBytes: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -304,9 +333,55 @@ export default function Discovery() {
   async function handleRemove(id) {
     try {
       await schemaUrlRegistry.remove(id);
+      setSelectedIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       await refresh();
     } catch (e) {
       setError(e?.message || "Failed to remove URL");
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleGroup(specs) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const ids = specs.map((s) => s.id);
+      const allIn = ids.every((id) => next.has(id));
+      if (allIn) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(urls.map((u) => u.id)));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  async function handleBulkRemove() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Stop tracking ${ids.length} schema URL${ids.length === 1 ? "" : "s"}? This can't be undone.`)) return;
+    try {
+      await Promise.all(ids.map((id) => schemaUrlRegistry.remove(id)));
+      setSelectedIds(new Set());
+      await refresh();
+    } catch (e) {
+      setError(e?.message || "Failed to delete selected URLs");
     }
   }
 
@@ -361,7 +436,43 @@ export default function Discovery() {
                 ({groups.length} provider{groups.length !== 1 ? "s" : ""} · {urls.length} spec{urls.length !== 1 ? "s" : ""})
               </span>
             </h2>
+            {urls.length > 0 ? (
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  onClick={selectAll}
+                  className="text-blue-600 hover:underline"
+                  disabled={selectedIds.size === urls.length}
+                >
+                  Select all
+                </button>
+                <span className="text-slate-300">·</span>
+                <button
+                  onClick={clearSelection}
+                  className="text-blue-600 hover:underline"
+                  disabled={selectedIds.size === 0}
+                >
+                  Clear
+                </button>
+              </div>
+            ) : null}
           </div>
+
+          {selectedIds.size > 0 ? (
+            <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900">
+              <span className="text-xs text-blue-900 dark:text-blue-200">
+                {selectedIds.size} selected
+              </span>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleBulkRemove}
+                className="ml-auto"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete {selectedIds.size}
+              </Button>
+            </div>
+          ) : null}
+
           {groups.length === 0 ? (
             <p className="text-sm text-slate-500">No specs tracked yet — run a discovery above.</p>
           ) : (
@@ -373,6 +484,9 @@ export default function Discovery() {
                 specs={g.specs}
                 initiallyOpen={groups.length === 1}
                 onRemove={handleRemove}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleGroup={toggleGroup}
               />
             ))
           )}
