@@ -45,7 +45,9 @@ const Change = z.object({
   rationale: z.string().optional(),
   from: z.union([Pointer, z.array(Pointer)]).optional(),
   to:   z.union([Pointer, z.array(Pointer)]).optional(),
-  at:   Pointer.optional(),
+  // Lenient: accept array from the model and collapse to first entry in
+  // post-processing. v0.2 spec formally requires a single pointer.
+  at:   z.union([Pointer, z.array(Pointer)]).optional(),
   tags: z.array(z.string()).optional(),
   lifecycle: z.object({
     deprecated_date: z.string().optional(),
@@ -236,7 +238,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    res.status(200).json(validated.data);
+    // Normalize: v0.2 schema requires `at` to be a single pointer. Collapse
+    // any arrays the model emitted to their first element.
+    const normalized = {
+      ...validated.data,
+      changes: validated.data.changes.map((c) => {
+        if (Array.isArray(c.at)) {
+          return { ...c, at: c.at[0] };
+        }
+        return c;
+      }),
+    };
+
+    res.status(200).json(normalized);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[extract-changeset] generateText threw: ${msg}`);
