@@ -10,8 +10,6 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 
-export const config = { runtime: "nodejs" };
-
 const OP = z.enum([
   "add", "remove", "rename", "move", "split", "merge", "replace", "recompose",
   "tighten", "loosen", "constrain", "retype", "redefault", "recode",

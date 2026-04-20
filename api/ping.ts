@@ -1,9 +1,4 @@
-// Minimal diagnostic: no imports, no async work. If this 500s, something
-// is wrong with the api/ routing itself. If it returns 200, isolation
-// confirms the import of "ai" or "zod" in extract-changeset.ts is the
-// cause of FUNCTION_INVOCATION_FAILED.
-
-export const config = { runtime: "nodejs" };
+// Minimal diagnostic: no imports, no async work.
 
 export default function handler(_req: Request): Response {
   return new Response(
