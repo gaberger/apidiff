@@ -312,11 +312,17 @@ export default function ChangesetSpec() {
           )}
 
           <p className="text-[11px] text-stone-500 leading-relaxed">
-            <strong>Limitations:</strong> <code className="text-[10px] px-1 bg-stone-100 rounded">target</code> kinds
-            are coarse (endpoint vs schema) because release notes don't identify specific fields;
-            pointers are synthetic; sunset dates aren't extracted. A production generator
-            should enrich each entry by matching the FWD ticket to its OpenAPI path and by
-            parsing phrases like <em>"will be removed in release 26.6"</em> for lifecycle dates.
+            <strong>What's extracted:</strong> HTTP verb + path from each release note's affected-operations list,
+            emitted as RFC 6901 JSON Pointers (<code className="text-[10px] px-1 bg-stone-100 rounded">#/paths/~1api~1collector-tasks/post</code>).
+            Multi-op notes become a single change entry with a pointer array.
+            <br />
+            <strong>Still best-effort:</strong> items without an explicit path (most model changes)
+            fall back to an opaque <code className="text-[10px] px-1 bg-stone-100 rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointer;
+            sunset phrases like <em>"will be removed in release 26.6"</em> flow to
+            <code className="text-[10px] px-1 bg-stone-100 rounded">lifecycle.reason</code> but don't yet resolve to a date;
+            <code className="text-[10px] px-1 bg-stone-100 rounded">breakingChanges</code> all collapse to <code className="text-[10px] px-1 bg-stone-100 rounded">constrain</code>{" "}
+            since the description phrasing isn't classified into <code className="text-[10px] px-1 bg-stone-100 rounded">retype</code> /{" "}
+            <code className="text-[10px] px-1 bg-stone-100 rounded">tighten</code> / <code className="text-[10px] px-1 bg-stone-100 rounded">recode</code>.
           </p>
         </section>
 
