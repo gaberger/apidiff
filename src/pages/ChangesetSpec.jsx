@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Download, FileJson, FileCode } from "lucide-react";
+import CodeBlock from "@/components/ui/CodeBlock";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
 import exampleYaml from "../../apidiffspec/example-changeset.yaml?raw";
 
@@ -236,9 +237,7 @@ export default function ChangesetSpec() {
           <p className="text-sm leading-relaxed text-stone-600">
             A full example exercising all four families, multi-target renames, cross-changeset supersedes, severity, and <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">detectable: false</code> on semantic ops.
           </p>
-          <pre className="text-[11px] font-mono leading-relaxed bg-stone-900 text-stone-100 rounded-lg p-4 overflow-x-auto max-h-[32rem]">
-{exampleYaml}
-          </pre>
+          <CodeBlock code={exampleYaml} lang="yaml" />
           <button
             onClick={() => downloadBlob(exampleYaml, "example-changeset.yaml", "application/yaml")}
             className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
@@ -252,9 +251,7 @@ export default function ChangesetSpec() {
           <p className="text-sm leading-relaxed text-stone-600">
             Draft 2020-12 JSON Schema. Use any standard validator to check a changeset document.
           </p>
-          <pre className="text-[11px] font-mono leading-relaxed bg-stone-900 text-stone-100 rounded-lg p-4 overflow-x-auto max-h-[32rem]">
-{schemaJson}
-          </pre>
+          <CodeBlock code={schemaJson} lang="json" />
           <button
             onClick={() => downloadBlob(schemaJson, "api-changeset-schema.json", "application/json")}
             className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
