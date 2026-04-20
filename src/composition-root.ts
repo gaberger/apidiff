@@ -58,7 +58,10 @@ export function createBrowserStores(): {
   discoveryService: DiscoveryService;
 } {
   const integrationStore = new LocalStorageIntegrationAdapter();
-  const specProxy = new BrowserProxyAdapter();
+  // alwaysProxy: true — route every fetch through the Vercel Function so we
+  // never hit browser CORS rejections for non-CORS-friendly hosts (docs.fwd.app,
+  // most vendor docs sites). The server has no origin restriction.
+  const specProxy = new BrowserProxyAdapter({ alwaysProxy: true });
 
   // Browser-safe discovery adapters. No GitHub token — the client bundle
   // must not ship credentials; 60 req/hr unauthenticated is sufficient for
