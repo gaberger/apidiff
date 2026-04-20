@@ -48,6 +48,13 @@ const Change = z.object({
   // Lenient: accept array from the model and collapse to first entry in
   // post-processing. v0.2 spec formally requires a single pointer.
   at:   z.union([Pointer, z.array(Pointer)]).optional(),
+  // Inline snapshots so a human reader doesn't need to resolve the JSON
+  // Pointer against the OpenAPI spec to understand what changed.
+  before: z.unknown().optional(),
+  after:  z.unknown().optional(),
+  // Endpoints that consume a changed schema/field — emitted even when the
+  // primary pointer points at a schema node, so readers see the blast radius.
+  affectedOperations: z.array(Pointer).optional(),
   tags: z.array(z.string()).optional(),
   lifecycle: z.object({
     deprecated_date: z.string().optional(),
@@ -156,7 +163,36 @@ Other rules:
 - Parse "will be removed in release X.Y.Z" from deprecation descriptions into lifecycle.reason.
 - For breaking=true, always set migration.client_action.
 - tags[] includes the bucket, the area (lowercase dash-separated), and the ticket ID.
-- Return a complete Changeset with changeset_version "0.2" and api.from/to populated.`;
+- Return a complete Changeset with changeset_version "0.2" and api.from/to populated.
+
+CRITICAL — make each change self-describing so readers don't have to resolve
+JSON Pointers against the OpenAPI spec:
+
+- When the description uses "changed from X to Y" phrasing (default values,
+  type changes, format changes, enum values), populate before/after with the
+  literal values. Example for FWD-41282:
+    before: "LEGACY"
+    after: "JSON"
+
+- When the change points at a schema or schema-field but the item's affectedOps
+  carries the endpoints that consume it, ALSO emit affectedOperations as an
+  array of pointers in "#/paths/~1<path>/<method>" form — one per affectedOp.
+  This is the blast radius: readers see which endpoints are touched without
+  having to open the spec.
+
+- Full worked example for FWD-41282 (schema default-value change):
+    { id: "FWD-41282", op: "redefault", target: "schema-field",
+      severity: "breaking", breaking: true,
+      description: "NQE: itemFormat default changed in NqeQueryOptions.",
+      at: "#/components/schemas/NqeQueryOptions/properties/itemFormat",
+      before: "LEGACY",
+      after: "JSON",
+      affectedOperations: [
+        "#/paths/~1api~1nqe/post",
+        "#/paths/~1api~1nqe-diffs~1{before}~1{after}/post"
+      ],
+      migration: { client_action: "Send itemFormat: 'LEGACY' explicitly to preserve old behavior." },
+      tags: ["breaking-change", "nqe", "FWD-41282"] }`;
 
 function countItems(diff: unknown): number {
   if (!diff || typeof diff !== "object") return 0;
