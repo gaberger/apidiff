@@ -8,11 +8,12 @@ import {
   ChevronDown,
   ExternalLink,
   FileText,
+  Search,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { schemaCache, schemaUrlRegistry } from "@/lib/browser-stores";
+import { schemaCache, schemaUrlRegistry, discoveryService } from "@/lib/browser-stores";
 import { PROVIDER_REGISTRY } from "@/lib/domain/provider-registry.js";
-import DiscoveryPanel from "@/components/settings/DiscoveryPanel";
 import releaseNotesDiff from "@/data/release-notes-diff.json";
 
 function formatBytes(n) {
@@ -146,6 +147,66 @@ function SpecRow({ spec, diff, onRemove }) {
         <DiffBadges diff={diff} />
       </div>
       {open ? <DiffBullets diff={diff} /> : null}
+    </div>
+  );
+}
+
+function DiscoverInput({ onSuccess }) {
+  const [input, setInput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastCount, setLastCount] = useState(null);
+
+  async function run() {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    setRunning(true);
+    setError(null);
+    setLastCount(null);
+    try {
+      const result = await discoveryService.discoverByUrl(trimmed);
+      if (!result) {
+        setError("No specs found. Try a different URL or provider name.");
+        return;
+      }
+      // DiscoveryService already persists every discovered URL to schema_urls.
+      // Refresh the parent's spec list so they render in the catalog below.
+      setLastCount(result.versions.length);
+      setInput("");
+      await onSuccess();
+    } catch (e) {
+      setError(e?.message || "Discovery failed");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && run()}
+          placeholder="Provider slug (e.g. forward-networks) or URL"
+          className="flex-1 px-2.5 py-1.5 text-sm font-mono border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 focus:outline-none focus:border-blue-400"
+        />
+        <Button size="sm" onClick={run} disabled={running || !input.trim()}>
+          {running ? (
+            <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Discovering…</>
+          ) : (
+            <><Search className="w-3.5 h-3.5 mr-1.5" />Discover</>
+          )}
+        </Button>
+      </div>
+      {error ? (
+        <p className="text-xs text-rose-700 dark:text-rose-300">{error}</p>
+      ) : null}
+      {lastCount !== null && !error ? (
+        <p className="text-xs text-slate-500">
+          {lastCount === 0 ? "No new specs found." : `Added ${lastCount} spec${lastCount === 1 ? "" : "s"} to the catalog below.`}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -289,7 +350,7 @@ export default function Discovery() {
 
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold mb-3 text-slate-900 dark:text-slate-50">Run discovery</h2>
-          <DiscoveryPanel onAddComparisons={() => { /* /discovery is a spec catalog — comparison-building lives in /settings */ }} />
+          <DiscoverInput onSuccess={refresh} />
         </section>
 
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 mb-6">
