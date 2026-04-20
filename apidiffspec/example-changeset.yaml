@@ -1,0 +1,269 @@
+# Example API Changeset
+# ---------------------
+# Validates against api-changeset-schema.json (v0.2)
+# Describes the transition from version 2.4.0 to 2.5.0 of a hypothetical
+# "Orders API", exercising operations from all four families plus
+# cross-changeset supersedes, multi-target pointers, detectable flags,
+# and severity beyond the breaking boolean.
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  description: Example e-commerce orders service
+  from:
+    version: "2.4.0"
+    spec: ./openapi-2.4.0.yaml
+  to:
+    version: "2.5.0"
+    spec: ./openapi-2.5.0.yaml
+
+released: 2026-04-20
+
+summary: >
+  Naming cleanup across User schema, migration of Order.amount to
+  integer cents, deprecation of the legacy /search endpoint, and a
+  semantic change to how 'pending' orders are surfaced.
+
+notices:
+  - level: urgent
+    message: >
+      The /search endpoint will be fully removed on 2026-10-20.
+      Begin migrating to /search/advanced immediately.
+    url: https://docs.example.com/migrate/search
+
+changes:
+
+  # --- Structural: rename applied at 12 coordinated locations --------------
+  # Single entry with a pointer array — NOT 12 linked entries.
+  - id: CHG-001
+    op: rename
+    target: schema-field
+    from:
+      - "#/components/schemas/User/properties/userName"
+      - "#/paths/~1users/get/parameters/0/name"
+      - "#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/userName"
+    to:
+      - "#/components/schemas/User/properties/username"
+      - "#/paths/~1users/get/parameters/0/name"
+      - "#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/username"
+    severity: breaking
+    breaking: true
+    rationale: Align with project-wide snake_case convention.
+    migration:
+      client_action: Rename field references in request/response handling.
+      server_behavior: Accepts and returns both names during the dual_support window.
+      dual_support:
+        start: 2026-04-20
+        end:   2026-10-20
+      automated: false
+
+  # --- Structural: split ----------------------------------------------------
+  - id: CHG-002
+    op: split
+    target: schema-field
+    from: "#/components/schemas/Contact/properties/name"
+    to:
+      - "#/components/schemas/Contact/properties/first_name"
+      - "#/components/schemas/Contact/properties/last_name"
+    severity: breaking
+    breaking: true
+    rationale: >
+      'name' conflated first and last names, making
+      culturally-correct rendering impossible.
+    migration:
+      client_action: >
+        Split local 'name' values on first whitespace, or collect
+        first/last separately going forward.
+      server_behavior: >
+        During dual_support, server populates both 'name' and the
+        split fields in responses; accepts either on input.
+      dual_support:
+        start: 2026-04-20
+        end:   2026-10-20
+      example:
+        before: { name: "Ada Lovelace" }
+        after:  { first_name: "Ada", last_name: "Lovelace" }
+
+  # --- Constraint: recode (encoding change) --------------------------------
+  - id: CHG-003
+    op: recode
+    target: schema-field
+    at: "#/components/schemas/Order/properties/amount"
+    severity: breaking
+    breaking: true
+    rationale: Eliminate floating-point rounding errors in monetary arithmetic.
+    before: { type: number, format: double, description: "Amount in USD" }
+    after:  { type: integer, minimum: 0, description: "Amount in USD cents" }
+    migration:
+      client_action: Multiply outgoing values by 100; divide incoming values by 100.
+      automated: false
+      example:
+        before: { amount: 19.99 }
+        after:  { amount: 1999 }
+
+  # --- Structural: add (non-breaking, info severity) -----------------------
+  - id: CHG-004
+    op: add
+    target: query-parameter
+    to: "#/paths/~1orders/get/parameters/4"
+    severity: info
+    breaking: false
+    description: Optional filter_by_status query parameter on GET /orders.
+    rationale: Enables clients to narrow large result sets server-side.
+
+  # --- Constraint: add enum value (notice — strict parsers may break) ------
+  - id: CHG-005
+    op: add
+    target: enum-value
+    to: "#/components/schemas/OrderStatus/enum/5"
+    severity: notice
+    breaking: false
+    description: Added 'refund_pending' to OrderStatus enum.
+    rationale: Expose refund workflow state to clients.
+    migration:
+      client_action: >
+        Ensure switch/case statements on OrderStatus handle unknown
+        values gracefully. Strict-validation clients must update.
+      automated: false
+
+  # --- Lifecycle: deprecate endpoint ---------------------------------------
+  - id: CHG-006
+    op: deprecate
+    target: endpoint
+    at: "#/paths/~1search/post"
+    severity: notice
+    breaking: false
+    description: POST /search is deprecated in favor of POST /search/advanced.
+    rationale: The new endpoint supports pagination, faceting, and typed filters.
+    lifecycle:
+      deprecated_date: 2026-04-20
+      sunset_date:     2026-10-20
+      replacement:     "#/paths/~1search~1advanced/post"
+      reason:          Superseded by a more capable endpoint.
+    migration:
+      guide_url: https://docs.example.com/migrate/search
+      client_action: Switch to POST /search/advanced; request shape documented in guide.
+
+  # --- Semantic: resemanticize (author-only, invisible to spec diff) -------
+  - id: CHG-007
+    op: resemanticize
+    target: enum-value
+    at: "#/components/schemas/OrderStatus/enum/0"
+    severity: breaking
+    breaking: true
+    detectable: false
+    description: >
+      The meaning of OrderStatus='pending' has changed. Previously it meant
+      'awaiting payment'; it now means 'awaiting fulfillment after successful
+      payment'. The pre-payment state is now represented by the new
+      'payment_pending' value (see CHG-008).
+    rationale: >
+      The old conflation of pre-payment and pre-fulfillment states caused
+      ambiguity in operator dashboards and client reporting.
+    migration:
+      client_action: >
+        Any code interpreting 'pending' as 'not yet paid' must be updated
+        to check 'payment_pending' instead.
+      server_behavior: >
+        During dual_support, the server never returns the new meaning of
+        'pending' without also setting a payment_confirmed_at timestamp,
+        allowing clients to distinguish.
+      dual_support:
+        start: 2026-04-20
+        end:   2026-10-20
+      automated: false
+    related:
+      - CHG-008
+
+  - id: CHG-008
+    op: add
+    target: enum-value
+    to: "#/components/schemas/OrderStatus/enum/6"
+    severity: info
+    breaking: false
+    description: Added 'payment_pending' to OrderStatus enum.
+    related:
+      - CHG-007
+
+  # --- Constraint: tighten (breaking validation change) --------------------
+  - id: CHG-009
+    op: tighten
+    target: request-field
+    at: "#/paths/~1orders/post/requestBody/content/application~1json/schema/properties/currency"
+    severity: breaking
+    breaking: true
+    rationale: Reject ambiguous lowercase currency codes at the API boundary.
+    before: { type: string, minLength: 3, maxLength: 3 }
+    after:  { type: string, pattern: "^[A-Z]{3}$" }
+    migration:
+      client_action: Uppercase currency codes before submission.
+      automated: true
+
+  # --- Semantic: annotate (author-only, docs clarification) ----------------
+  - id: CHG-010
+    op: annotate
+    target: response-field
+    at: "#/components/schemas/Order/properties/created_at"
+    severity: info
+    detectable: false
+    description: >
+      Documented that 'created_at' reflects the moment the order entered the
+      system, not the moment payment was authorized. Wire format unchanged.
+
+  # --- Semantic: retime (author-only, consistency semantics) ---------------
+  - id: CHG-011
+    op: retime
+    target: endpoint
+    at: "#/paths/~1orders/get"
+    severity: notice
+    detectable: false
+    description: >
+      GET /orders results are now eventually consistent within 2s of a write,
+      having previously been read-your-writes consistent.
+    rationale: Read replicas introduced to reduce primary load.
+    migration:
+      client_action: >
+        If an immediate read-after-write is required, query
+        GET /orders/{id} instead (which remains strongly consistent).
+
+  # --- Constraint: constrain (orthogonal, neither stricter nor looser) -----
+  - id: CHG-012
+    op: constrain
+    target: request-field
+    at: "#/components/schemas/Contact/properties/email"
+    severity: breaking
+    breaking: true
+    rationale: Switch from RFC 5321 email validation to RFC 3986 URI validation for the unified contacts endpoint.
+    before: { type: string, format: email }
+    after:  { type: string, format: uri }
+    migration:
+      client_action: Prefix email values with 'mailto:' when used as a contact URI.
+      automated: true
+
+  # --- Structural: recompose (allOf restructured, no semantic change) ------
+  - id: CHG-013
+    op: recompose
+    target: schema
+    from: "#/components/schemas/Order"
+    to:   "#/components/schemas/Order"
+    severity: info
+    detectable: true
+    description: >
+      Order schema refactored from inline properties to allOf composition of
+      BaseOrder + OrderStatus. Rendered wire format is identical.
+
+  # --- Cross-changeset supersedes ------------------------------------------
+  - id: CHG-014
+    op: remove
+    target: header-parameter
+    from: "#/paths/~1orders/get/parameters/X-Legacy-Flag"
+    severity: breaking
+    breaking: true
+    rationale: Sunset window from the 2.3.0 changeset has now elapsed.
+    migration:
+      client_action: Remove the X-Legacy-Flag header from all /orders requests.
+    supersedes:
+      - changeset: "2.3.0"
+        id: CHG-041
+        url: https://docs.example.com/changesets/2.3.0#CHG-041

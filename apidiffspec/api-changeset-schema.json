@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.org/schemas/api-changeset/0.2.json",
+  "title": "API Changeset",
+  "description": "A structured specification for communicating API mutations between two versions of an OpenAPI document. A changeset document describes 'how we got from spec A to spec B' in a form that is both human-readable and machine-parseable. Operations fall into four families: structural (shape), constraint (rules), semantic (meaning), and lifecycle (status). Operations in the semantic family (resemanticize, retime, reorder) and documentation-only operations (annotate) are author-only: a spec-diff tool cannot detect them by comparing two OpenAPI documents, which is the primary reason this format exists alongside the specs rather than being derived from them.",
+  "type": "object",
+  "required": ["changeset_version", "api", "changes"],
+  "additionalProperties": false,
+
+  "properties": {
+    "changeset_version": {
+      "type": "string",
+      "description": "Version of the changeset schema format itself (this spec), in semver.",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+    },
+
+    "api": {
+      "type": "object",
+      "description": "Identifies which API and which pair of versions this changeset describes.",
+      "required": ["name", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "name":        { "type": "string" },
+        "description": { "type": "string" },
+        "from":        { "$ref": "#/$defs/spec_reference" },
+        "to":          { "$ref": "#/$defs/spec_reference" }
+      }
+    },
+
+    "released": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the 'to' version was released to consumers."
+    },
+
+    "summary": {
+      "type": "string",
+      "description": "Brief human-readable overview of this changeset."
+    },
+
+    "notices": {
+      "type": "array",
+      "description": "Changeset-level announcements not tied to a specific change entry (e.g., urgent security guidance).",
+      "items": {
+        "type": "object",
+        "required": ["level", "message"],
+        "properties": {
+          "level":   { "enum": ["info", "warning", "urgent"] },
+          "message": { "type": "string" },
+          "url":     { "type": "string", "format": "uri" }
+        }
+      }
+    },
+
+    "changes": {
+      "type": "array",
+      "description": "The list of individual changes that together constitute this changeset. Per-file changesets are encouraged for git workflows (one changeset per release, or one per-change file aggregated at build time); aggregated changesets are better for consumption. The schema supports both — consumers should be liberal in what they accept.",
+      "items": { "$ref": "#/$defs/change" },
+      "minItems": 0
+    }
+  },
+
+  "$defs": {
+
+    "spec_reference": {
+      "type": "object",
+      "description": "Identifies a specific OpenAPI document by version and (optionally) location.",
+      "required": ["version"],
+      "additionalProperties": false,
+      "properties": {
+        "version":   { "type": "string", "description": "API version identifier (semver, date, or opaque string)." },
+        "spec":      { "type": "string", "description": "URL or relative path to the OpenAPI document." },
+        "spec_hash": { "type": "string", "description": "Optional content hash (e.g. sha256:...) for integrity verification." }
+      }
+    },
+
+    "operation": {
+      "description": "The kind of mutation. Operations are grouped into four families: structural (shape), constraint (rules), semantic (meaning), and lifecycle (status). Semantic-family ops plus 'annotate' are author-only and cannot be recovered from a spec diff — tooling should treat their absence from a diff as non-evidence, not as validation failure.",
+      "type": "string",
+      "oneOf": [
+        { "const": "add",            "description": "Structural. A new element was introduced. Requires 'to'." },
+        { "const": "remove",         "description": "Structural. An element was deleted. Requires 'from'." },
+        { "const": "rename",         "description": "Structural. Same element, new identifier. Requires 'from' and 'to'." },
+        { "const": "move",           "description": "Structural. Same element, new location (e.g., flattened or nested). Requires 'from' and 'to'." },
+        { "const": "split",          "description": "Structural. One element became many. Requires 'from' (single) and 'to' (array)." },
+        { "const": "merge",          "description": "Structural. Many elements became one. Requires 'from' (array) and 'to' (single)." },
+        { "const": "replace",        "description": "Structural. Element swapped for a different one with similar intent. Requires 'from' and 'to'." },
+        { "const": "recompose",      "description": "Structural. Schema composition reshuffled (allOf/oneOf/anyOf restructured without semantic change). Requires 'from' and 'to'." },
+
+        { "const": "tighten",        "description": "Constraint. Validation rules became stricter (required added, narrower type, smaller max, etc.). Requires 'at'." },
+        { "const": "loosen",         "description": "Constraint. Validation rules became more permissive. Requires 'at'." },
+        { "const": "constrain",      "description": "Constraint. Rules changed in a way that is neither strictly stricter nor strictly looser (e.g., swapped format from email to URI). Requires 'at'." },
+        { "const": "retype",         "description": "Constraint. Type changed (e.g., string→int, int32→int64, scalar→object). Requires 'at'." },
+        { "const": "redefault",      "description": "Constraint. Default value changed. Requires 'at'." },
+        { "const": "recode",         "description": "Constraint. Encoding/format/units changed (ISO date→unix, dollars→cents, etc.). Requires 'at'." },
+
+        { "const": "resemanticize",  "description": "Semantic (author-only). Same shape, different meaning. Cannot be detected by spec diff. Requires 'at'." },
+        { "const": "reorder",        "description": "Semantic (author-only). Ordering semantics changed. Requires 'at'." },
+        { "const": "retime",         "description": "Semantic (author-only). Timing/consistency semantics changed (sync→eventual, immediate→batched). Requires 'at'." },
+        { "const": "annotate",       "description": "Semantic (author-only). Documentation-only clarification with no wire-format change. Requires 'at'." },
+
+        { "const": "deprecate",      "description": "Lifecycle. Element still works but is scheduled for removal. Requires 'at' and 'lifecycle'." },
+        { "const": "sunset",         "description": "Lifecycle. Removal date committed. Requires 'at' and 'lifecycle.sunset_date'." },
+        { "const": "restore",        "description": "Lifecycle. Element un-deprecated. Requires 'at'." },
+        { "const": "withdraw",       "description": "Lifecycle. Element removed before previously-announced sunset (emergency). Requires 'from'." }
+      ]
+    },
+
+    "target_kind": {
+      "type": "string",
+      "description": "What kind of thing the operation applies to. Orthogonal to the operation itself.",
+      "enum": [
+        "endpoint",
+        "operation",
+        "path-parameter",
+        "query-parameter",
+        "header-parameter",
+        "cookie-parameter",
+        "request-body",
+        "request-field",
+        "response",
+        "response-field",
+        "response-header",
+        "status-code",
+        "schema",
+        "schema-field",
+        "enum-value",
+        "security-scheme",
+        "content-type",
+        "server",
+        "rate-limit",
+        "auth",
+        "webhook",
+        "callback",
+        "example",
+        "discriminator",
+        "link",
+        "tag"
+      ]
+    },
+
+    "json_pointer": {
+      "type": "string",
+      "description": "RFC 6901 JSON Pointer into the referenced OpenAPI document. May be prefixed with '#' for URI-fragment style.",
+      "pattern": "^#?(/([^/~]|~[01])*)*$"
+    },
+
+    "pointer_or_pointers": {
+      "description": "A single JSON Pointer OR an array of JSON Pointers. An array signals that one logical change applies to multiple coordinated locations (e.g., renaming a field that appears in 12 endpoint schemas is ONE change entry with a 12-element pointer array, not 12 linked entries).",
+      "oneOf": [
+        { "$ref": "#/$defs/json_pointer" },
+        { "type": "array", "items": { "$ref": "#/$defs/json_pointer" }, "minItems": 1 }
+      ]
+    },
+
+    "cross_reference": {
+      "description": "A reference to another change entry. May be a bare ID (same changeset) or an object scoping to a different changeset document by version and change ID.",
+      "oneOf": [
+        { "type": "string", "description": "Change ID within the same changeset document." },
+        {
+          "type": "object",
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": {
+            "changeset": { "type": "string", "description": "Version identifier of the other changeset document (e.g., '2.3.0')." },
+            "id":        { "type": "string", "description": "Change ID within that changeset." },
+            "url":       { "type": "string", "format": "uri", "description": "Optional direct URL to the referenced changeset document." }
+          }
+        }
+      ]
+    },
+
+    "change": {
+      "type": "object",
+      "required": ["id", "op", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable identifier for this change (e.g., 'CHG-001'). Used for cross-referencing.",
+          "pattern": "^[A-Z0-9][A-Z0-9_-]*$"
+        },
+        "op":     { "$ref": "#/$defs/operation" },
+        "target": { "$ref": "#/$defs/target_kind" },
+
+        "from": {
+          "description": "Pointer(s) into the 'from' OpenAPI spec. Required for ops that remove or transform an existing element. An array means the single logical change is mirrored at N coordinated locations.",
+          "$ref": "#/$defs/pointer_or_pointers"
+        },
+        "to": {
+          "description": "Pointer(s) into the 'to' OpenAPI spec. Required for ops that add or transform into new location. An array means the single logical change is mirrored at N coordinated locations.",
+          "$ref": "#/$defs/pointer_or_pointers"
+        },
+        "at": {
+          "description": "Pointer into both specs, for ops that modify an element in place (e.g., deprecate, retype).",
+          "$ref": "#/$defs/json_pointer"
+        },
+
+        "breaking": {
+          "type": "boolean",
+          "description": "Shorthand: true iff this change requires consumer-side modification to keep working. Equivalent to 'severity == breaking'. Retained for authoring ergonomics; 'severity' is the authoritative field if both are set."
+        },
+
+        "severity": {
+          "type": "string",
+          "enum": ["info", "notice", "breaking"],
+          "description": "Attention level for consumers. 'info' = cosmetic or internal, 'notice' = non-breaking but behavior-affecting (new enum values, new required response fields that affect log storage, new rate limits), 'breaking' = consumer must act. Non-breaking changes can still warrant attention — this axis is strictly richer than the 'breaking' boolean."
+        },
+
+        "detectable": {
+          "type": "boolean",
+          "description": "Whether a spec-diff tool can surface this change by comparing the two OpenAPI documents. Defaults TRUE for structural/constraint/lifecycle ops, FALSE for semantic-family ops (resemanticize, reorder, retime) and 'annotate'. Authors may override when a structural change happens to be diff-invisible (e.g., a retype where the new type renders identically). Validators use this field to decide whether a missing diff entry is suspicious."
+        },
+
+        "rationale":   { "type": "string", "description": "Why this change is being made." },
+        "description": { "type": "string", "description": "Human-readable description of the change." },
+
+        "before": { "description": "Optional inline snapshot of the relevant spec fragment before the change." },
+        "after":  { "description": "Optional inline snapshot of the relevant spec fragment after the change." },
+
+        "migration": { "$ref": "#/$defs/migration" },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+
+        "related": {
+          "type": "array",
+          "description": "Cross-references to logically related changes (same or other changeset documents).",
+          "items": { "$ref": "#/$defs/cross_reference" }
+        },
+        "supersedes": {
+          "type": "array",
+          "description": "Cross-references to prior changes this one supersedes or reverses. Use the object form with 'changeset' when pointing to a different changeset document.",
+          "items": { "$ref": "#/$defs/cross_reference" }
+        },
+
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+
+      "allOf": [
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "const": "add" } } },
+          "then": { "required": ["to"] }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "enum": ["remove", "withdraw"] } } },
+          "then": { "required": ["from"] }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "enum": ["rename", "move", "replace", "recompose"] } } },
+          "then": { "required": ["from", "to"] }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "const": "split" } } },
+          "then": {
+            "required": ["from", "to"],
+            "properties": { "to": { "type": "array", "minItems": 2 } }
+          }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "const": "merge" } } },
+          "then": {
+            "required": ["from", "to"],
+            "properties": { "from": { "type": "array", "minItems": 2 } }
+          }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "enum": ["deprecate", "sunset", "restore"] } } },
+          "then": { "required": ["at", "lifecycle"] }
+        },
+        {
+          "if":   { "required": ["op"], "properties": { "op": { "enum": ["tighten", "loosen", "constrain", "retype", "redefault", "recode", "resemanticize", "reorder", "retime", "annotate"] } } },
+          "then": { "required": ["at"] }
+        },
+        {
+          "if":   { "required": ["breaking"], "properties": { "breaking": { "const": true } } },
+          "then": { "required": ["migration"] }
+        },
+        {
+          "if":   { "required": ["severity"], "properties": { "severity": { "const": "breaking" } } },
+          "then": { "required": ["migration"] }
+        }
+      ]
+    },
+
+    "migration": {
+      "type": "object",
+      "description": "Guidance for consumers on how to handle this change.",
+      "additionalProperties": false,
+      "properties": {
+        "client_action":    { "type": "string", "description": "What the consumer must do." },
+        "server_behavior":  { "type": "string", "description": "What the server does during the transition window." },
+        "dual_support": {
+          "type": "object",
+          "description": "Window during which both old and new behaviors coexist.",
+          "required": ["start"],
+          "additionalProperties": false,
+          "properties": {
+            "start": { "type": "string", "format": "date" },
+            "end":   { "type": "string", "format": "date" }
+          }
+        },
+        "automated": {
+          "type": "boolean",
+          "description": "True if an SDK / codegen / gateway can absorb the change with no consumer code changes."
+        },
+        "guide_url": { "type": "string", "format": "uri" },
+        "example": {
+          "type": "object",
+          "description": "Side-by-side before/after illustration for documentation.",
+          "additionalProperties": false,
+          "properties": {
+            "before": {},
+            "after":  {}
+          }
+        }
+      }
+    },
+
+    "lifecycle": {
+      "type": "object",
+      "description": "Lifecycle transition metadata, aligned with RFC 9745 (Deprecation) and RFC 8594 (Sunset).",
+      "additionalProperties": false,
+      "properties": {
+        "deprecated_date": { "type": "string", "format": "date" },
+        "sunset_date":     { "type": "string", "format": "date", "description": "Must be >= deprecated_date (validated by tooling, not by schema)." },
+        "replacement": {
+          "description": "JSON Pointer to the recommended alternative element.",
+          "$ref": "#/$defs/json_pointer"
+        },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
