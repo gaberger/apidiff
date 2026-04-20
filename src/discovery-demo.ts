@@ -8,9 +8,18 @@
 //   npx tsx src/discovery-demo.ts --search twilio     # search APIs.guru
 
 import { allCategories } from "./core/domain/provider-registry.js";
-import { createDiscoveryApp } from "./composition-root.js";
+import { createDiscoveryAdapters } from "./composition-root.js";
+import { DiscoveryService } from "./core/usecases/discovery-service.js";
+import { ApisGuruDiscoveryAdapter } from "./adapters/secondary/apisguru-discovery-adapter.js";
+import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
+import type { ApiProvider } from "./core/domain/discovery-types.js";
 
-const { discovery, apisGuruAdapter } = createDiscoveryApp();
+const adapterMap = createDiscoveryAdapters();
+const discovery = new DiscoveryService(
+  Array.from(adapterMap.values()),
+  new ChangelogParserAdapter(),
+);
+const apisGuruAdapter = new ApisGuruDiscoveryAdapter();
 
 // ── CLI ─────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -24,14 +33,10 @@ async function main() {
     console.log("╚══════════════════════════════════════════════════════╝\n");
 
     for (const cat of allCategories()) {
-      const inCat = providers.filter((p) => p.category === cat);
+      const inCat = providers.filter((p: ApiProvider) => p.category === cat);
       console.log(`  ── ${cat.toUpperCase()} ${"─".repeat(40 - cat.length)}`);
       for (const p of inCat) {
-        const src = p.specSource.kind === "github"
-          ? `github:${p.specSource.owner}/${p.specSource.repo}`
-          : p.specSource.kind === "apis-guru"
-            ? `apis-guru:${p.specSource.providerKey}`
-            : `url:${p.specSource.baseUrl}`;
+        const src = describeSource(p);
         console.log(`    ${p.name.padEnd(20)} ${src}`);
       }
       console.log();
@@ -72,6 +77,10 @@ async function main() {
 
   // Discover a specific provider
   const slug = args[0];
+  if (!slug) {
+    console.log("  Usage: discovery-demo <slug> | --list | --category <cat> | --search <term>");
+    return;
+  }
   console.log(`\nDiscovering ${slug}...\n`);
   const result = await discovery.discoverProvider(slug);
   if (!result) {
@@ -114,6 +123,16 @@ function printResult(result: import("./core/domain/discovery-types.js").Discover
   }
 
   console.log(`└${"─".repeat(50)}\n`);
+}
+
+function describeSource(p: ApiProvider): string {
+  const s = p.specSource;
+  switch (s.kind) {
+    case "github":     return `github:${s.owner}/${s.repo}`;
+    case "apis-guru":  return `apis-guru:${s.providerKey}`;
+    case "docusaurus": return `docusaurus:${s.baseUrl}`;
+    case "url":        return `url:${s.specUrls[0]?.url ?? ""}`;
+  }
 }
 
 main().catch((err) => {

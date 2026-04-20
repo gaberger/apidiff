@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { specProxy } from "@/lib/spec-proxy";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
@@ -70,8 +70,8 @@ export default function VersionPicker({ provider, onSelectComparison }) {
     setLoading(true);
     try {
       const [r1, r2] = await Promise.all([
-        base44.functions.invoke('proxyFetch', { url: v1.url }).then(r => r.data.document),
-        base44.functions.invoke('proxyFetch', { url: v2.url }).then(r => r.data.document),
+        specProxy.fetch(v1.url).then(r => r.document),
+        specProxy.fetch(v2.url).then(r => r.document),
       ]);
       onSelectComparison(r1, r2, label);
     } finally {

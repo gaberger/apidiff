@@ -1,4 +1,4 @@
-import { base44 } from "@/api/base44Client";
+import { specProxy } from "@/lib/spec-proxy";
 import * as specCache from "@/lib/spec-cache.js";
 
 export class SpecFetchError extends Error {
@@ -30,28 +30,21 @@ export async function fetchSpec(url, { onProgress, bypassCache = false } = {}) {
   emit(onProgress, "fetching", { url });
   let response;
   try {
-    response = await base44.functions.invoke("proxyFetch", { url });
+    response = await specProxy.fetch(url);
   } catch (err) {
-    const msg = err?.response?.data?.error || err?.message || "unknown error";
+    const msg = err?.message || "unknown error";
     emit(onProgress, "error", { url, phase: "fetch", message: msg });
     throw new SpecFetchError(`Fetch failed: ${msg}`, { url, phase: "fetch", cause: err });
   }
 
-  const data = response?.data;
-  if (data?.error) {
-    emit(onProgress, "error", { url, phase: "proxy", message: data.error });
-    throw new SpecFetchError(data.error, { url, phase: "proxy" });
-  }
-
-  const document = data?.document;
+  const document = response?.document;
   if (document == null) {
     emit(onProgress, "error", { url, phase: "parse", message: "Empty response from proxy" });
     throw new SpecFetchError("Empty response from proxy", { url, phase: "parse" });
   }
 
-  // proxyFetch may return `document` as a parsed object (when it auto-parsed
-  // JSON) or as a string (for YAML / raw text). Normalize to string for both
-  // caching and downstream parsing, which expects a string.
+  // specProxy returns `document` as a parsed object (JSON) or string (YAML /
+  // raw text). Normalize to string for caching + downstream parsing.
   const content = typeof document === "string"
     ? document
     : JSON.stringify(document, null, 2);

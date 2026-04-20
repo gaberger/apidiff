@@ -1,0 +1,78 @@
+{
+  "id": "feat-remove-base44",
+  "title": "Remove base44 platform dependency — ports + local adapters",
+  "adr": "ADR-020",
+  "created": "2026-04-20",
+  "status": "done",
+  "topology": "hierarchical",
+  "budget": "~60000 tokens",
+  "prior_work": {
+    "done": [
+      "src/api/base44Client.js — infrastructure client to be deleted",
+      "src/lib/AuthContext.jsx — auth surface slated for removal",
+      "src/lib/PageNotFound.jsx — consumes base44.auth.me",
+      "src/components/UserNotRegisteredError.jsx — auth-error branch",
+      "src/pages/Settings.jsx — consumes base44.entities.Integration.*",
+      "src/components/sidebar/IntegrationList.jsx — consumes base44.entities.Integration.list",
+      "src/lib/fetch-spec.js — consumes base44.functions.invoke('proxyFetch')",
+      "src/components/diff/SpecInput.jsx — consumes base44.functions.invoke('proxyFetch')",
+      "src/components/sidebar/VersionPicker.jsx — consumes base44.functions.invoke('proxyFetch')",
+      "src/components/settings/DiscoveryPanel.jsx — consumes base44.functions.invoke('discoverApi')",
+      "src/adapters/secondary/*-discovery-adapter.ts — existing hex-compliant discovery adapters",
+      "src/adapters/secondary/schema-fetch-adapter.ts — existing fetch adapter for CLI/web"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Strip base44 auth surface",
+      "description": "Delete src/lib/AuthContext.jsx and src/components/UserNotRegisteredError.jsx. Rewrite src/App.jsx to drop AuthProvider/useAuth/UserNotRegisteredError wrapper (keep QueryClientProvider + Router + Toaster). Rewrite src/lib/PageNotFound.jsx to remove base44.auth.me and the admin-branch note.",
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "App.jsx has no AuthProvider, useAuth, or UserNotRegisteredError. No file under src/ imports base44.auth.*. hex analyze still passes.",
+      "status": "done"
+    },
+    {
+      "id": "step-2",
+      "name": "IntegrationStoragePort + LocalStorageIntegrationAdapter",
+      "description": "Add IntegrationStoragePort to src/core/ports/index.ts with list/create/update/delete returning Promise<Integration[]> / Promise<Integration>. Add Integration domain type. Implement src/adapters/secondary/localstorage-integration-adapter.ts backed by window.localStorage (JSON-serialized, namespaced key 'apidiff.integrations.v1'). Wire into composition-root.ts. Create a React hook src/lib/useIntegrationStore.js that exposes the port via useQuery/useMutation. Swap src/pages/Settings.jsx and src/components/sidebar/IntegrationList.jsx from base44.entities.Integration.* to the hook.",
+      "layer": "port+adapter+primary-bridge",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "Settings page loads, saves, deletes integrations via localStorage. No import of base44 in Settings.jsx or IntegrationList.jsx. hex analyze clean.",
+      "status": "done"
+    },
+    {
+      "id": "step-3",
+      "name": "SpecProxyPort + Vercel Function + browser fallback",
+      "description": "Add SpecProxyPort to core/ports. Primary implementation: a new Vercel Function at api/proxy-fetch.ts that accepts { url } and returns { document, status }. Browser adapter src/adapters/secondary/browser-proxy-adapter.ts attempts direct fetch first, falls back to the Vercel function on CORS failure. Wire via composition-root. Expose through a useSpecProxy hook. Swap fetch-spec.js, VersionPicker.jsx, SpecInput.jsx from base44.functions.invoke('proxyFetch') to the hook.",
+      "layer": "port+adapter+function",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "URL-based spec loading works for both same-origin and CORS-restricted sources. Vercel Function deployed or dev-mode stub in place. No call-site imports base44 for proxy fetch.",
+      "status": "done"
+    },
+    {
+      "id": "step-4",
+      "name": "DiscoveryPort wiring (leverage existing adapters)",
+      "description": "Expose the existing src/adapters/secondary/*-discovery-adapter.ts chain through a DiscoveryPort in core/ports. Wire all discovery adapters (github, apisguru, docusaurus, url, changelog-parser) into composition-root. Add useDiscovery hook. Swap DiscoveryPanel.jsx from base44.functions.invoke('discoverApi') to the hook. Delete any base44-side discoverApi logic.",
+      "layer": "port+primary-bridge",
+      "dependencies": ["step-3"],
+      "tier": 2,
+      "done_condition": "DiscoveryPanel runs against in-browser discovery adapters. No base44.functions.invoke calls remain anywhere in src/.",
+      "status": "done"
+    },
+    {
+      "id": "step-5",
+      "name": "Delete base44 package + teach analyzer the React boundary",
+      "description": "Remove @base44/sdk from package.json. Delete src/api/base44Client.js and src/lib/app-params.js. Remove VITE_BASE44_API_KEY from .env.example / vercel env. Extend .hex/adr-rules.toml with a rule forbidding **/*.jsx,tsx from importing @/api/*, @base44/*, or src/adapters/*. Re-run hex analyze — expect zero violations on the extended rule set.",
+      "layer": "cleanup",
+      "dependencies": ["step-4"],
+      "tier": 3,
+      "done_condition": "package.json has no base44 dependency. src/api/base44Client.js and src/lib/app-params.js deleted. hex analyze passes with extended React boundary rule. bun build succeeds.",
+      "status": "done"
+    }
+  ],
+  "status_overall": "complete"
+}

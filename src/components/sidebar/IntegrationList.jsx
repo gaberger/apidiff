@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { PanelLeftClose, PanelLeft, Settings, Plus, ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { integrationStore } from "@/lib/integration-store";
 import { motion } from "framer-motion";
 import { PROVIDER_REGISTRY } from "@/lib/domain/provider-registry.js";
+import fwdData from "@/data/fwdnetworks.json";
 
 // Category ordering + display labels — domain knows the slugs ("payments"), UI owns the
 // presentation order (by usage frequency) and human labels.
@@ -32,6 +33,7 @@ const CATEGORY_LABEL = {
   "commerce": "Commerce",
   "analytics": "Analytics",
   "infrastructure": "Infrastructure",
+  "release-notes": "Release Notes",
   "other": "Other",
 };
 
@@ -89,12 +91,12 @@ function registryEntryToIntegration(p) {
   };
 }
 
-export default function IntegrationList({ selected, onSelect, collapsed, onToggleCollapse }) {
+export default function IntegrationList({ selected, onSelect, initialSlug, collapsed, onToggleCollapse }) {
   const [integrations, setIntegrations] = useState([]);
   const [collapsedCats, setCollapsedCats] = useState(() => new Set());
 
   useEffect(() => {
-    base44.entities.Integration.list().then((items) => {
+    integrationStore.list().then((items) => {
       setIntegrations(items.map(item => {
         const d = item.data || item;
         return { id: item.id, ...d };
@@ -102,22 +104,81 @@ export default function IntegrationList({ selected, onSelect, collapsed, onToggl
     }).catch(() => {});
   }, []);
 
+  const FWD_VERSIONS = [
+    { label: "26.3.0", from: "2026-03-17", breaking: 3, stats: { newOperations: 4, newModels: 3, modelChanges: 8 }, diff: null },
+    { label: "26.2.0", from: "2026-02-17", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "26.1.0", from: "2026-01-22", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.12.0", from: "2025-12-16", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 3 }, diff: null },
+    { label: "25.11.0", from: "2025-11-18", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.10.0", from: "2025-10-21", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.9.0", from: "2025-09-16", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.8.0", from: "2025-08-19", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.7.0", from: "2025-07-22", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.6.0", from: "2025-06-17", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.5.0", from: "2025-05-20", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.4.0", from: "2025-04-22", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.3.0", from: "2025-03-18", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.2.0", from: "2025-02-13", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "25.1.0", from: "2025-01-21", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.12.0", from: "2024-12-17", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.11.0", from: "2024-11-19", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.10.0", from: "2024-10-17", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.9.0", from: "2024-09-12", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.8.0", from: "2024-08-22", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.7.0", from: "2024-07-11", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.6.0", from: "2024-06-13", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.5.0", from: "2024-05-16", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.4.0", from: "2024-04-11", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.3.0", from: "2024-03-14", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.2.0", from: "2024-02-15", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "24.1.0", from: "2024-01-18", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.12.0", from: "2023-12-12", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 2 }, diff: null },
+    { label: "23.11.0", from: "2023-11-14", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.10.0", from: "2023-10-19", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.9.0", from: "2023-09-21", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.8.0", from: "2023-08-23", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.7.0", from: "2023-07-20", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.6.0", from: "2023-06-20", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.5.0", from: "2023-05-24", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.4.0", from: "2023-04-20", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.3.0", from: "2023-03-23", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.2.0", from: "2023-02-22", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+    { label: "23.1.0", from: "2023-01-19", breaking: 0, stats: { newOperations: 0, newModels: 0, modelChanges: 0 }, diff: null },
+  ];
+
+  const STATIC_INTEGRATIONS = [
+    {
+      id: "fwdnetworks-static",
+      name: fwdData.name || "Forward Networks",
+      slug: "forward-networks",
+      color: fwdData.color || "#FF6B35",
+      logo_url: null,
+      versions: fwdData.versions || [],
+    },
+  ];
+
   // Merge base44 integrations with kind:'url' registry entries. If the same slug
   // exists in both, the base44 record wins (user-editable state beats defaults).
   const mergedIntegrations = useMemo(() => {
     const bySlug = new Map();
+    // First add static integrations
+    for (const integ of STATIC_INTEGRATIONS) {
+      const slug = (integ.slug || integ.name || "").toLowerCase();
+      if (slug) bySlug.set(slug, integ);
+    }
+    // Then add base44 integrations (they override static)
     for (const integ of integrations) {
       const slug = (integ.slug || integ.name || "").toLowerCase();
       if (slug) bySlug.set(slug, integ);
     }
-    const merged = [...integrations];
+    // Finally add registry entries that don't exist yet
     for (const p of PROVIDER_REGISTRY) {
       const slug = p.slug.toLowerCase();
       if (bySlug.has(slug)) continue;
       const synthesized = registryEntryToIntegration(p);
-      if (synthesized) merged.push(synthesized);
+      if (synthesized) bySlug.set(slug, synthesized);
     }
-    return merged;
+    return Array.from(bySlug.values());
   }, [integrations]);
 
   // Group by category, preserve the curated category order, alphabetise within each group.
@@ -141,6 +202,16 @@ export default function IntegrationList({ selected, onSelect, collapsed, onToggl
     }
     return ordered;
   }, [mergedIntegrations]);
+
+  // Auto-select integration from URL
+  useEffect(() => {
+    if (initialSlug && mergedIntegrations.length > 0 && !selected) {
+      const found = mergedIntegrations.find(i => i.slug?.toLowerCase() === initialSlug.toLowerCase());
+      if (found) {
+        onSelect(found);
+      }
+    }
+  }, [initialSlug, mergedIntegrations, selected, onSelect]);
 
   const toggleCategory = (cat) => {
     setCollapsedCats((prev) => {

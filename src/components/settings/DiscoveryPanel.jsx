@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { discoveryService } from "@/lib/browser-stores";
 import { Button } from "@/components/ui/button";
 import { Search, Loader2, Plus, ExternalLink, GitBranch, BookOpen, Bot, ChevronDown, ChevronRight } from "lucide-react";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
@@ -49,19 +49,34 @@ export default function DiscoveryPanel({ onAddComparisons }) {
     setSource(null);
 
     try {
-      const res = await base44.functions.invoke('discoverApi', {
-        base_url: baseUrl.trim(),
-        changelog_url: changelogUrl.trim() || undefined,
-      });
-      const data = res.data;
-      if (data.versions?.length > 0 || data.pairs?.length > 0) {
+      const result = await discoveryService.discoverByUrl(
+        baseUrl.trim(),
+        changelogUrl.trim() || undefined,
+      );
+      if (!result) {
+        setError("No specs found. Try a different URL or provider name.");
+        return;
+      }
+      // DiscoveryResult uses VersionPair { label, v1, v2 }; flatten to the
+      // shape DiscoveryPanel already renders: { label, v1_url, v2_url }.
+      const data = {
+        versions: result.versions,
+        pairs: result.pairs.map(p => ({
+          label: p.label,
+          v1_url: p.v1.url,
+          v2_url: p.v2.url,
+        })),
+        changelog_versions: result.changelogVersions,
+        source: result.source,
+      };
+      if (data.versions.length > 0 || data.pairs.length > 0) {
         setResults(data);
         setSource(data.source);
       } else {
         setError("No specs found. Try a different URL or provider name.");
       }
     } catch (e) {
-      setError(e.response?.data?.error || e.message);
+      setError(e.message);
     } finally {
       setRunning(false);
     }

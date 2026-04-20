@@ -8,6 +8,9 @@ import type {
   SchemaCompareResult,
   ChecklistItem,
   ResolvedSpec,
+  Integration,
+  IntegrationDraft,
+  ProxyFetchResult,
 } from "../domain/types.js";
 
 import type {
@@ -66,4 +69,21 @@ export interface ApiDiscoveryPort {
 /** Parses changelog pages for version identifiers */
 export interface ChangelogParserPort {
   parse(url: string): Promise<string[]>;
+}
+
+/**
+ * Fetches an OpenAPI spec from a URL for the browser. Attempts direct fetch
+ * first, falls back to a server-side proxy (e.g. Vercel Function) on CORS
+ * failure. Returns the parsed document (object for JSON, string for YAML/text).
+ */
+export interface SpecProxyPort {
+  fetch(url: string): Promise<ProxyFetchResult>;
+}
+
+/** Persists user-configured API integrations (name, version URLs, comparison pairs). */
+export interface IntegrationStoragePort {
+  list(): Promise<Integration[]>;
+  create(draft: IntegrationDraft): Promise<Integration>;
+  update(id: string, patch: Partial<Integration>): Promise<Integration>;
+  delete(id: string): Promise<void>;
 }

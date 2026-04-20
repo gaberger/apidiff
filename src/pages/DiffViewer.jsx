@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon, HelpCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon, HelpCircle, BookOpen } from "lucide-react";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts.js";
 import ShortcutsHelp from "@/components/diff/ShortcutsHelp.jsx";
@@ -31,6 +31,60 @@ export default function DiffViewer() {
   const [summaryCounts, setSummaryCounts] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [error, setError] = useState(null);
+
+  // URL params
+  const { integration: integrationSlug } = useParams();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Path filter from URL
+  const pathFilter = searchParams.get("path") || "";
+  const setPathFilter = (value) => {
+    const params = new URLSearchParams(searchParams);
+    if (value) params.set("path", value);
+    else params.delete("path");
+    setSearchParams(params, { replace: true });
+  };
+
+  // Filter results for display - compute inline instead of useMemo
+  let filteredResults = results ? [...results] : null;
+  const isReleaseNotes = results?.[0]?.type === "releaseNotes";
+  
+  // For release notes, calculate total changes from diff data
+  let releaseNotesChangeCount = 0;
+  if (isReleaseNotes && results[0]?.diff) {
+    const d = results[0].diff;
+    releaseNotesChangeCount = 
+      (d.breakingChanges?.added?.length || 0) +
+      (d.scheduledBreakingChanges?.added?.length || 0) +
+      (d.newOperations?.added?.length || 0) +
+      (d.newModels?.added?.length || 0) +
+      (d.modelChanges?.added?.length || 0);
+  }
+  
+  if (filteredResults) {
+    // First filter out unchanged (case-insensitive)
+    filteredResults = filteredResults.filter((r) => r.type?.toLowerCase() !== "unchanged");
+    
+    // Apply path filter
+    if (pathFilter) {
+      const filterPath = pathFilter.toLowerCase();
+      filteredResults = filteredResults.filter((r) => {
+        const path = (r.path || "").toLowerCase();
+        return path.includes(filterPath);
+      });
+    }
+    
+    // Apply type filter (case-insensitive)
+    if (activeFilter && activeFilter !== "all") {
+      const BREAKING_TYPES = ["removed", "type-change", "renamed", "moved"];
+      if (activeFilter === "breaking") {
+        filteredResults = filteredResults.filter((r) => BREAKING_TYPES.includes(r.type?.toLowerCase()));
+      } else {
+        filteredResults = filteredResults.filter((r) => r.type?.toLowerCase() === activeFilter);
+      }
+    }
+  }
 
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 768);
@@ -146,7 +200,29 @@ export default function DiffViewer() {
     }
   };
 
-  const handleLoadSpecs = async (v1, v2, label) => {
+  const handleLoadSpecs = async (v1, v2, label, extra) => {
+    // Handle release notes or spec diff with release notes
+    if (extra?.type === "releaseNotes" || extra?.type === "specDiff") {
+      setBefore("");
+      setAfter("");
+      setResults(null);
+      setGuide(null);
+      setError(null);
+      setActiveFilter("all");
+      setActiveTab("compare");
+      setResolving(false);
+      
+      const releaseNotesResult = {
+        type: extra.type,
+        label,
+        diff: extra.diff,
+        stats: extra.stats,
+        isEmpty: false,
+      };
+      setResults([releaseNotesResult]);
+      return;
+    }
+
     // Keep the current editor content visible under the spinner. Previously we
     // called setBefore("")/setAfter("") here to avoid re-rendering a large
     // textarea, but that showed a blank window under the spinner during the
@@ -232,11 +308,15 @@ export default function DiffViewer() {
   const scrollToPath = useCallback((textarea, pathStr) => {
     if (!textarea || !pathStr) return -1;
     const lines = textarea.value.split("\n");
-    let remaining = pathStr;
-    let targetLine = -1;
-    let expectedIndent = -1;
-
-    for (let i = 0; i < lines.length && remaining.length > 0; i++) {
+    
+    // Normalize: remove "paths." prefix if present
+    const normalizedPath = pathStr.replace(/^paths\./, '').replace(/^paths$/, '');
+    
+    // For OpenAPI paths, find the most specific match (deepest key)
+    // that matches our path segments in order
+    let bestMatch = { line: -1, indent: -1, matchedParts: 0 };
+    
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const indent = line.search(/\S/);
       if (indent === -1) continue;
@@ -245,22 +325,21 @@ export default function DiffViewer() {
       if (!keyMatch) continue;
 
       const key = keyMatch[1];
-
-      // Check if the remaining path starts with this key
-      if (remaining === key || remaining.startsWith(key + ".")) {
-        if (targetLine === -1 || indent > expectedIndent) {
-          expectedIndent = indent;
-          targetLine = i;
-          // Consume this key from the remaining path
-          if (remaining === key) {
-            remaining = "";
-          } else {
-            remaining = remaining.slice(key.length + 1); // +1 for the dot
-          }
+      
+      // Check if this key is part of our path
+      // For paths like "/api/snapshots/{id}/aliases", the key in JSON is the full path
+      if (normalizedPath.includes(key) || key.includes(normalizedPath) || 
+          (normalizedPath.includes('/') && key.includes(normalizedPath.split('/').join('')))) {
+        // Found a match - prefer deeper (more specific) matches
+        // Higher indent = deeper in the JSON structure
+        if (indent > bestMatch.indent) {
+          bestMatch = { line: i, indent: indent, matchedParts: 1 };
         }
       }
     }
 
+    const targetLine = bestMatch.line;
+    
     if (targetLine >= 0) {
       // Use computed CSS line-height — scrollHeight/totalLines is an average that
       // breaks whenever the textarea wraps long lines. Include paddingTop so line 0
@@ -350,6 +429,16 @@ export default function DiffViewer() {
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Changeset spec link */}
+              <Link
+                to="/changeset-spec"
+                aria-label="Changeset spec"
+                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard inline-flex items-center"
+                title="API Changeset specification"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+              </Link>
+
               {/* Settings link */}
               <Link
                 to="/settings"
@@ -445,7 +534,15 @@ export default function DiffViewer() {
       <div className="flex flex-1 overflow-hidden">
         <IntegrationList
           selected={selectedIntegration}
-          onSelect={setSelectedIntegration}
+          onSelect={(integration) => {
+            setSelectedIntegration(integration);
+            if (integration) {
+              navigate(`/${integration.slug}`, { replace: true });
+            } else {
+              navigate("/", { replace: true });
+            }
+          }}
+          initialSlug={integrationSlug}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
@@ -481,7 +578,12 @@ export default function DiffViewer() {
                   <IntegrationHeader
                     integration={selectedIntegration}
                     onLoadSpecs={handleLoadSpecs}
-                    onClear={() => setSelectedIntegration(null)}
+                    onClear={function() { 
+                      console.log("Clear button clicked!"); 
+                      const url = new URL(window.location.href);
+                      url.search = "";
+                      window.location.href = url.pathname;
+                    }}
                     onProgress={setFetchStages}
                   />
                 )}
@@ -543,11 +645,22 @@ export default function DiffViewer() {
                     className="space-y-6"
                   >
                     <h2 className="text-base sm:text-lg font-bold text-stone-800">
-                      {summaryCounts ? summaryCounts.breaking : results.filter((r) => r.type !== "unchanged").length} changes detected
+                      {isReleaseNotes ? releaseNotesChangeCount : (filteredResults ? filteredResults.length : 0)} changes detected
+                      {pathFilter && <span className="ml-2 text-sm font-normal text-stone-500">filtered by: {pathFilter}</span>}
                     </h2>
 
+                    <div className="mb-3">
+                      <input
+                        type="text"
+                        value={pathFilter}
+                        onChange={(e) => setPathFilter(e.target.value)}
+                        placeholder="Filter by path (e.g. /users, /api/v1)"
+                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-md bg-stone-50 font-mono"
+                      />
+                    </div>
+
                     <DiffResults
-                      results={results}
+                      results={filteredResults}
                       summaryCounts={summaryCounts}
                       activeFilter={activeFilter}
                       onFilterChange={setActiveFilter}

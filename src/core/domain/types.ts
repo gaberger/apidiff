@@ -106,3 +106,35 @@ export interface ResolvedSpec {
     readonly version: string;
   };
 }
+
+export interface IntegrationVersion {
+  readonly label: string;
+  readonly url: string;
+}
+
+export interface IntegrationComparison {
+  readonly label: string;
+  readonly v1_url: string;
+  readonly v2_url: string;
+}
+
+export interface Integration {
+  readonly id: string;
+  readonly name: string;
+  readonly slug?: string;
+  readonly category?: string;
+  readonly color?: string;
+  readonly logo_url?: string;
+  readonly base_url?: string;
+  readonly changelog_url?: string;
+  readonly versions?: ReadonlyArray<IntegrationVersion>;
+  readonly comparisons?: ReadonlyArray<IntegrationComparison>;
+}
+
+export type IntegrationDraft = Omit<Integration, "id">;
+
+export interface ProxyFetchResult {
+  readonly document: unknown;
+  readonly contentType?: string;
+  readonly status: number;
+}

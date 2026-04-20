@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { base44 } from "@/api/base44Client";
+import { integrationStore } from "@/lib/integration-store";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Save, ChevronDown, ChevronUp } from "lucide-react";
@@ -70,7 +70,7 @@ export default function Settings() {
   }, [integrations]);
 
   useEffect(() => {
-    base44.entities.Integration.list().then((items) => {
+    integrationStore.list().then((items) => {
       // base44 returns either [{id, data:{...fields}}] or [{id, ...fields}] depending on
       // the entity version — flatten so the card fields read predictably.
       setIntegrations(
@@ -96,7 +96,7 @@ export default function Settings() {
     // them to a real base44 entity (strip the `registry:` id + the marker).
     if (!integration.id || isRegistryId(integration.id)) {
       const { id: _ignored, __source: _src, ...payload } = integration;
-      const created = await base44.entities.Integration.create(payload);
+      const created = await integrationStore.create(payload);
       setIntegrations((prev) => {
         // If the registry-sourced record was edited in-place, replace its synthetic
         // row; otherwise append. mergedIntegrations will dedupe by slug anyway.
@@ -105,7 +105,7 @@ export default function Settings() {
       });
       if (!integration.id) setNewIntegration(null);
     } else {
-      const updated = await base44.entities.Integration.update(integration.id, integration);
+      const updated = await integrationStore.update(integration.id, integration);
       setIntegrations((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
     }
     setSaving(null);
@@ -118,7 +118,7 @@ export default function Settings() {
       setIntegrations((prev) => prev.filter((i) => i.id !== id));
       return;
     }
-    await base44.entities.Integration.delete(id);
+    await integrationStore.delete(id);
     setIntegrations((prev) => prev.filter((i) => i.id !== id));
   }
 

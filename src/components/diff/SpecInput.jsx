@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, X, Globe, Loader2 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { specProxy } from "@/lib/spec-proxy";
 import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 
 /**
@@ -304,12 +304,11 @@ const SpecInputRaw = React.memo(function SpecInput({
     setIsFetching(true);
 
     try {
-      const res = await base44.functions.invoke('proxyFetch', { url });
-      const data = res.data;
-      if (data.error) throw new Error(data.error);
-      onChange(JSON.stringify(data.document, null, 2));
+      const res = await specProxy.fetch(url);
+      const doc = res.document;
+      onChange(typeof doc === "string" ? doc : JSON.stringify(doc, null, 2));
     } catch (ex) {
-      setError("Fetch failed: " + (ex.response?.data?.error || ex.message));
+      setError("Fetch failed: " + ex.message);
     } finally {
       setIsFetching(false);
     }

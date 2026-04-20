@@ -13,7 +13,11 @@ import { GitHubDiscoveryAdapter } from "./adapters/secondary/github-discovery-ad
 import { ApisGuruDiscoveryAdapter } from "./adapters/secondary/apisguru-discovery-adapter.js";
 import { UrlDiscoveryAdapter } from "./adapters/secondary/url-discovery-adapter.js";
 import { DocusaurusDiscoveryAdapter } from "./adapters/secondary/docusaurus-discovery-adapter.js";
-import type { ApiDiscoveryPort } from "./core/ports/index.js";
+import { LocalStorageIntegrationAdapter } from "./adapters/secondary/localstorage-integration-adapter.js";
+import { BrowserProxyAdapter } from "./adapters/secondary/browser-proxy-adapter.js";
+import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
+import { DiscoveryService } from "./core/usecases/discovery-service.js";
+import type { ApiDiscoveryPort, IntegrationStoragePort, SpecProxyPort } from "./core/ports/index.js";
 import type { SpecSource } from "./core/domain/discovery-types.js";
 
 export function createCliApp() {
@@ -41,6 +45,34 @@ export function createWebApp() {
   );
 
   return { responseDiffService, webAdapter, specInput };
+}
+
+/**
+ * Browser-only wiring. Called once at module-init from the React bridge
+ * (src/lib/useIntegrationStore.js). Safe to import into JSX/TSX bundles:
+ * contains no Node-specific imports.
+ */
+export function createBrowserStores(): {
+  integrationStore: IntegrationStoragePort;
+  specProxy: SpecProxyPort;
+  discoveryService: DiscoveryService;
+} {
+  const integrationStore = new LocalStorageIntegrationAdapter();
+  const specProxy = new BrowserProxyAdapter();
+
+  // Browser-safe discovery adapters. No GitHub token — the client bundle
+  // must not ship credentials; 60 req/hr unauthenticated is sufficient for
+  // user-initiated discovery. Node-only adapters stay out of this wiring.
+  const discoveryAdapters: ApiDiscoveryPort[] = [
+    new GitHubDiscoveryAdapter(undefined),
+    new ApisGuruDiscoveryAdapter(),
+    new UrlDiscoveryAdapter(),
+    new DocusaurusDiscoveryAdapter(),
+  ];
+  const changelogParser = new ChangelogParserAdapter();
+  const discoveryService = new DiscoveryService(discoveryAdapters, changelogParser);
+
+  return { integrationStore, specProxy, discoveryService };
 }
 
 /** Registry of discovery adapters keyed by the SpecSource kind they handle. */

@@ -1,41 +1,65 @@
-import base44 from "@base44/vite-plugin";
 import react from "@vitejs/plugin-react";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import path from "path";
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "");
-
+export default defineConfig(() => {
   return {
     logLevel: "error",
     plugins: [
-      base44({
-        legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === "true",
-        hmrNotifier: true,
-        navigationNotifier: true,
-        analyticsTracker: true,
-        visualEditAgent: true,
-      }),
       react(),
-      // Inject api_key header into all /api proxy requests for dev auth.
-      // Runs server-side in the Vite dev middleware only — the key is read
-      // via loadEnv (NOT import.meta.env), so it never ends up in the
-      // client bundle. In production this middleware is inactive and auth
-      // is expected to flow through the session-exchange endpoint tracked
-      // by wp-security-client-api-key-remediation.
-      ...(env.BASE44_API_KEY
-        ? [
-            {
-              name: "base44-api-key-injector",
-              configureServer(server: import("vite").ViteDevServer) {
-                server.middlewares.use("/api", (req, _res, next) => {
-                  req.headers["api_key"] = env.BASE44_API_KEY;
-                  next();
-                });
-              },
-            },
-          ]
-        : []),
+      // Dev-mode mirror of the /api/proxy-fetch Vercel Function.
+      // In production Vercel serves the handler from api/proxy-fetch.ts;
+      // in `vite dev` we inline the same logic here so CORS-restricted spec
+      // URLs resolve against the local dev server.
+      {
+        name: "apidiff-proxy-fetch-dev",
+        configureServer(server: import("vite").ViteDevServer) {
+          server.middlewares.use("/api/proxy-fetch", async (req, res) => {
+            try {
+              const host = req.headers.host ?? "localhost";
+              const fullUrl = new URL(req.url ?? "", `http://${host}`);
+              const target = fullUrl.searchParams.get("url");
+              if (!target) {
+                res.statusCode = 400;
+                res.setHeader("content-type", "application/json");
+                res.end(JSON.stringify({ error: "missing url query parameter" }));
+                return;
+              }
+              let parsed: URL;
+              try { parsed = new URL(target); } catch {
+                res.statusCode = 400;
+                res.setHeader("content-type", "application/json");
+                res.end(JSON.stringify({ error: "invalid url" }));
+                return;
+              }
+              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+                res.statusCode = 400;
+                res.setHeader("content-type", "application/json");
+                res.end(JSON.stringify({ error: "only http/https urls are allowed" }));
+                return;
+              }
+              const upstream = await fetch(parsed.toString(), { redirect: "follow" });
+              const contentType = upstream.headers.get("content-type") ?? undefined;
+              const raw = await upstream.text();
+              const looksJson = (contentType ?? "").toLowerCase().includes("json")
+                || raw.trimStart().startsWith("{")
+                || raw.trimStart().startsWith("[");
+              let document: unknown = raw;
+              if (looksJson) {
+                try { document = JSON.parse(raw); } catch { /* keep as string */ }
+              }
+              res.statusCode = 200;
+              res.setHeader("content-type", "application/json");
+              res.end(JSON.stringify({ document, contentType, status: upstream.status }));
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : "unknown fetch error";
+              res.statusCode = 502;
+              res.setHeader("content-type", "application/json");
+              res.end(JSON.stringify({ error: `upstream fetch failed: ${msg}` }));
+            }
+          });
+        },
+      },
     ],
     resolve: {
       alias: {
@@ -45,12 +69,6 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
-      proxy: {
-        "/api": {
-          target: "http://localhost:4747",
-          changeOrigin: true,
-        },
-      },
     },
     worker: {
       format: "es",
