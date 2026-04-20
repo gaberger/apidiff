@@ -63,6 +63,35 @@ function humanReadableList(affectedOps) {
   return affectedOps.map(humanReadable);
 }
 
+// Shorten "26.3.0" -> "26.3" to match docs.fwd.app section URLs.
+function shortVersion(v) {
+  if (!v) return v;
+  const m = String(v).match(/^(\d+\.\d+)(?:\.\d+)?$/);
+  return m ? m[1] : v;
+}
+
+// "Network Collection" -> "network-collection".
+// Preserves the slug exactly as docs.fwd.app exposes it for section specs.
+function sectionSlug(area) {
+  if (!area) return undefined;
+  return area
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || undefined;
+}
+
+function sourceUrls(toRelease, area, ticket) {
+  const slug = sectionSlug(area);
+  const ver = shortVersion(toRelease);
+  if (!slug || !ver) return undefined;
+  const base = `https://docs.fwd.app/${ver}/api`;
+  return {
+    specUrl: `${base}/spec/${slug}.json`,
+    ...(ticket ? { docsUrl: `${base}/${slug}/${ticket}` } : {}),
+  };
+}
+
 function extractSunsetVersion(description) {
   const m = description?.match(SUNSET_RE);
   return m ? m[1] : undefined;
@@ -105,6 +134,12 @@ function buildChange({ item, op, target, severity, breaking, bucket, seq, toRele
   // radius + operation labels without resolving JSON Pointers.
   if (affectedPointers) change.affectedOperations = affectedPointers;
   if (humanOps) change.humanReadable = humanOps;
+
+  // Jump-to-spec shortcuts derived from the area/ticket/release. Lets
+  // a reader open the per-section OpenAPI file or the ticket's docs page
+  // without leaving the changeset.
+  const source = sourceUrls(toRelease, item.area, item.title);
+  if (source) change.source = source;
 
   if (breaking) {
     change.migration = {

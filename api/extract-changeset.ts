@@ -58,6 +58,13 @@ const Change = z.object({
   // Human-friendly labels for affectedOperations (and for at/from/to when
   // they resolve to paths). Array indexes line up with affectedOperations.
   humanReadable: z.array(z.string()).optional(),
+  // Jump-to-spec shortcuts: the raw per-section OpenAPI file plus the
+  // ticket's docs page. Populated by the caller, not the model — ignored
+  // if the model fabricates URLs.
+  source: z.object({
+    specUrl: z.string().url().optional(),
+    docsUrl: z.string().url().optional(),
+  }).optional(),
   tags: z.array(z.string()).optional(),
   lifecycle: z.object({
     deprecated_date: z.string().optional(),
@@ -225,6 +232,40 @@ function collectTitles(diff: unknown): Set<string> {
   return out;
 }
 
+function collectAreas(diff: unknown): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!diff || typeof diff !== "object") return out;
+  const d = diff as Record<string, { added?: Array<{ title?: string; area?: string }>; removed?: Array<{ title?: string; area?: string }> }>;
+  for (const k of ["breakingChanges", "scheduledBreakingChanges", "newOperations", "newModels", "modelChanges"]) {
+    for (const it of [...(d[k]?.added ?? []), ...(d[k]?.removed ?? [])]) {
+      if (it?.title && it?.area && !out.has(it.title)) out.set(it.title, it.area);
+    }
+  }
+  return out;
+}
+
+function shortVersion(v: string | undefined): string | undefined {
+  if (!v) return undefined;
+  const m = v.match(/^(\d+\.\d+)(?:\.\d+)?$/);
+  return m ? m[1] : v;
+}
+
+function sectionSlug(area: string | undefined): string | undefined {
+  if (!area) return undefined;
+  const slug = area.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || undefined;
+}
+
+function deriveSource(toRelease: string | undefined, area: string | undefined, ticket: string | undefined) {
+  const slug = sectionSlug(area);
+  const ver = shortVersion(toRelease);
+  if (!slug || !ver) return undefined;
+  const base = `https://docs.fwd.app/${ver}/api`;
+  const out: { specUrl: string; docsUrl?: string } = { specUrl: `${base}/spec/${slug}.json` };
+  if (ticket) out.docsUrl = `${base}/${slug}/${ticket}`;
+  return out;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
 
@@ -307,11 +348,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // "FWD-49532-schema" when one ticket affects multiple schemas; the
     // correct move is a pointer array, not a new entry.
     const realTitles = collectTitles(diff);
+    const areas = collectAreas(diff);
+    const toRelease = (diff as { to?: string })?.to;
     const invented: string[] = [];
     const changes = validated.data.changes.map((c) => {
       const at = Array.isArray(c.at) ? c.at[0] : c.at;
       if (!realTitles.has(c.id)) invented.push(c.id);
-      return { ...c, at };
+      // Server-derived source URLs (bypass model hallucination risk).
+      const source = deriveSource(toRelease, areas.get(c.id), c.id);
+      return { ...c, at, ...(source ? { source } : {}) };
     });
 
     if (invented.length > 0) {
