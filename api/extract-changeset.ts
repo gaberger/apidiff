@@ -7,7 +7,7 @@
 // on claude-sonnet-4.6 because the model no longer has to parse DOM.
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { generateObject } from "ai";
+import { generateText } from "ai";
 import { z } from "zod";
 
 const OP = z.enum([
@@ -161,24 +161,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log(`[extract-changeset] items=${itemCount} bytes=${diffJson.length} -> gateway`);
 
   try {
-    const { object } = await generateObject({
+    const { text, usage } = await generateText({
       model: "anthropic/claude-sonnet-4.6",
-      schema: Changeset,
       abortSignal: AbortSignal.timeout(90_000),
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT + `\n\nOutput format: return a single JSON object conforming to the v0.2 Changeset shape. No markdown fences, no commentary — just the JSON.`,
       prompt:
         `API name: ${apiName}\n` +
         `Release date: ${released || "(unknown)"}\n\n` +
         `Pre-parsed release-notes diff:\n\n${diffJson}\n\n` +
-        `Emit a Changeset v0.2 document. api.from.version = "${diff.from}", ` +
+        `Emit a Changeset v0.2 document as JSON. api.from.version = "${diff.from}", ` +
         `api.to.version = "${diff.to}", released = "${released || ""}". ` +
-        `One change entry per ticket. Return {} with empty changes if no items.`,
+        `One change entry per ticket. Empty changes array if no items.`,
     });
-    console.log(`[extract-changeset] OK changes=${object.changes.length} t+${Date.now() - t0}ms`);
-    res.status(200).json(object);
+    console.log(`[extract-changeset] text ${text.length} chars, usage=${JSON.stringify(usage)} t+${Date.now() - t0}ms`);
+
+    // Extract JSON from the response. Accept either raw JSON or JSON wrapped
+    // in ```json fences, since some runs may add them despite the prompt.
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonText = (fenced ? fenced[1] : text).trim();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (parseErr) {
+      res.status(502).json({
+        error: "Model returned non-JSON output",
+        sample: text.slice(0, 400),
+      });
+      return;
+    }
+
+    const validated = Changeset.safeParse(parsed);
+    if (!validated.success) {
+      res.status(502).json({
+        error: "Model output failed v0.2 schema validation",
+        issues: validated.error.issues.slice(0, 5),
+        sample: jsonText.slice(0, 400),
+      });
+      return;
+    }
+
+    res.status(200).json(validated.data);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[extract-changeset] generateObject threw: ${msg}`);
+    console.error(`[extract-changeset] generateText threw: ${msg}`);
     res.status(500).json({ error: `AI extraction failed: ${msg}` });
   }
 }
