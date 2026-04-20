@@ -190,6 +190,7 @@ export const PROVIDER_REGISTRY: readonly ApiProvider[] = [
     slug: "forward-networks",
     category: "infrastructure",
     specSource: { kind: "docusaurus", baseUrl: "https://docs.fwd.app" },
+    changelogUrl: "https://docs.fwd.app/release-notes/api",
     docsUrl: "https://docs.fwd.app/latest/api/",
   },
 ] as const;
