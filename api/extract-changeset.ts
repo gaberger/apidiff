@@ -175,9 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const { object } = await generateObject({
-      model: "anthropic/claude-sonnet-4-6",
+      model: "anthropic/claude-haiku-4-5",
       schema: Changeset,
-      abortSignal: AbortSignal.timeout(90_000),
+      abortSignal: AbortSignal.timeout(120_000),
       system: SYSTEM_PROMPT,
       prompt:
         `API name: ${apiName}\n` +
