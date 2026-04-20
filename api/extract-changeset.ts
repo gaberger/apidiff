@@ -2,15 +2,10 @@
 //
 // Accepts { year, version } and returns a Changeset v0.2 document derived
 // from the Forward Networks release-notes page for that version. Uses
-// Vercel AI Gateway with Anthropic Claude and structured output via the
-// AI SDK's generateObject. Auth: automatic OIDC when deployed to Vercel;
-// no API key to manage.
-//
-// Why this exists alongside the regex/balanced-parser generator:
-// release-note phrasing often describes schema field renames, format
-// tightenings, and sunset dates in prose that a deterministic parser
-// cannot safely classify. An LLM with a schema-constrained output is
-// the right tool for that classification step.
+// Vercel AI Gateway with Anthropic Claude via structured output.
+// Requires AI_GATEWAY_API_KEY in the Vercel project env (the SDK picks
+// it up automatically and routes "anthropic/..." strings through the
+// gateway).
 
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -174,8 +169,11 @@ export default async function handler(req: Request): Promise<Response> {
   const excerpt = stripBoilerplate(html);
 
   try {
+    if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
+      return json({ error: "AI_GATEWAY_API_KEY is not set in the deployment environment" }, 500);
+    }
     const { object } = await generateObject({
-      model: "anthropic/claude-sonnet-4-latest",
+      model: "anthropic/claude-sonnet-4-5",
       schema: Changeset,
       system: SYSTEM_PROMPT,
       prompt:
