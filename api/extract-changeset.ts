@@ -173,8 +173,9 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ error: "AI_GATEWAY_API_KEY is not set in the deployment environment" }, 500);
     }
     const { object } = await generateObject({
-      model: "anthropic/claude-sonnet-4-5",
+      model: "anthropic/claude-sonnet-4-6",
       schema: Changeset,
+      abortSignal: AbortSignal.timeout(90_000),
       system: SYSTEM_PROMPT,
       prompt:
         `API name: ${apiName}\n` +
