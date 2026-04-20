@@ -2,8 +2,24 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { schemaCache, schemaUrlRegistry } from "@/lib/browser-stores";
+import { schemaCache, schemaUrlRegistry, integrationStore } from "@/lib/browser-stores";
+import { PROVIDER_REGISTRY } from "@/lib/domain/provider-registry.js";
 import DiscoveryPanel from "@/components/settings/DiscoveryPanel";
+
+function hostnameOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
+}
+
+// Map a hostname back to a registry provider (e.g. docs.fwd.app → forward-networks)
+// so the created Integration keeps the curated slug + category the sidebar expects.
+function matchRegistry(hostname) {
+  if (!hostname) return null;
+  return PROVIDER_REGISTRY.find((p) => {
+    if (p.specSource.kind === "docusaurus") return hostnameOf(p.specSource.baseUrl) === hostname;
+    if (p.specSource.kind === "url") return p.specSource.specUrls.some((u) => hostnameOf(u.url) === hostname);
+    return false;
+  }) || null;
+}
 
 function formatBytes(n) {
   if (!n) return "0 B";
@@ -51,6 +67,35 @@ export default function Discovery() {
     }
   }
 
+  async function handleAddDiscovered(pairs, versions) {
+    try {
+      const firstUrl = versions?.[0]?.url || pairs?.[0]?.v1_url;
+      const host = hostnameOf(firstUrl);
+      const match = matchRegistry(host);
+      const draft = {
+        name: match?.name || host || "Discovered API",
+        slug: match?.slug || host.replace(/\./g, "-"),
+        category: match?.category,
+        color: "#635BFF",
+        versions: (versions || []).map((v) => ({ label: v.label, url: v.url })),
+        comparisons: (pairs || []).map((p) => ({ label: p.label, v1_url: p.v1_url, v2_url: p.v2_url })),
+      };
+      const existing = await integrationStore.list();
+      const dupe = existing.find((i) => {
+        const d = i.data || i;
+        return d.slug && d.slug === draft.slug;
+      });
+      if (dupe) {
+        setError(`"${draft.name}" is already in the integration list. Edit it from Settings instead.`);
+        return;
+      }
+      await integrationStore.create(draft);
+      window.location.reload();
+    } catch (e) {
+      setError(e?.message || "Failed to add discovered integration");
+    }
+  }
+
   async function handlePurge() {
     if (!window.confirm("Clear the entire schema cache? Fetched specs will be re-downloaded on next use.")) return;
     try {
@@ -90,7 +135,7 @@ export default function Discovery() {
 
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold mb-3 text-slate-900 dark:text-slate-50">Run discovery</h2>
-          <DiscoveryPanel onAddComparisons={() => { /* no-op: /settings owns the comparison-creation flow */ }} />
+          <DiscoveryPanel onAddComparisons={handleAddDiscovered} />
         </section>
 
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-4 mb-6">
