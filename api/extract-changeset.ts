@@ -1,12 +1,13 @@
-// AI-powered Changeset extractor (Vercel Function, Node.js runtime).
+// AI-powered Changeset extractor (Vercel Function, Node runtime).
 //
-// Accepts { year, version } and returns a Changeset v0.2 document derived
-// from the Forward Networks release-notes page for that version. Uses
-// Vercel AI Gateway with Anthropic Claude via structured output.
-// Requires AI_GATEWAY_API_KEY in the Vercel project env (the SDK picks
-// it up automatically and routes "anthropic/..." strings through the
-// gateway).
+// Accepts { year, version, fromVersion, apiName } via POST and returns a
+// Changeset v0.2 document derived from the Forward Networks release-notes
+// page for the target version. Uses Vercel AI Gateway with Anthropic Claude
+// via the AI SDK's generateObject for structured output. Requires
+// AI_GATEWAY_API_KEY in the deployment env (the SDK picks it up
+// automatically and routes "anthropic/..." strings through the gateway).
 
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { generateObject } from "ai";
 import { z } from "zod";
 
@@ -29,10 +30,9 @@ const TARGET = z.enum([
 const SEVERITY = z.enum(["info", "notice", "breaking"]);
 
 const Pointer = z.string().describe(
-  "RFC 6901 JSON Pointer into the OpenAPI spec, e.g. '#/paths/~1api~1orders/post' " +
-  "or '#/components/schemas/Order'. Use '~1' to escape '/' and '~0' to escape '~'. " +
-  "Prefer real spec paths when the release note cites one. Only use " +
-  "'#/changelog/<bucket>/<FWD-ticket>' when the note gives no resolvable path.",
+  "RFC 6901 JSON Pointer into the OpenAPI spec, e.g. '#/paths/~1api~1orders/post'. " +
+  "Escape '/' as '~1' and '~' as '~0'. Prefer real spec paths when the note cites " +
+  "one; fall back to '#/changelog/<bucket>/<ticket-id>' when no path is resolvable.",
 );
 
 const Change = z.object({
@@ -41,7 +41,7 @@ const Change = z.object({
   target: TARGET,
   severity: SEVERITY,
   breaking: z.boolean().optional(),
-  detectable: z.boolean().optional().describe("False for semantic-family ops that can't be diffed from OpenAPI documents."),
+  detectable: z.boolean().optional(),
   description: z.string(),
   rationale: z.string().optional(),
   from: z.union([Pointer, z.array(Pointer)]).optional(),
@@ -67,7 +67,7 @@ const Changeset = z.object({
     from: z.object({ version: z.string() }),
     to:   z.object({ version: z.string() }),
   }),
-  released: z.string().optional().describe("Release date in YYYY-MM-DD from the release-notes page."),
+  released: z.string().optional(),
   summary: z.string().optional(),
   changes: z.array(Change),
 });
@@ -101,98 +101,79 @@ Mapping guidance for release-note sections:
 
 Extraction rules:
 1. Every release-note bullet with an FWD-XXXXX ticket becomes ONE change entry.
-2. id = the FWD ticket ID verbatim (e.g. "FWD-50059").
-3. description = the human-readable body of the bullet, including any quoted field names.
-4. When the bullet lists one or more "METHOD /path" lines, emit RFC 6901 pointers
-   like "#/paths/~1api~1collector-tasks/post". Multiple paths -> array.
-5. When the bullet names a schema or field, emit "#/components/schemas/<Name>" or
-   "#/components/schemas/<Name>/properties/<field>". Best-effort; if you can't
-   construct a real pointer, fall back to "#/changelog/<bucket>/<ticket-id>".
-6. Parse sunset phrases like "will be removed in release 26.6" into lifecycle.reason
-   (e.g. "Scheduled for removal in release 26.6").
-7. tags[] should include the release-note category (new-operation, model-change,
-   scheduled-deprecation, ...) plus the area/product name (lowercase, dash-separated).
-8. For breaking=true items, migration.client_action must be set to actionable
-   guidance for consumers.
-9. Return a complete Changeset document with changeset_version "0.2" and the
-   api.from/api.to block populated from the caller-supplied versions.`;
-
-async function fetchReleaseNotes(year: number, version: string): Promise<{ html: string; released?: string }> {
-  const url = `https://docs.fwd.app/release-notes/api/${year}/release.${version}/`;
-  const res = await fetch(url, { redirect: "follow" });
-  if (!res.ok) throw new Error(`Upstream ${res.status} fetching ${url}`);
-  const html = await res.text();
-  const m = html.match(/Released:\s*(\d{4}-\d{2}-\d{2})/);
-  return { html, released: m ? m[1] : undefined };
-}
+2. id = the FWD ticket ID verbatim.
+3. description = the human-readable body, including any quoted field names.
+4. When the bullet lists "METHOD /path" lines, emit RFC 6901 pointers like
+   "#/paths/~1api~1collector-tasks/post". Multiple paths -> array.
+5. When the bullet names a schema or field, emit
+   "#/components/schemas/<Name>" or "#/components/schemas/<Name>/properties/<field>".
+   Best-effort; fall back to "#/changelog/<bucket>/<ticket-id>" when unsure.
+6. Parse sunset phrases like "will be removed in release 26.6" into lifecycle.reason.
+7. tags[] should include the release-note category plus the product area
+   (lowercase, dash-separated).
+8. For breaking=true items, migration.client_action must be set.
+9. Return a Changeset document with changeset_version "0.2" and api.from/to
+   populated from the caller-supplied versions.`;
 
 function stripBoilerplate(html: string): string {
-  // Keep only the <article> contents if present, then strip scripts/styles.
   const article = html.match(/<article[\s\S]*?<\/article>/i);
   let body = article ? article[0] : html;
   body = body.replace(/<script[\s\S]*?<\/script>/gi, "");
   body = body.replace(/<style[\s\S]*?<\/style>/gi, "");
   body = body.replace(/<svg[\s\S]*?<\/svg>/gi, "");
-  // Collapse aggressive whitespace to cut tokens.
   return body.replace(/\s+/g, " ").trim();
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
-
-export default async function handler(req: Request): Promise<Response> {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
-  console.log("[extract-changeset] start", req.method, req.url);
-  // Diagnostic path — no AI, no fetch. Proves module loaded + handler reached.
-  if (new URL(req.url).searchParams.has("ping")) {
-    return json({
+
+  // Diagnostic ping — no AI, no upstream fetch.
+  if (typeof req.query.ping !== "undefined") {
+    res.status(200).json({
       ok: true,
       method: req.method,
-      env: {
-        AI_GATEWAY_API_KEY: !!process.env.AI_GATEWAY_API_KEY,
-        VERCEL_OIDC_TOKEN: !!process.env.VERCEL_OIDC_TOKEN,
-        VERCEL_ENV: process.env.VERCEL_ENV,
-      },
+      env: { AI_GATEWAY_API_KEY: !!process.env.AI_GATEWAY_API_KEY },
       t: Date.now() - t0,
     });
+    return;
   }
-  if (req.method !== "POST") return json({ error: "POST required" }, 405);
-  let input: { year?: number; version?: string; fromVersion?: string; apiName?: string; debug?: boolean };
-  try {
-    input = await req.json();
-  } catch {
-    return json({ error: "invalid JSON body" }, 400);
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "POST required" });
+    return;
   }
-  const { year, version, fromVersion, apiName = "Forward Networks API", debug } = input;
-  if (!year || !version) return json({ error: "year and version are required" }, 400);
-  console.log(`[extract-changeset] input year=${year} version=${version} from=${fromVersion} debug=${!!debug}`);
-  console.log(`[extract-changeset] env AI_GATEWAY_API_KEY=${process.env.AI_GATEWAY_API_KEY ? "set" : "UNSET"} VERCEL_OIDC_TOKEN=${process.env.VERCEL_OIDC_TOKEN ? "set" : "UNSET"}`);
+
+  const { year, version, fromVersion, apiName = "Forward Networks API" } = (req.body ?? {}) as {
+    year?: number; version?: string; fromVersion?: string; apiName?: string;
+  };
+  if (!year || !version) {
+    res.status(400).json({ error: "year and version are required" });
+    return;
+  }
+
+  if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
+    res.status(500).json({ error: "AI_GATEWAY_API_KEY is not set in the deployment environment" });
+    return;
+  }
 
   let html: string;
   let released: string | undefined;
   try {
-    ({ html, released } = await fetchReleaseNotes(year, version));
+    const url = `https://docs.fwd.app/release-notes/api/${year}/release.${version}/`;
+    const upstream = await fetch(url, { redirect: "follow" });
+    if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
+    html = await upstream.text();
+    const m = html.match(/Released:\s*(\d{4}-\d{2}-\d{2})/);
+    released = m ? m[1] : undefined;
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return json({ error: `release-notes fetch failed: ${msg}` }, 502);
+    res.status(502).json({ error: `release-notes fetch failed: ${e instanceof Error ? e.message : String(e)}` });
+    return;
   }
 
   const excerpt = stripBoilerplate(html);
-  console.log(`[extract-changeset] release notes fetched bytes=${html.length} excerpt=${excerpt.length} t+${Date.now() - t0}ms`);
-
-  if (debug) {
-    return json({ debug: true, excerptSample: excerpt.slice(0, 500), excerptLength: excerpt.length, released });
-  }
+  console.log(`[extract-changeset] excerpt=${excerpt.length} bytes, t+${Date.now() - t0}ms, calling generateObject...`);
 
   try {
-    if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
-      return json({ error: "AI_GATEWAY_API_KEY is not set in the deployment environment" }, 500);
-    }
-    console.log("[extract-changeset] calling generateObject...");
     const { object } = await generateObject({
       model: "anthropic/claude-sonnet-4-6",
       schema: Changeset,
@@ -204,15 +185,15 @@ export default async function handler(req: Request): Promise<Response> {
         `Target version (to): ${version}\n` +
         `Release date: ${released || "(not parsed)"}\n\n` +
         `Release-notes HTML (article only, scripts/styles stripped):\n\n${excerpt}\n\n` +
-        `Emit a Changeset v0.2 document covering every FWD-ticketed change in the notes. ` +
-        `Include the release date in the top-level "released" field. ` +
-        `If the section is empty, return an empty changes array — do NOT fabricate entries.`,
+        `Emit a Changeset v0.2 document covering every FWD-ticketed change. ` +
+        `Include the release date in "released". ` +
+        `If no changes exist, return an empty changes array — do NOT fabricate entries.`,
     });
-    console.log(`[extract-changeset] generateObject OK changes=${object?.changes?.length ?? 0} t+${Date.now() - t0}ms`);
-    return json(object);
+    console.log(`[extract-changeset] OK changes=${object.changes.length} t+${Date.now() - t0}ms`);
+    res.status(200).json(object);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[extract-changeset] generateObject threw: ${msg}`);
-    return json({ error: `AI extraction failed: ${msg}` }, 500);
+    res.status(500).json({ error: `AI extraction failed: ${msg}` });
   }
 }

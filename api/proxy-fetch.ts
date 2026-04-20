@@ -1,17 +1,9 @@
-// Vercel Function (Fluid Compute, Node.js runtime).
-// Per ADR-020: server-side URL proxy for CORS-restricted OpenAPI specs.
+// Vercel Function — server-side URL proxy for CORS-restricted OpenAPI specs.
 // Accepts GET /api/proxy-fetch?url=<encoded-url> and returns
 // { document, contentType, status } as JSON. `document` is a parsed object
 // when the upstream content-type is JSON, otherwise the raw string.
 
-export const config = { runtime: "nodejs" };
-
-function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status: init.status ?? 200,
-    headers: { "content-type": "application/json", ...(init.headers ?? {}) },
-  });
-}
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 function parseDocument(raw: string, contentType: string | null): unknown {
   const ct = (contentType ?? "").toLowerCase();
@@ -22,28 +14,34 @@ function parseDocument(raw: string, contentType: string | null): unknown {
   return raw;
 }
 
-export default async function handler(req: Request): Promise<Response> {
-  const reqUrl = new URL(req.url);
-  const target = reqUrl.searchParams.get("url");
-  if (!target) return jsonResponse({ error: "missing url query parameter" }, { status: 400 });
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const target = typeof req.query.url === "string" ? req.query.url : Array.isArray(req.query.url) ? req.query.url[0] : undefined;
+  if (!target) {
+    res.status(400).json({ error: "missing url query parameter" });
+    return;
+  }
 
   let parsed: URL;
-  try { parsed = new URL(target); } catch { return jsonResponse({ error: "invalid url" }, { status: 400 }); }
+  try { parsed = new URL(target); } catch {
+    res.status(400).json({ error: "invalid url" });
+    return;
+  }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return jsonResponse({ error: "only http/https urls are allowed" }, { status: 400 });
+    res.status(400).json({ error: "only http/https urls are allowed" });
+    return;
   }
 
   try {
     const upstream = await fetch(parsed.toString(), { redirect: "follow" });
     const contentType = upstream.headers.get("content-type") ?? undefined;
     const raw = await upstream.text();
-    return jsonResponse({
+    res.status(200).json({
       document: parseDocument(raw, contentType ?? null),
       contentType,
       status: upstream.status,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "unknown fetch error";
-    return jsonResponse({ error: `upstream fetch failed: ${msg}` }, { status: 502 });
+    res.status(502).json({ error: `upstream fetch failed: ${msg}` });
   }
 }
