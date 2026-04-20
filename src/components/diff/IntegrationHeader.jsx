@@ -1,13 +1,20 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, GitCompareArrows } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
 import { fetchSpec } from "@/lib/fetch-spec.js";
-import { prettyVersionLabel } from "@/lib/version-label.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
 
+// Pretty version label without the buggy stripping
+function prettyVersionLabel(label) {
+  if (!label) return "";
+  return String(label).trim();
+}
+
 export default function IntegrationHeader({ integration, onLoadSpecs, onClear, onProgress }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [v1Idx, setV1Idx] = useState(null);
   const [v2Idx, setV2Idx] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,9 +36,12 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
 
   // Reset product + version picks whenever the integration changes; hydrate
   // productKey from localStorage when available and still valid.
+  // Only clear version selection if no URL params exist
   useEffect(() => {
-    setV1Idx(null);
-    setV2Idx(null);
+    if (!searchParams.get("v1") && !searchParams.get("v2")) {
+      setV1Idx(null);
+      setV2Idx(null);
+    }
     if (!hasProducts) {
       setProductKey("");
       return;
@@ -42,13 +52,52 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       if (saved && groups.some((g) => (g.product?.key ?? "") === saved)) next = saved;
     } catch { /* ignore */ }
     setProductKey(next);
-  }, [integration.id, slug, hasProducts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [integration.id, slug, hasProducts, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeGroup = useMemo(() => {
     if (!hasProducts) return groups[0];
     return groups.find((g) => (g.product?.key ?? "") === productKey) ?? groups[0];
   }, [groups, productKey, hasProducts]);
   const activeVersions = activeGroup?.versions ?? [];
+
+  // Sync version selection to URL
+  useEffect(() => {
+    if (v1Idx !== null) {
+      const v1Label = versions[v1Idx]?.label;
+      const v2Label = v2Idx !== null ? versions[v2Idx]?.label : null;
+      const params = new URLSearchParams(searchParams);
+      if (v1Label) params.set("v1", v1Label);
+      if (v2Label) params.set("v2", v2Label);
+      else params.delete("v2");
+      setSearchParams(params, { replace: true });
+    }
+  }, [v1Idx, v2Idx, versions, searchParams, setSearchParams]);
+
+  // Read version selection from URL on mount
+  useEffect(() => {
+    const v1Param = searchParams.get("v1");
+    const v2Param = searchParams.get("v2");
+    if (versions.length > 0) {
+      const v1Found = v1Param ? versions.findIndex(v => v.label === v1Param) : -1;
+      const v2Found = v2Param ? versions.findIndex(v => v.label === v2Param) : -1;
+      if (v1Found >= 0) setV1Idx(v1Found);
+      if (v2Found >= 0) setV2Idx(v2Found);
+    }
+  }, [versions, searchParams]);
+
+  // Auto-fire the comparison once when both versions were restored from URL
+  // (so the URL is a self-contained shareable link). Gated by a ref so the
+  // user's subsequent picks don't re-trigger.
+  const autoLoadedRef = useRef(false);
+  useEffect(() => {
+    if (autoLoadedRef.current) return;
+    if (v1Idx === null || v2Idx === null || v1Idx === v2Idx) return;
+    if (!searchParams.get("v1") || !searchParams.get("v2")) return;
+    if (versions.length === 0) return;
+    autoLoadedRef.current = true;
+    handleCompare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v1Idx, v2Idx, versions.length]);
 
   function handleProductChange(nextKey) {
     setProductKey(nextKey);
@@ -57,14 +106,187 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
     try { window.localStorage.setItem(STORAGE_PREFIX + slug, nextKey); } catch { /* ignore */ }
   }
 
+  const isReleaseNotes = integration.isReleaseNotes;
+  const isFwdNetworks = integration.slug === "forward-networks";
+  const hasFwdReleaseNotes = isFwdNetworks && versions.some((v) => v?.diff);
+
+  // Synthesize OpenAPI spec from release notes diff
+  function synthesizeSpecFromReleaseNotes(version, prevVersion) {
+    const spec = {
+      openapi: "3.0.0",
+      info: {
+        title: `Forward Networks API ${version.label}`,
+        version: version.label,
+        description: `Release notes for version ${version.label}`
+      },
+      paths: {},
+      components: {
+        schemas: {}
+      }
+    };
+
+    if (!version.diff) return spec;
+
+    // Add new operations as path items
+    for (const op of version.diff.newOperations?.added || []) {
+      const path = `/new-operations/${op.title.toLowerCase().replace(/\s+/g, '-')}`;
+      spec.paths[path] = {
+        get: {
+          summary: op.title,
+          description: op.description,
+          operationId: op.title
+        }
+      };
+    }
+
+    // Add breaking changes as removed operations
+    for (const change of version.diff.breakingChanges?.added || []) {
+      const path = `/breaking/${change.title.toLowerCase().replace(/\s+/g, '-')}`;
+      spec.paths[path] = {
+        delete: {
+          summary: `[BREAKING] ${change.title}`,
+          description: change.description,
+          operationId: change.title
+        }
+      };
+    }
+
+    // Add new models as schemas
+    for (const model of version.diff.newModels?.added || []) {
+      spec.components.schemas[model.title] = {
+        type: "object",
+        description: model.description
+      };
+    }
+
+    // Add model changes
+    for (const change of version.diff.modelChanges?.added || []) {
+      spec.components.schemas[change.title] = {
+        type: "object",
+        description: `[MODEL CHANGE] ${change.description}`,
+        "x-change-type": "modified"
+      };
+    }
+
+    return spec;
+  }
+
+  // Known versions that have actual OpenAPI specs
+  const FWD_VERSIONS_WITH_SPECS = ["26.3", "26.2"];
+
+  // Construct URL for Forward Networks versions - try both URL patterns
+  function getFwdUrls(rawLabel) {
+    const match = rawLabel.match(/^(\d+\.\d+)/);
+    const version = match ? match[1] : rawLabel.replace(/[^\d.]/g, '');
+    // Try both URL patterns - newer versions use /api/, older use /api-doc/api/
+    return [
+      `https://docs.fwd.app/${version}/api/spec/complete.json`,
+      `https://docs.fwd.app/${version}/api-doc/api/spec/complete.json`,
+    ];
+  }
+
+  function canDiffWithSpecs(versionLabel) {
+    const match = versionLabel.match(/^(\d+\.\d+)/);
+    const version = match ? match[1] : versionLabel.replace(/[^\d.]/g, '');
+    return FWD_VERSIONS_WITH_SPECS.includes(version);
+  }
+
+  // Check if a version has actual OpenAPI specs available
+  function versionHasSpecs(label) {
+    const versionMatch = label.match(/^(\d+)\.(\d+)/);
+    if (!versionMatch) return false;
+    const versionNum = parseInt(versionMatch[1]) * 100 + parseInt(versionMatch[2]);
+    return versionNum >= 2510; // 25.10+
+  }
+
   async function handleCompare() {
+    // Handle Forward Networks - check if we should fetch actual specs or fall back to release notes
+    if (isFwdNetworks && v1Idx !== null) {
+      const v = versions[v1Idx];
+      const hasSpecs = versionHasSpecs(v.label);
+      
+      // If version has specs, fetch and diff them
+      if (hasSpecs) {
+        const urls = getFwdUrls(v.label);
+        
+        for (const url of urls) {
+          try {
+            const spec = await fetchSpec(url);
+            
+            // Fetch previous version for comparison
+            const prevIdx = v1Idx + 1;
+            let prevSpec = null;
+            if (prevIdx < versions.length) {
+              const prevV = versions[prevIdx];
+              if (versionHasSpecs(prevV.label)) {
+                const prevUrls = getFwdUrls(prevV.label);
+                for (const prevUrl of prevUrls) {
+                  try {
+                    prevSpec = await fetchSpec(prevUrl);
+                    break;
+                  } catch { /* try next URL */ }
+                }
+              }
+            }
+            
+            onLoadSpecs(prevSpec || "{}", spec, `${integration.name}: ${v.label}`, { 
+              type: "specDiff",
+              diff: v.diff || {},
+              stats: { ...v.stats, breaking: v.breaking }
+            });
+            return;
+          } catch (err) {
+            console.log("[FWD] Failed to fetch from", url, err.message);
+          }
+        }
+      }
+      
+      // Fall back to release notes if no specs available
+      if (hasFwdReleaseNotes && v.diff) {
+        if (v2Idx !== null && v2Idx !== v1Idx) {
+          // Comparing two versions via release notes
+          const v1 = versions[v1Idx];
+          const v2 = versions[v2Idx];
+          const label = `${integration.name} ${v1.label} → ${v2.label} - Release Notes Comparison`;
+          
+          onLoadSpecs({}, {}, label, { 
+            type: "releaseNotes", 
+            diff: v1.diff || {}, 
+            stats: { ...v1.stats, breaking: v1.breaking } 
+          });
+          return;
+        } else {
+          // Single version - show its release notes
+          const label = `${integration.name} ${v.label} (${v.from}) - Synthesized from Release Notes`;
+          const afterSpec = synthesizeSpecFromReleaseNotes(v, null);
+          const beforeSpec = { 
+            ...afterSpec, 
+            info: { ...afterSpec.info, title: `${integration.name} previous version` }
+          };
+          beforeSpec.paths = {};
+          beforeSpec.components.schemas = {};
+          
+          onLoadSpecs(beforeSpec, afterSpec, label, { 
+            type: "releaseNotes", 
+            diff: v.diff, 
+            stats: { ...v.stats, breaking: v.breaking } 
+          });
+          return;
+        }
+      }
+      
+      // No specs and no release notes
+      return;
+    }
+
+    // For other integrations (non-FWD), use the standard URL-based flow
     if (v1Idx === null || v2Idx === null || v1Idx === v2Idx) return;
-    const v1 = versions[v1Idx];
-    const v2 = versions[v2Idx];
+    let v1 = versions[v1Idx];
+    let v2 = versions[v2Idx];
 
     const stages = [
-      { id: "v1", label: `Fetching ${prettyVersionLabel(v1.label)}`, status: "pending", cacheHit: false },
-      { id: "v2", label: `Fetching ${prettyVersionLabel(v2.label)}`, status: "pending", cacheHit: false },
+      { id: "v1", label: `Fetching ${v1.label}`, status: "pending", cacheHit: false, url: v1.url },
+      { id: "v2", label: `Fetching ${v2.label}`, status: "pending", cacheHit: false, url: v2.url },
     ];
     const push = () => onProgress?.(stages.map((s) => ({ ...s })));
 
@@ -74,7 +296,11 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       if (evt.stage === "cache-hit") { stage.status = "complete"; stage.cacheHit = true; }
       else if (evt.stage === "fetching") { stage.status = "in-progress"; }
       else if (evt.stage === "done") { stage.status = "complete"; }
-      else if (evt.stage === "error") { stage.status = "error"; stage.error = evt.message; }
+      else if (evt.stage === "error") { 
+        stage.status = "error"; 
+        stage.message = evt.message || evt.error || "Unknown error";
+        console.log("[FETCH ERROR] Stage:", stageId, "Error:", stage.message);
+      }
       push();
     };
 
@@ -87,7 +313,11 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       onLoadSpecs(r1, r2, `${integration.name}${categoryLabel}: ${prettyVersionLabel(v1.label)} \u2192 ${prettyVersionLabel(v2.label)}`);
     } catch (err) {
       const lastActive = stages.find((s) => s.status === "in-progress");
-      if (lastActive) { lastActive.status = "error"; lastActive.error = err?.message ?? "fetch failed"; }
+      if (lastActive) { 
+        lastActive.status = "error"; 
+        lastActive.error = err?.message ?? "fetch failed"; 
+        lastActive.message = err?.message ?? "fetch failed";
+      }
       push();
     } finally {
       setLoading(false);
@@ -124,7 +354,7 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
 
       {versions.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {hasProducts && (
+          {hasProducts && !isReleaseNotes && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="t-meta">Category</span>
               {groups.map((g) => {
@@ -157,17 +387,22 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
             accentColor={color}
           />
 
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            {isFwdNetworks && v1Idx !== null && !canDiffWithSpecs(versions[v1Idx]?.label || "") && !versions[v1Idx]?.diff && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
+                No specs or release notes available for this version
+              </span>
+            )}
             <button
               onClick={handleCompare}
-              disabled={v1Idx === null || v2Idx === null || v1Idx === v2Idx || loading}
+              disabled={loading || v1Idx === null || (isFwdNetworks && !canDiffWithSpecs(versions[v1Idx]?.label || "") && !versions[v1Idx]?.diff)}
               className="px-4 py-2 text-xs font-semibold rounded-md text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-fast ease-standard flex items-center gap-1.5 shadow-e1 hover:shadow-e2 hover:-translate-y-px disabled:translate-y-0 disabled:shadow-none"
               style={{ background: color }}
             >
               {loading ? (
-                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading specs…</>
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading...</>
               ) : (
-                <><GitCompareArrows className="w-3.5 h-3.5" /> Load & Compare</>
+                <><GitCompareArrows className="w-3.5 h-3.5" /> Diff {versions[v1Idx]?.label} {isFwdNetworks && versionHasSpecs(versions[v1Idx]?.label || "") ? "Specs" : "Release Notes"}</>
               )}
             </button>
           </div>
