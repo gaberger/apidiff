@@ -134,8 +134,7 @@ export default function ChangesetSpec() {
 
   async function runAiExtraction() {
     if (!selectedDiff) return;
-    const toVersion = selectedDiff.to;
-    const year = Number("20" + toVersion.split(".")[0]);
+    const released = (releaseNotes.versions || []).find(v => v.version === selectedDiff.to)?.releaseDate;
     setAiStatus("loading");
     setAiError(null);
     setAiDoc(null);
@@ -144,9 +143,8 @@ export default function ChangesetSpec() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          year,
-          version: toVersion,
-          fromVersion: selectedDiff.from,
+          diff: selectedDiff,
+          released,
           apiName: "Forward Networks API",
         }),
       });

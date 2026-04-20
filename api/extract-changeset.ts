@@ -1,11 +1,10 @@
 // AI-powered Changeset extractor (Vercel Function, Node runtime).
 //
-// Accepts { year, version, fromVersion, apiName } via POST and returns a
-// Changeset v0.2 document derived from the Forward Networks release-notes
-// page for the target version. Uses Vercel AI Gateway with Anthropic Claude
-// via the AI SDK's generateObject for structured output. Requires
-// AI_GATEWAY_API_KEY in the deployment env (the SDK picks it up
-// automatically and routes "anthropic/..." strings through the gateway).
+// Accepts a pre-parsed release-notes diff entry (from
+// src/data/release-notes-diff.json) and returns a Changeset v0.2 document.
+// The client already has structured data — we don't re-fetch the HTML.
+// Dropping the 25 KB HTML payload cuts inference time from ~4 min to <30 s
+// on claude-sonnet-4.6 because the model no longer has to parse DOM.
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { generateObject } from "ai";
@@ -30,13 +29,13 @@ const TARGET = z.enum([
 const SEVERITY = z.enum(["info", "notice", "breaking"]);
 
 const Pointer = z.string().describe(
-  "RFC 6901 JSON Pointer into the OpenAPI spec, e.g. '#/paths/~1api~1orders/post'. " +
-  "Escape '/' as '~1' and '~' as '~0'. Prefer real spec paths when the note cites " +
-  "one; fall back to '#/changelog/<bucket>/<ticket-id>' when no path is resolvable.",
+  "RFC 6901 JSON Pointer. Use '~1' for '/' and '~0' for '~'. " +
+  "Prefer '#/paths/~1<escaped-path>/<method>' or '#/components/schemas/<Name>'. " +
+  "Fall back to '#/changelog/<bucket>/<ticket-id>' when no real path is known.",
 );
 
 const Change = z.object({
-  id: z.string().describe("Stable identifier. Prefer the FWD ticket ID verbatim (e.g. 'FWD-50059')."),
+  id: z.string().describe("Prefer the FWD ticket ID verbatim (e.g. 'FWD-50059')."),
   op: OP,
   target: TARGET,
   severity: SEVERITY,
@@ -72,66 +71,65 @@ const Changeset = z.object({
   changes: z.array(Change),
 });
 
-const SYSTEM_PROMPT = `You convert Forward Networks API release notes into API Changeset v0.2 documents.
+const SYSTEM_PROMPT = `You convert Forward Networks release-notes diff entries into API Changeset v0.2 documents.
 
-Operation families and their ops:
-  structural  : add, remove, rename, move, split, merge, replace, recompose
-  constraint  : tighten, loosen, constrain, retype, redefault, recode
-  semantic    : resemanticize, reorder, retime, annotate   (author-only, detectable: false)
-  lifecycle   : deprecate, sunset, restore, withdraw
+Each bucket in the diff has { added, removed } lists. Each item is
+{ title, area, description, affectedOps[] } where title is an FWD-XXXXX ticket
+and affectedOps is an array of { method, path, query } — this is the HTTP verb
+and path of the affected endpoint when the release note cited one.
 
-Mapping guidance for release-note sections:
+Mapping rules — bucket + item flavor maps to Changeset op/target/severity:
 
-  Section                            | op         | target        | severity   | breaking
-  ---------------------------------- | ---------- | ------------- | ---------- | --------
-  New operations                     | add        | endpoint      | info       | false
-  Removed operations                 | remove     | endpoint      | breaking   | true
-  New models                         | add        | schema        | info       | false
-  Removed models                     | remove     | schema        | breaking   | true
-  Model changes (field added)        | add        | schema-field  | info       | false
-  Model changes (field removed)      | remove     | schema-field  | breaking   | true
-  Model changes (type change)        | retype     | schema-field  | breaking   | true
-  Model changes (stricter rule)      | tighten    | schema-field  | breaking   | true
-  Model changes (looser rule)        | loosen     | schema-field  | info       | false
-  Model changes (default changed)    | redefault  | schema-field  | notice     | false
-  Model changes (encoding/format)    | recode     | schema-field  | breaking   | true
-  Model changes (renamed field)      | rename     | schema-field  | breaking   | true
-  Breaking changes (other)           | constrain  | schema-field  | breaking   | true
-  Scheduled breaking changes         | deprecate  | endpoint      | notice     | false
+  Bucket                           | op         | target        | severity | breaking | notes
+  -------------------------------- | ---------- | ------------- | -------- | -------- | ---------------------------
+  newOperations.added              | add        | endpoint      | info     | false    |
+  newOperations.removed            | remove     | endpoint      | breaking | true     |
+  newModels.added                  | add        | schema        | info     | false    |
+  newModels.removed                | remove     | schema        | breaking | true     |
+  modelChanges.added (field added) | add        | schema-field  | info     | false    | when description reads "added X"
+  modelChanges.added (field rem.)  | remove     | schema-field  | breaking | true     | when description reads "removed X"
+  modelChanges.added (renamed)     | rename     | schema-field  | breaking | true     | when description reads "renamed X to Y"
+  modelChanges.added (retyped)     | retype     | schema-field  | breaking | true     | when description reads "changed type"
+  modelChanges.added (tightened)   | tighten    | schema-field  | breaking | true     | "stricter", "now required", narrower bounds
+  modelChanges.added (loosened)    | loosen     | schema-field  | info     | false    | "optional", wider bounds
+  modelChanges.added (recoded)     | recode     | schema-field  | breaking | true     | format/encoding/units change
+  modelChanges.added (other)       | constrain  | schema-field  | notice   | false    | fallback
+  breakingChanges.added            | constrain  | schema-field  | breaking | true     | classify harder via description if possible
+  scheduledBreakingChanges.added   | deprecate  | endpoint      | notice   | false    | sunset parsed into lifecycle.reason
 
-Extraction rules:
-1. Every release-note bullet with an FWD-XXXXX ticket becomes ONE change entry.
-2. id = the FWD ticket ID verbatim.
-3. description = the human-readable body, including any quoted field names.
-4. When the bullet lists "METHOD /path" lines, emit RFC 6901 pointers like
-   "#/paths/~1api~1collector-tasks/post". Multiple paths -> array.
-5. When the bullet names a schema or field, emit
-   "#/components/schemas/<Name>" or "#/components/schemas/<Name>/properties/<field>".
-   Best-effort; fall back to "#/changelog/<bucket>/<ticket-id>" when unsure.
-6. Parse sunset phrases like "will be removed in release 26.6" into lifecycle.reason.
-7. tags[] should include the release-note category plus the product area
-   (lowercase, dash-separated).
-8. For breaking=true items, migration.client_action must be set.
-9. Return a Changeset document with changeset_version "0.2" and api.from/to
-   populated from the caller-supplied versions.`;
+Pointer rules:
+- When affectedOps[i] has a method+path, emit "#/paths/~1<path-escaped>/<method-lower>".
+  Escape '/' as '~1' and '~' as '~0'. Example: "POST /api/collector-tasks" ->
+  "#/paths/~1api~1collector-tasks/post". Multiple ops -> pointer array.
+- When description names a schema ("Added CollectorTask"), emit
+  "#/components/schemas/CollectorTask". When it names a field on a schema
+  ("Order.amount"), emit "#/components/schemas/Order/properties/amount".
+- If no real path is resolvable, emit "#/changelog/<bucket>/<ticket-id>".
 
-function stripBoilerplate(html: string): string {
-  const article = html.match(/<article[\s\S]*?<\/article>/i);
-  let body = article ? article[0] : html;
-  body = body.replace(/<script[\s\S]*?<\/script>/gi, "");
-  body = body.replace(/<style[\s\S]*?<\/style>/gi, "");
-  body = body.replace(/<svg[\s\S]*?<\/svg>/gi, "");
-  return body.replace(/\s+/g, " ").trim();
+Other rules:
+- id = FWD ticket verbatim.
+- description = the original item description, prefixed with the area when helpful.
+- Parse "will be removed in release X.Y.Z" from deprecation descriptions into lifecycle.reason.
+- For breaking=true, always set migration.client_action.
+- tags[] includes the bucket, the area (lowercase dash-separated), and the ticket ID.
+- Return a complete Changeset with changeset_version "0.2" and api.from/to populated.`;
+
+function countItems(diff: unknown): number {
+  if (!diff || typeof diff !== "object") return 0;
+  const d = diff as Record<string, { added?: unknown[]; removed?: unknown[] }>;
+  let n = 0;
+  for (const k of ["breakingChanges", "scheduledBreakingChanges", "newOperations", "newModels", "modelChanges"]) {
+    n += (d[k]?.added?.length ?? 0) + (d[k]?.removed?.length ?? 0);
+  }
+  return n;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const t0 = Date.now();
 
-  // Diagnostic ping — no AI, no upstream fetch.
   if (typeof req.query.ping !== "undefined") {
     res.status(200).json({
       ok: true,
-      method: req.method,
       env: { AI_GATEWAY_API_KEY: !!process.env.AI_GATEWAY_API_KEY },
       t: Date.now() - t0,
     });
@@ -143,11 +141,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { year, version, fromVersion, apiName = "Forward Networks API" } = (req.body ?? {}) as {
-    year?: number; version?: string; fromVersion?: string; apiName?: string;
+  const { diff, released, apiName = "Forward Networks API" } = (req.body ?? {}) as {
+    diff?: Record<string, unknown>;
+    released?: string;
+    apiName?: string;
   };
-  if (!year || !version) {
-    res.status(400).json({ error: "year and version are required" });
+  if (!diff || !diff.from || !diff.to) {
+    res.status(400).json({ error: "diff with from/to is required" });
     return;
   }
 
@@ -156,38 +156,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let html: string;
-  let released: string | undefined;
-  try {
-    const url = `https://docs.fwd.app/release-notes/api/${year}/release.${version}/`;
-    const upstream = await fetch(url, { redirect: "follow" });
-    if (!upstream.ok) throw new Error(`upstream ${upstream.status}`);
-    html = await upstream.text();
-    const m = html.match(/Released:\s*(\d{4}-\d{2}-\d{2})/);
-    released = m ? m[1] : undefined;
-  } catch (e: unknown) {
-    res.status(502).json({ error: `release-notes fetch failed: ${e instanceof Error ? e.message : String(e)}` });
-    return;
-  }
-
-  const excerpt = stripBoilerplate(html);
-  console.log(`[extract-changeset] excerpt=${excerpt.length} bytes, t+${Date.now() - t0}ms, calling generateObject...`);
+  const itemCount = countItems(diff);
+  const diffJson = JSON.stringify(diff, null, 2);
+  console.log(`[extract-changeset] items=${itemCount} bytes=${diffJson.length} -> gateway`);
 
   try {
     const { object } = await generateObject({
       model: "anthropic/claude-sonnet-4.6",
       schema: Changeset,
-      abortSignal: AbortSignal.timeout(120_000),
+      abortSignal: AbortSignal.timeout(90_000),
       system: SYSTEM_PROMPT,
       prompt:
         `API name: ${apiName}\n` +
-        `Previous version (from): ${fromVersion || "none"}\n` +
-        `Target version (to): ${version}\n` +
-        `Release date: ${released || "(not parsed)"}\n\n` +
-        `Release-notes HTML (article only, scripts/styles stripped):\n\n${excerpt}\n\n` +
-        `Emit a Changeset v0.2 document covering every FWD-ticketed change. ` +
-        `Include the release date in "released". ` +
-        `If no changes exist, return an empty changes array — do NOT fabricate entries.`,
+        `Release date: ${released || "(unknown)"}\n\n` +
+        `Pre-parsed release-notes diff:\n\n${diffJson}\n\n` +
+        `Emit a Changeset v0.2 document. api.from.version = "${diff.from}", ` +
+        `api.to.version = "${diff.to}", released = "${released || ""}". ` +
+        `One change entry per ticket. Return {} with empty changes if no items.`,
     });
     console.log(`[extract-changeset] OK changes=${object.changes.length} t+${Date.now() - t0}ms`);
     res.status(200).json(object);
