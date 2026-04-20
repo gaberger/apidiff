@@ -256,14 +256,23 @@ function sectionSlug(area: string | undefined): string | undefined {
   return slug || undefined;
 }
 
-function deriveSource(toRelease: string | undefined, area: string | undefined, ticket: string | undefined) {
+function deriveSource(
+  toRelease: string | undefined,
+  area: string | undefined,
+  ticket: string | undefined,
+  year: number | undefined,
+) {
   const slug = sectionSlug(area);
   const ver = shortVersion(toRelease);
-  if (!slug || !ver) return undefined;
-  const base = `https://docs.fwd.app/${ver}/api`;
-  const out: { specUrl: string; docsUrl?: string } = { specUrl: `${base}/spec/${slug}.json` };
-  if (ticket) out.docsUrl = `${base}/${slug}/${ticket}`;
-  return out;
+  const out: { specUrl?: string; docsUrl?: string } = {};
+  if (slug && ver) out.specUrl = `https://docs.fwd.app/${ver}/api/spec/${slug}.json`;
+  // Anchor back to the release-notes page for the ticket — verified pattern
+  // (every FWD-xxx bullet has an id="FWD-xxx" on docs.fwd.app). Do NOT guess
+  // at `/api/<section>/<ticket>` URLs; many 404.
+  if (ticket && year && toRelease) {
+    out.docsUrl = `https://docs.fwd.app/release-notes/api/${year}/release.${toRelease}/#${ticket}`;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -350,12 +359,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const realTitles = collectTitles(diff);
     const areas = collectAreas(diff);
     const toRelease = (diff as { to?: string })?.to;
+    // Derive year from "26.3.0" -> 2026. Docs URLs need the 4-digit form.
+    const yearMatch = toRelease?.match(/^(\d{2})\./);
+    const year = yearMatch ? 2000 + Number(yearMatch[1]) : undefined;
     const invented: string[] = [];
     const changes = validated.data.changes.map((c) => {
       const at = Array.isArray(c.at) ? c.at[0] : c.at;
       if (!realTitles.has(c.id)) invented.push(c.id);
       // Server-derived source URLs (bypass model hallucination risk).
-      const source = deriveSource(toRelease, areas.get(c.id), c.id);
+      const source = deriveSource(toRelease, areas.get(c.id), c.id, year);
       return { ...c, at, ...(source ? { source } : {}) };
     });
 

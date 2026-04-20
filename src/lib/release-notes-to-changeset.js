@@ -81,15 +81,21 @@ function sectionSlug(area) {
     || undefined;
 }
 
-function sourceUrls(toRelease, area, ticket) {
+// Deterministic URL patterns:
+//   specUrl: section OpenAPI file at docs.fwd.app/<ver>/api/spec/<slug>.json
+//            — verified shape used by the Docusaurus discovery adapter.
+//   docsUrl: release-notes page with a ticket anchor. The anchor exists for
+//            every FWD-xxx bullet on the page (confirmed from the source
+//            HTML). Do NOT guess ticket-specific section paths — many 404.
+function sourceUrls(toRelease, area, ticket, year) {
   const slug = sectionSlug(area);
   const ver = shortVersion(toRelease);
-  if (!slug || !ver) return undefined;
-  const base = `https://docs.fwd.app/${ver}/api`;
-  return {
-    specUrl: `${base}/spec/${slug}.json`,
-    ...(ticket ? { docsUrl: `${base}/${slug}/${ticket}` } : {}),
-  };
+  const out = {};
+  if (slug && ver) out.specUrl = `https://docs.fwd.app/${ver}/api/spec/${slug}.json`;
+  if (ticket && year && toRelease) {
+    out.docsUrl = `https://docs.fwd.app/release-notes/api/${year}/release.${toRelease}/#${ticket}`;
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function extractSunsetVersion(description) {
@@ -97,7 +103,7 @@ function extractSunsetVersion(description) {
   return m ? m[1] : undefined;
 }
 
-function buildChange({ item, op, target, severity, breaking, bucket, seq, toRelease }) {
+function buildChange({ item, op, target, severity, breaking, bucket, seq, toRelease, year }) {
   const pointers = pointersFor(item.affectedOps, bucket, item.title);
   const affectedPointers = affectedOperationsList(item.affectedOps);
   const humanOps = humanReadableList(item.affectedOps);
@@ -138,7 +144,7 @@ function buildChange({ item, op, target, severity, breaking, bucket, seq, toRele
   // Jump-to-spec shortcuts derived from the area/ticket/release. Lets
   // a reader open the per-section OpenAPI file or the ticket's docs page
   // without leaving the changeset.
-  const source = sourceUrls(toRelease, item.area, item.title);
+  const source = sourceUrls(toRelease, item.area, item.title, year);
   if (source) change.source = source;
 
   if (breaking) {
@@ -162,10 +168,12 @@ function buildChange({ item, op, target, severity, breaking, bucket, seq, toRele
 export function releaseNotesToChangeset(data, diff, opts = {}) {
   const apiName = opts.apiName || "Forward Networks API";
   const versionDate = new Map((data.versions || []).map((v) => [v.version, v.releaseDate]));
+  const versionYear = new Map((data.versions || []).map((v) => [v.version, v.year]));
+  const year = versionYear.get(diff.to);
   const changes = [];
   let seq = 1;
   const push = (cfg) =>
-    changes.push(buildChange({ ...cfg, seq: seq++, toRelease: diff.to }));
+    changes.push(buildChange({ ...cfg, seq: seq++, toRelease: diff.to, year }));
 
   for (const item of diff.newOperations?.added || []) {
     push({ item, op: "add", target: "endpoint", severity: "info", breaking: false, bucket: "new-operation" });
