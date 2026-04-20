@@ -1,0 +1,6 @@
+.hex/
+docs/
+proofs/
+tests/
+base44/
+release-notes-diff.json

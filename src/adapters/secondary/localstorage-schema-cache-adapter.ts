@@ -1,9 +1,7 @@
-// localStorage-backed SchemaCachePort.
-//
-// Uses the apidiff:spec:* keyspace so the legacy src/lib/spec-cache.js
-// module (used by fetch-spec.js) and this adapter stay interoperable:
-// either side can write entries the other will read. TTL and size limits
-// match the legacy module exactly.
+// localStorage-backed SchemaCachePort. 24h TTL, 3.5MB/entry cap, LRU
+// eviction by fetched_at. Keyspace apidiff:spec:<hash>; same TTL + size
+// limits as the deleted legacy spec-cache.js so existing browser caches
+// remain readable after the port migration.
 
 import type { CachedSchema, SchemaCacheStats } from "../../core/domain/types.js";
 import type { SchemaCachePort } from "../../core/ports/index.js";

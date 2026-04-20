@@ -5,6 +5,8 @@ dist/
 .hex/
 .mcp.json
 *.env
+env.local
+env*.local
 
 # Coq build artifacts
 proofs/*.aux
@@ -13,3 +15,6 @@ proofs/*.vo
 proofs/*.vok
 proofs/*.vos
 proofs/.*.aux
+.vercel
+.env*.local
+supabase/.temp/

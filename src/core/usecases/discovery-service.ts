@@ -2,19 +2,39 @@
 // May import from domain/ and ports/ only
 
 import type { ApiProvider, DiscoveryResult, DiscoveredVersion, VersionPair, SpecSource } from "../domain/discovery-types.js";
-import type { ApiDiscoveryPort, ChangelogParserPort } from "../ports/index.js";
+import type { ApiDiscoveryPort, ChangelogParserPort, SchemaUrlRegistryPort } from "../ports/index.js";
 import { PROVIDER_REGISTRY, findProvider } from "../domain/provider-registry.js";
 
 export class DiscoveryService {
   private readonly adapters: Map<string, ApiDiscoveryPort>;
   private readonly changelogParser: ChangelogParserPort;
+  private readonly urlRegistry: SchemaUrlRegistryPort | undefined;
 
   constructor(
     discoveryAdapters: ApiDiscoveryPort[],
     changelogParser: ChangelogParserPort,
+    urlRegistry?: SchemaUrlRegistryPort,
   ) {
     this.adapters = new Map(discoveryAdapters.map((a) => [a.sourceKind, a]));
     this.changelogParser = changelogParser;
+    this.urlRegistry = urlRegistry;
+  }
+
+  /**
+   * Persist every discovered version URL to the registry. Idempotent:
+   * SchemaUrlRegistryPort.add() dedupes by url. Failures are swallowed so a
+   * persistence outage never breaks the discovery flow.
+   */
+  private async registerVersions(
+    versions: readonly DiscoveredVersion[],
+    providerLabel: string,
+  ): Promise<void> {
+    if (!this.urlRegistry) return;
+    await Promise.allSettled(
+      versions.map((v) =>
+        this.urlRegistry!.add({ url: v.url, label: `${providerLabel} ${v.label}` }),
+      ),
+    );
   }
 
   /** Discover all versions for a known provider by slug */
@@ -93,8 +113,11 @@ export class DiscoveryService {
       }
     }
 
+    const providerName = deriveProviderName(trimmed);
+    await this.registerVersions(sorted, providerName);
+
     return {
-      provider: deriveProviderName(trimmed),
+      provider: providerName,
       versions: sorted,
       pairs,
       changelogVersions,
@@ -121,6 +144,8 @@ export class DiscoveryService {
         // Changelog parsing is best-effort
       }
     }
+
+    await this.registerVersions(sorted, provider.name);
 
     return {
       provider: provider.name,

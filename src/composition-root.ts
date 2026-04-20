@@ -17,6 +17,10 @@ import { LocalStorageIntegrationAdapter } from "./adapters/secondary/localstorag
 import { BrowserProxyAdapter } from "./adapters/secondary/browser-proxy-adapter.js";
 import { LocalStorageSchemaCacheAdapter } from "./adapters/secondary/localstorage-schema-cache-adapter.js";
 import { LocalStorageSchemaUrlAdapter } from "./adapters/secondary/localstorage-schema-url-adapter.js";
+import { SupabaseIntegrationAdapter } from "./adapters/secondary/supabase/integration-adapter.js";
+import { SupabaseSchemaCacheAdapter } from "./adapters/secondary/supabase/schema-cache-adapter.js";
+import { SupabaseSchemaUrlAdapter } from "./adapters/secondary/supabase/schema-url-adapter.js";
+import { hasSupabase } from "./adapters/secondary/supabase/client.js";
 import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
 import { DiscoveryService } from "./core/usecases/discovery-service.js";
 import type {
@@ -67,18 +71,30 @@ export function createBrowserStores(): {
   schemaUrlRegistry: SchemaUrlRegistryPort;
   discoveryService: DiscoveryService;
 } {
-  const integrationStore = new LocalStorageIntegrationAdapter();
+  // Persistence layer — pick Supabase if env is configured (VITE_SUPABASE_URL
+  // + VITE_SUPABASE_ANON_KEY present at build time), otherwise fall back to
+  // the localStorage adapters. Same port contracts, different backends —
+  // downstream code is unaware of the swap.
+  const useSupabase = hasSupabase();
+  const integrationStore = useSupabase
+    ? new SupabaseIntegrationAdapter()
+    : new LocalStorageIntegrationAdapter();
+
   // alwaysProxy: true — route every fetch through the Vercel Function so we
   // never hit browser CORS rejections for non-CORS-friendly hosts (docs.fwd.app,
   // most vendor docs sites). The server has no origin restriction.
   const specProxy = new BrowserProxyAdapter({ alwaysProxy: true });
 
   // Data layer — cache for fetched schemas, registry for tracked URLs.
-  // The cache operates on the same apidiff:spec:* keyspace used by the
-  // legacy src/lib/spec-cache.js module, so fetch-spec.js and this adapter
-  // stay in sync without either one owning the storage exclusively.
-  const schemaCache = new LocalStorageSchemaCacheAdapter();
-  const schemaUrlRegistry = new LocalStorageSchemaUrlAdapter();
+  // localStorage variant writes to the apidiff:spec:* keyspace; Supabase
+  // variant writes to public.schema_cache. fetch-spec.js consumes this via
+  // the SchemaCachePort — no direct storage access anywhere in src/lib.
+  const schemaCache = useSupabase
+    ? new SupabaseSchemaCacheAdapter()
+    : new LocalStorageSchemaCacheAdapter();
+  const schemaUrlRegistry = useSupabase
+    ? new SupabaseSchemaUrlAdapter()
+    : new LocalStorageSchemaUrlAdapter();
 
   // Browser-safe discovery adapters. No GitHub token — the client bundle
   // must not ship credentials; 60 req/hr unauthenticated is sufficient for
@@ -90,9 +106,15 @@ export function createBrowserStores(): {
     new DocusaurusDiscoveryAdapter(),
   ];
   const changelogParser = new ChangelogParserAdapter();
-  const discoveryService = new DiscoveryService(discoveryAdapters, changelogParser);
+  // Registry is optional on DiscoveryService; passing it makes every
+  // discovered version URL land in schema_urls (Supabase or localStorage).
+  const discoveryService = new DiscoveryService(
+    discoveryAdapters,
+    changelogParser,
+    schemaUrlRegistry,
+  );
 
-  return { integrationStore, specProxy, discoveryService };
+  return { integrationStore, specProxy, schemaCache, schemaUrlRegistry, discoveryService };
 }
 
 /** Registry of discovery adapters keyed by the SpecSource kind they handle. */

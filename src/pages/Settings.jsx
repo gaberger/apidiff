@@ -197,6 +197,12 @@ export default function Settings() {
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <h1 className="text-sm font-bold text-stone-800">Integration Settings</h1>
+            <Link
+              to="/discovery"
+              className="ml-2 px-2.5 py-1 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+            >
+              Discovery
+            </Link>
           </div>
           <Button
             size="sm"

@@ -1,5 +1,4 @@
-import { specProxy } from "@/lib/spec-proxy";
-import * as specCache from "@/lib/spec-cache.js";
+import { specProxy, schemaCache, schemaUrlRegistry } from "@/lib/browser-stores";
 
 export class SpecFetchError extends Error {
   constructor(message, { url, phase, cause } = {}) {
@@ -20,10 +19,10 @@ export async function fetchSpec(url, { onProgress, bypassCache = false } = {}) {
 
   emit(onProgress, "cache-lookup", { url });
   if (!bypassCache) {
-    const cached = specCache.get(url);
-    if (cached) {
+    const cached = await schemaCache.get(url);
+    if (cached?.content) {
       emit(onProgress, "cache-hit", { url });
-      return cached;
+      return cached.content;
     }
   }
 
@@ -55,7 +54,9 @@ export async function fetchSpec(url, { onProgress, bypassCache = false } = {}) {
   }
 
   emit(onProgress, "caching", { url, size: content.length });
-  specCache.put(url, content);
+  // Fire-and-forget — persistence failures must not break the fetch flow.
+  void schemaCache.put(url, content).catch(() => {});
+  void schemaUrlRegistry.touchFetched(url).catch(() => {});
 
   emit(onProgress, "done", { url, size: content.length });
   return content;

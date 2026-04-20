@@ -6,6 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import DiffViewer from './pages/DiffViewer';
 import Settings from './pages/Settings';
 import ChangesetSpec from './pages/ChangesetSpec';
+import Discovery from './pages/Discovery';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Routes>
           <Route path="/" element={<DiffViewer />} />
           <Route path="/changeset-spec" element={<ChangesetSpec />} />
+          <Route path="/discovery" element={<Discovery />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/:integration" element={<DiffViewer />} />
           <Route path="*" element={<PageNotFound />} />

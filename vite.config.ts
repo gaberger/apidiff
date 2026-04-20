@@ -5,6 +5,12 @@ import path from "path";
 export default defineConfig(() => {
   return {
     logLevel: "error",
+    // Expose both VITE_* (local dev convention) and NEXT_PUBLIC_* (Vercel's
+    // default browser-safe namespace) to the client bundle. Lets Supabase
+    // credentials provisioned by the Vercel Supabase integration flow in
+    // without requiring a second VITE_-prefixed copy of every secret.
+    // Only prefix browser-safe values; service-role keys stay unprefixed.
+    envPrefix: ["VITE_", "NEXT_PUBLIC_"],
     plugins: [
       react(),
       // Dev-mode mirror of the /api/proxy-fetch Vercel Function.

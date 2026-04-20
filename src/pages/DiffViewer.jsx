@@ -433,6 +433,12 @@ export default function DiffViewer() {
                   Changeset Spec
                 </Link>
                 <Link
+                  to="/discovery"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-fast ease-standard"
+                >
+                  Discovery
+                </Link>
+                <Link
                   to="/settings"
                   className="px-3 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-fast ease-standard"
                 >
