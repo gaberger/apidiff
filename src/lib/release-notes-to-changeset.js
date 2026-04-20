@@ -38,6 +38,11 @@ function opPointer({ method, path }) {
   return `#/paths/${escPointer(path)}/${method.toLowerCase()}`;
 }
 
+function humanReadable({ method, path, query }) {
+  const q = query ? `?${query}` : "";
+  return `${method} ${path}${q}`;
+}
+
 function fallbackPointer(bucket, title) {
   return `#/changelog/${bucket}/${title || "item"}`;
 }
@@ -48,6 +53,16 @@ function pointersFor(affectedOps, bucket, title) {
   return affectedOps.map(opPointer);
 }
 
+function affectedOperationsList(affectedOps) {
+  if (!affectedOps || affectedOps.length === 0) return undefined;
+  return affectedOps.map(opPointer);
+}
+
+function humanReadableList(affectedOps) {
+  if (!affectedOps || affectedOps.length === 0) return undefined;
+  return affectedOps.map(humanReadable);
+}
+
 function extractSunsetVersion(description) {
   const m = description?.match(SUNSET_RE);
   return m ? m[1] : undefined;
@@ -55,6 +70,8 @@ function extractSunsetVersion(description) {
 
 function buildChange({ item, op, target, severity, breaking, bucket, seq, toRelease }) {
   const pointers = pointersFor(item.affectedOps, bucket, item.title);
+  const affectedPointers = affectedOperationsList(item.affectedOps);
+  const humanOps = humanReadableList(item.affectedOps);
   const tags = [bucket];
   if (item.area) tags.push(item.area.toLowerCase().replace(/\s+/g, "-"));
   if (item.title) tags.push(item.title);
@@ -82,6 +99,12 @@ function buildChange({ item, op, target, severity, breaking, bucket, seq, toRele
     const sunsetVer = extractSunsetVersion(item.description);
     if (sunsetVer) change.lifecycle.reason = `Scheduled for removal in release ${sunsetVer}.`;
   }
+
+  // Attach affectedOperations + humanReadable whenever the item cites
+  // concrete HTTP verb+path entries. These give human readers the blast
+  // radius + operation labels without resolving JSON Pointers.
+  if (affectedPointers) change.affectedOperations = affectedPointers;
+  if (humanOps) change.humanReadable = humanOps;
 
   if (breaking) {
     change.migration = {

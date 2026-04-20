@@ -55,6 +55,9 @@ const Change = z.object({
   // Endpoints that consume a changed schema/field — emitted even when the
   // primary pointer points at a schema node, so readers see the blast radius.
   affectedOperations: z.array(Pointer).optional(),
+  // Human-friendly labels for affectedOperations (and for at/from/to when
+  // they resolve to paths). Array indexes line up with affectedOperations.
+  humanReadable: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   lifecycle: z.object({
     deprecated_date: z.string().optional(),
@@ -179,6 +182,13 @@ JSON Pointers against the OpenAPI spec:
   array of pointers in "#/paths/~1<path>/<method>" form — one per affectedOp.
   This is the blast radius: readers see which endpoints are touched without
   having to open the spec.
+
+- ALWAYS emit humanReadable as a parallel array of "METHOD /path" strings,
+  one per entry in affectedOperations. Example: for FWD-41282 emit
+    affectedOperations: ["#/paths/~1api~1nqe/post", "#/paths/~1api~1nqe-diffs~1{before}~1{after}/post"]
+    humanReadable:      ["POST /api/nqe",            "POST /api/nqe-diffs/{before}/{after}"]
+  Indexes must line up one-to-one. humanReadable is for human eyes; the
+  pointers are for tooling.
 
 - Full worked example for FWD-41282 (schema default-value change):
     { id: "FWD-41282", op: "redefault", target: "schema-field",
