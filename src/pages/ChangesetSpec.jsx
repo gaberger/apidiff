@@ -1,9 +1,12 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Download, FileJson, FileCode } from "lucide-react";
+import { Download, FileJson, FileCode, Sparkles } from "lucide-react";
+import YAML from "yaml";
 import CodeBlock from "@/components/ui/CodeBlock";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
 import exampleYaml from "../../apidiffspec/example-changeset.yaml?raw";
+import releaseNotes from "@/data/release-notes-diff.json";
+import { releaseNotesToChangeset } from "@/lib/release-notes-to-changeset";
 
 const FAMILIES = [
   {
@@ -97,6 +100,27 @@ export default function ChangesetSpec() {
       {label}
     </Link>
   );
+
+  // Pair selector for the real-world generated example. Default to the most
+  // recent diff (index 0), which covers all five release-notes buckets.
+  const [pairIdx, setPairIdx] = useState(0);
+  const diffs = releaseNotes.diffs || [];
+  const selectedDiff = diffs[pairIdx];
+
+  const generatedDoc = useMemo(
+    () => (selectedDiff ? releaseNotesToChangeset(releaseNotes, selectedDiff) : null),
+    [selectedDiff],
+  );
+  const generatedYaml = useMemo(
+    () => (generatedDoc ? YAML.stringify(generatedDoc, { lineWidth: 100 }) : ""),
+    [generatedDoc],
+  );
+  const generatedStats = useMemo(() => {
+    if (!generatedDoc) return null;
+    const by = {};
+    for (const c of generatedDoc.changes) by[c.op] = (by[c.op] || 0) + 1;
+    return by;
+  }, [generatedDoc]);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -232,10 +256,74 @@ export default function ChangesetSpec() {
           </ul>
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Example</h2>
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <h2 className="text-xl font-semibold text-stone-900">Generated from real release notes</h2>
+          </div>
           <p className="text-sm leading-relaxed text-stone-600">
-            A full example exercising all four families, multi-target renames, cross-changeset supersedes, severity, and <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">detectable: false</code> on semantic ops.
+            Forward Networks publishes versioned release notes with categorized changes
+            (new operations, new models, model changes, breaking changes, scheduled
+            deprecations). The transformer at <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">src/lib/release-notes-to-changeset.js</code> maps
+            those buckets onto v0.2 operations — a rough first pass that preserves
+            ticket IDs as change IDs and tags, and emits <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointers
+            since release notes don't carry OpenAPI JSON Pointers.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              Release
+            </label>
+            <select
+              value={pairIdx}
+              onChange={(e) => setPairIdx(Number(e.target.value))}
+              className="text-xs font-mono px-2.5 py-1.5 border border-stone-200 rounded-md bg-white focus:outline-none focus:border-amber-400"
+            >
+              {diffs.map((d, i) => (
+                <option key={i} value={i}>
+                  {d.from} → {d.to}
+                </option>
+              ))}
+            </select>
+            {generatedStats && (
+              <div className="flex flex-wrap gap-1.5 text-[11px]">
+                <span className="text-stone-500">{generatedDoc.changes.length} change{generatedDoc.changes.length !== 1 ? "s" : ""}:</span>
+                {Object.entries(generatedStats).map(([op, n]) => (
+                  <span key={op} className="font-mono px-1.5 py-0.5 bg-stone-100 rounded text-stone-700">
+                    {op} ×{n}
+                  </span>
+                ))}
+              </div>
+            )}
+            {generatedYaml && (
+              <button
+                onClick={() => downloadBlob(generatedYaml, `fwd-${selectedDiff.from}-to-${selectedDiff.to}.yaml`, "application/yaml")}
+                className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" /> Download
+              </button>
+            )}
+          </div>
+
+          {generatedYaml ? (
+            <CodeBlock code={generatedYaml} lang="yaml" />
+          ) : (
+            <p className="text-xs text-stone-500 italic">No release-notes data available.</p>
+          )}
+
+          <p className="text-[11px] text-stone-500 leading-relaxed">
+            <strong>Limitations:</strong> <code className="text-[10px] px-1 bg-stone-100 rounded">target</code> kinds
+            are coarse (endpoint vs schema) because release notes don't identify specific fields;
+            pointers are synthetic; sunset dates aren't extracted. A production generator
+            should enrich each entry by matching the FWD ticket to its OpenAPI path and by
+            parsing phrases like <em>"will be removed in release 26.6"</em> for lifecycle dates.
+          </p>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-xl font-semibold text-stone-900">Curated example</h2>
+          <p className="text-sm leading-relaxed text-stone-600">
+            A hand-authored example exercising all four families, multi-target renames, cross-changeset supersedes, severity, and <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">detectable: false</code> on semantic ops.
           </p>
           <CodeBlock code={exampleYaml} lang="yaml" />
           <button
