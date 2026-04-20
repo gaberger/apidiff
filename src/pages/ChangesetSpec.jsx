@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Download, FileJson, FileCode, Sparkles } from "lucide-react";
+import { Download, FileJson, FileCode, Sparkles, Bot, Loader2 } from "lucide-react";
 import YAML from "yaml";
 import CodeBlock from "@/components/ui/CodeBlock";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
@@ -121,6 +121,44 @@ export default function ChangesetSpec() {
     for (const c of generatedDoc.changes) by[c.op] = (by[c.op] || 0) + 1;
     return by;
   }, [generatedDoc]);
+
+  // AI-powered extraction state — null = not run, otherwise the extracted doc.
+  const [aiDoc, setAiDoc] = useState(null);
+  const [aiStatus, setAiStatus] = useState("idle"); // idle | loading | error
+  const [aiError, setAiError] = useState(null);
+
+  const aiYaml = useMemo(
+    () => (aiDoc ? YAML.stringify(aiDoc, { lineWidth: 100 }) : ""),
+    [aiDoc],
+  );
+
+  async function runAiExtraction() {
+    if (!selectedDiff) return;
+    const toVersion = selectedDiff.to;
+    const year = Number("20" + toVersion.split(".")[0]);
+    setAiStatus("loading");
+    setAiError(null);
+    setAiDoc(null);
+    try {
+      const res = await fetch("/api/extract-changeset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          year,
+          version: toVersion,
+          fromVersion: selectedDiff.from,
+          apiName: "Forward Networks API",
+        }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`);
+      setAiDoc(payload);
+      setAiStatus("idle");
+    } catch (e) {
+      setAiError(e.message);
+      setAiStatus("error");
+    }
+  }
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -311,8 +349,48 @@ export default function ChangesetSpec() {
             <p className="text-xs text-stone-500 italic">No release-notes data available.</p>
           )}
 
+          <div className="border-t border-stone-200 pt-4 mt-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={runAiExtraction}
+                disabled={aiStatus === "loading" || !selectedDiff}
+                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-amber-100 text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition-colors"
+              >
+                {aiStatus === "loading"
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting…</>
+                  : <><Bot className="w-3.5 h-3.5" /> Re-extract with AI</>}
+              </button>
+              <p className="text-[11px] text-stone-500 leading-relaxed flex-1 min-w-[12rem]">
+                Sends the release-notes HTML to <code className="text-[10px] px-1 bg-stone-100 rounded">/api/extract-changeset</code>{" "}
+                (Vercel Function, Claude via AI Gateway) with the v0.2 schema as structured-output shape.
+                Catches prose-only changes the heuristic misses (field renames described in sentences,
+                sunset dates in phrasing, stricter-vs-looser classification).
+              </p>
+            </div>
+            {aiError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+                AI extraction failed: {aiError}
+              </p>
+            )}
+            {aiDoc && aiYaml && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-[11px] text-stone-500">
+                  <Bot className="w-3 h-3 text-amber-500" />
+                  <span>AI extraction · {aiDoc.changes.length} change{aiDoc.changes.length !== 1 ? "s" : ""}</span>
+                  <button
+                    onClick={() => downloadBlob(aiYaml, `fwd-${selectedDiff.from}-to-${selectedDiff.to}-ai.yaml`, "application/yaml")}
+                    className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+                  >
+                    <Download className="w-3 h-3" /> Download
+                  </button>
+                </div>
+                <CodeBlock code={aiYaml} lang="yaml" />
+              </div>
+            )}
+          </div>
+
           <p className="text-[11px] text-stone-500 leading-relaxed">
-            <strong>What's extracted:</strong> HTTP verb + path from each release note's affected-operations list,
+            <strong>Heuristic extraction (above):</strong> HTTP verb + path from each release note's affected-operations list,
             emitted as RFC 6901 JSON Pointers (<code className="text-[10px] px-1 bg-stone-100 rounded">#/paths/~1api~1collector-tasks/post</code>).
             Multi-op notes become a single change entry with a pointer array.
             <br />
