@@ -145,7 +145,13 @@ Worked example:
       tags: ["new-operation", "network-collection", "FWD-50059"] }
 
 Other rules:
-- id = FWD ticket verbatim.
+- id = the ticket title VERBATIM from the input item (e.g. "FWD-50059" or
+  "FWDN-11999"). NEVER invent IDs, NEVER append suffixes like "-schema" or
+  "-classic-devices". If a single ticket affects multiple schemas OR multiple
+  endpoints, emit ONE change entry with a pointer ARRAY in from/to — not
+  multiple entries with fabricated IDs.
+- ONE change entry per ticket. Every id in your output must match a title
+  present in the input diff; the post-validator rejects invented IDs.
 - description = the original item description, prefixed with the area when helpful.
 - Parse "will be removed in release X.Y.Z" from deprecation descriptions into lifecycle.reason.
 - For breaking=true, always set migration.client_action.
@@ -160,6 +166,17 @@ function countItems(diff: unknown): number {
     n += (d[k]?.added?.length ?? 0) + (d[k]?.removed?.length ?? 0);
   }
   return n;
+}
+
+function collectTitles(diff: unknown): Set<string> {
+  const out = new Set<string>();
+  if (!diff || typeof diff !== "object") return out;
+  const d = diff as Record<string, { added?: Array<{ title?: string }>; removed?: Array<{ title?: string }> }>;
+  for (const k of ["breakingChanges", "scheduledBreakingChanges", "newOperations", "newModels", "modelChanges"]) {
+    for (const it of d[k]?.added ?? []) if (it?.title) out.add(it.title);
+    for (const it of d[k]?.removed ?? []) if (it?.title) out.add(it.title);
+  }
+  return out;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -238,19 +255,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Normalize: v0.2 schema requires `at` to be a single pointer. Collapse
-    // any arrays the model emitted to their first element.
-    const normalized = {
-      ...validated.data,
-      changes: validated.data.changes.map((c) => {
-        if (Array.isArray(c.at)) {
-          return { ...c, at: c.at[0] };
-        }
-        return c;
-      }),
-    };
+    // Normalize: v0.2 requires `at` single-valued; collapse any arrays.
+    // Reject invented IDs: every change.id must appear as a ticket title in
+    // the input diff. Model has been observed inventing composite IDs like
+    // "FWD-49532-schema" when one ticket affects multiple schemas; the
+    // correct move is a pointer array, not a new entry.
+    const realTitles = collectTitles(diff);
+    const invented: string[] = [];
+    const changes = validated.data.changes.map((c) => {
+      const at = Array.isArray(c.at) ? c.at[0] : c.at;
+      if (!realTitles.has(c.id)) invented.push(c.id);
+      return { ...c, at };
+    });
 
-    res.status(200).json(normalized);
+    if (invented.length > 0) {
+      res.status(422).json({
+        error: "Model invented ticket IDs not present in the release-notes diff",
+        invented,
+        hint: "Re-run — or use pointer arrays for multi-target changes instead of splitting into fake IDs.",
+      });
+      return;
+    }
+
+    res.status(200).json({ ...validated.data, changes });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[extract-changeset] generateText threw: ${msg}`);
