@@ -6,6 +6,5 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
-  ],
-  "cleanUrls": true
+  ]
 }
