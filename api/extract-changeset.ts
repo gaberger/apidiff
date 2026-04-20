@@ -97,14 +97,50 @@ Mapping rules — bucket + item flavor maps to Changeset op/target/severity:
   breakingChanges.added            | constrain  | schema-field  | breaking | true     | classify harder via description if possible
   scheduledBreakingChanges.added   | deprecate  | endpoint      | notice   | false    | sunset parsed into lifecycle.reason
 
-Pointer rules:
-- When affectedOps[i] has a method+path, emit "#/paths/~1<path-escaped>/<method-lower>".
-  Escape '/' as '~1' and '~' as '~0'. Example: "POST /api/collector-tasks" ->
-  "#/paths/~1api~1collector-tasks/post". Multiple ops -> pointer array.
-- When description names a schema ("Added CollectorTask"), emit
-  "#/components/schemas/CollectorTask". When it names a field on a schema
-  ("Order.amount"), emit "#/components/schemas/Order/properties/amount".
-- If no real path is resolvable, emit "#/changelog/<bucket>/<ticket-id>".
+Pointer rules — every change MUST carry a pointer field. NEVER return a change
+without one. Which field is which:
+
+  op                                 | field to populate
+  ---------------------------------- | --------------------------
+  add                                | to
+  remove, withdraw                   | from
+  rename, move, replace, recompose   | from AND to (both)
+  split                              | from (single) + to (array of 2+)
+  merge                              | from (array of 2+) + to (single)
+  deprecate, sunset, restore         | at
+  tighten, loosen, constrain,        | at
+    retype, redefault, recode,       |
+    resemanticize, reorder, retime,  |
+    annotate                         |
+
+Pointer source priority:
+
+  1. If the item's affectedOps array contains { method, path } entries,
+     emit "#/paths/<escaped-path>/<method-lower>" for each. Escape '/' as
+     '~1' and '~' as '~0'. Example: {method:"POST", path:"/api/collector-tasks"}
+     -> "#/paths/~1api~1collector-tasks/post". Multiple ops -> array.
+
+  2. If the description names a schema ("Added CollectorTask"), emit
+     "#/components/schemas/CollectorTask".
+     If it names a field on a schema ("Order.amount" or "itemFormat in
+     NqeQueryOptions"), emit
+     "#/components/schemas/<Schema>/properties/<field>".
+
+  3. If neither works, fall back to "#/changelog/<bucket>/<ticket-id>".
+
+Worked example:
+
+  Input item (bucket: newOperations.added):
+    { title: "FWD-50059", area: "Network Collection",
+      description: "",
+      affectedOps: [{method:"POST", path:"/api/collector-tasks", query:"type=NETWORK_COLLECTION"}] }
+
+  Correct change:
+    { id: "FWD-50059", op: "add", target: "endpoint",
+      severity: "info", breaking: false,
+      description: "Network Collection",
+      to: "#/paths/~1api~1collector-tasks/post",
+      tags: ["new-operation", "network-collection", "FWD-50059"] }
 
 Other rules:
 - id = FWD ticket verbatim.
