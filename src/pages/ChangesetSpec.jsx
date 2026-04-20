@@ -111,7 +111,26 @@ export default function ChangesetSpec() {
     () => (selectedDiff ? releaseNotesToChangeset(releaseNotes, selectedDiff) : null),
     [selectedDiff],
   );
+  // Hide the JSON Pointer arrays from the rendered YAML — humanReadable
+  // covers the same blast radius without forcing readers to decode '~1'.
+  // Downloads still include the pointers via rawYamlFor().
+  const stripPointersForDisplay = (doc) => {
+    if (!doc) return doc;
+    return {
+      ...doc,
+      changes: doc.changes.map((c) => {
+        const clean = { ...c };
+        delete clean.affectedOperations;
+        return clean;
+      }),
+    };
+  };
+
   const generatedYaml = useMemo(
+    () => (generatedDoc ? YAML.stringify(stripPointersForDisplay(generatedDoc), { lineWidth: 100 }) : ""),
+    [generatedDoc],
+  );
+  const generatedYamlFull = useMemo(
     () => (generatedDoc ? YAML.stringify(generatedDoc, { lineWidth: 100 }) : ""),
     [generatedDoc],
   );
@@ -128,6 +147,10 @@ export default function ChangesetSpec() {
   const [aiError, setAiError] = useState(null);
 
   const aiYaml = useMemo(
+    () => (aiDoc ? YAML.stringify(stripPointersForDisplay(aiDoc), { lineWidth: 100 }) : ""),
+    [aiDoc],
+  );
+  const aiYamlFull = useMemo(
     () => (aiDoc ? YAML.stringify(aiDoc, { lineWidth: 100 }) : ""),
     [aiDoc],
   );
@@ -333,8 +356,9 @@ export default function ChangesetSpec() {
             )}
             {generatedYaml && (
               <button
-                onClick={() => downloadBlob(generatedYaml, `fwd-${selectedDiff.from}-to-${selectedDiff.to}.yaml`, "application/yaml")}
+                onClick={() => downloadBlob(generatedYamlFull, `fwd-${selectedDiff.from}-to-${selectedDiff.to}.yaml`, "application/yaml")}
                 className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+                title="Download includes JSON Pointer affectedOperations"
               >
                 <Download className="w-3.5 h-3.5" /> Download
               </button>
@@ -376,8 +400,9 @@ export default function ChangesetSpec() {
                   <Bot className="w-3 h-3 text-amber-500" />
                   <span>AI extraction · {aiDoc.changes.length} change{aiDoc.changes.length !== 1 ? "s" : ""}</span>
                   <button
-                    onClick={() => downloadBlob(aiYaml, `fwd-${selectedDiff.from}-to-${selectedDiff.to}-ai.yaml`, "application/yaml")}
+                    onClick={() => downloadBlob(aiYamlFull, `fwd-${selectedDiff.from}-to-${selectedDiff.to}-ai.yaml`, "application/yaml")}
                     className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+                    title="Download includes JSON Pointer affectedOperations"
                   >
                     <Download className="w-3 h-3" /> Download
                   </button>
