@@ -147,15 +147,19 @@ function json(body: unknown, status = 200): Response {
 }
 
 export default async function handler(req: Request): Promise<Response> {
+  const t0 = Date.now();
+  console.log("[extract-changeset] start", req.method, req.url);
   if (req.method !== "POST") return json({ error: "POST required" }, 405);
-  let input: { year?: number; version?: string; fromVersion?: string; apiName?: string };
+  let input: { year?: number; version?: string; fromVersion?: string; apiName?: string; debug?: boolean };
   try {
     input = await req.json();
   } catch {
     return json({ error: "invalid JSON body" }, 400);
   }
-  const { year, version, fromVersion, apiName = "Forward Networks API" } = input;
+  const { year, version, fromVersion, apiName = "Forward Networks API", debug } = input;
   if (!year || !version) return json({ error: "year and version are required" }, 400);
+  console.log(`[extract-changeset] input year=${year} version=${version} from=${fromVersion} debug=${!!debug}`);
+  console.log(`[extract-changeset] env AI_GATEWAY_API_KEY=${process.env.AI_GATEWAY_API_KEY ? "set" : "UNSET"} VERCEL_OIDC_TOKEN=${process.env.VERCEL_OIDC_TOKEN ? "set" : "UNSET"}`);
 
   let html: string;
   let released: string | undefined;
@@ -167,11 +171,17 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const excerpt = stripBoilerplate(html);
+  console.log(`[extract-changeset] release notes fetched bytes=${html.length} excerpt=${excerpt.length} t+${Date.now() - t0}ms`);
+
+  if (debug) {
+    return json({ debug: true, excerptSample: excerpt.slice(0, 500), excerptLength: excerpt.length, released });
+  }
 
   try {
     if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
       return json({ error: "AI_GATEWAY_API_KEY is not set in the deployment environment" }, 500);
     }
+    console.log("[extract-changeset] calling generateObject...");
     const { object } = await generateObject({
       model: "anthropic/claude-sonnet-4-6",
       schema: Changeset,
@@ -187,9 +197,11 @@ export default async function handler(req: Request): Promise<Response> {
         `Include the release date in the top-level "released" field. ` +
         `If the section is empty, return an empty changes array — do NOT fabricate entries.`,
     });
+    console.log(`[extract-changeset] generateObject OK changes=${object?.changes?.length ?? 0} t+${Date.now() - t0}ms`);
     return json(object);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[extract-changeset] generateObject threw: ${msg}`);
     return json({ error: `AI extraction failed: ${msg}` }, 500);
   }
 }
