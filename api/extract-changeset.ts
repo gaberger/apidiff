@@ -149,6 +149,19 @@ function json(body: unknown, status = 200): Response {
 export default async function handler(req: Request): Promise<Response> {
   const t0 = Date.now();
   console.log("[extract-changeset] start", req.method, req.url);
+  // Diagnostic path — no AI, no fetch. Proves module loaded + handler reached.
+  if (new URL(req.url).searchParams.has("ping")) {
+    return json({
+      ok: true,
+      method: req.method,
+      env: {
+        AI_GATEWAY_API_KEY: !!process.env.AI_GATEWAY_API_KEY,
+        VERCEL_OIDC_TOKEN: !!process.env.VERCEL_OIDC_TOKEN,
+        VERCEL_ENV: process.env.VERCEL_ENV,
+      },
+      t: Date.now() - t0,
+    });
+  }
   if (req.method !== "POST") return json({ error: "POST required" }, 405);
   let input: { year?: number; version?: string; fromVersion?: string; apiName?: string; debug?: boolean };
   try {
