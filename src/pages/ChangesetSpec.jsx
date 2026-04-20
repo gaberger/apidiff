@@ -1,6 +1,6 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Download, FileJson, FileCode } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Download, FileJson, FileCode } from "lucide-react";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
 import exampleYaml from "../../apidiffspec/example-changeset.yaml?raw";
 
@@ -83,16 +83,35 @@ function downloadBlob(content, filename, mime) {
 }
 
 export default function ChangesetSpec() {
+  const { pathname } = useLocation();
+  const navItem = (to, label) => (
+    <Link
+      to={to}
+      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+        pathname === to
+          ? "text-stone-900 bg-stone-200"
+          : "text-stone-500 hover:text-stone-800 hover:bg-stone-100"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+
   return (
     <div className="min-h-screen bg-stone-50">
       <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="px-4 sm:px-8 flex items-center justify-between h-14">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="p-1.5 rounded hover:bg-stone-100 text-stone-500 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
-            <h1 className="text-sm font-bold text-stone-800">API Changeset Spec</h1>
-            <span className="text-[11px] font-mono text-stone-400 px-1.5 py-0.5 bg-stone-100 rounded">v0.2</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-sm font-bold tracking-tight whitespace-nowrap">
+              <span className="text-stone-800">api</span>
+              <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
+            </h1>
+            <nav className="ml-2 sm:ml-6 flex items-center gap-1">
+              {navItem("/", "Compare")}
+              {navItem("/changeset-spec", "Changeset Spec")}
+              {navItem("/settings", "Settings")}
+            </nav>
+            <span className="hidden sm:inline text-[11px] font-mono text-stone-400 px-1.5 py-0.5 bg-stone-100 rounded ml-2">Spec v0.2</span>
           </div>
           <div className="flex items-center gap-2">
             <button

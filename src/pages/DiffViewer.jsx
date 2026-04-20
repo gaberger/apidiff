@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, Settings as SettingsIcon, HelpCircle, BookOpen } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, HelpCircle } from "lucide-react";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts.js";
@@ -425,29 +425,25 @@ export default function DiffViewer() {
                 >
                   Guide
                 </button>
+                <div className="w-px h-4 bg-border mx-1" aria-hidden="true" />
+                <Link
+                  to="/changeset-spec"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-fast ease-standard"
+                >
+                  Changeset Spec
+                </Link>
+                <Link
+                  to="/settings"
+                  className="px-3 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-all duration-fast ease-standard"
+                >
+                  Settings
+                </Link>
               </nav>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
-              {/* Changeset spec link */}
-              <Link
-                to="/changeset-spec"
-                aria-label="Changeset spec"
-                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard inline-flex items-center"
-                title="API Changeset specification"
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-              </Link>
-
-              {/* Settings link */}
-              <Link
-                to="/settings"
-                aria-label="Settings"
-                className="p-1.5 rounded-md text-xs bg-secondary text-muted-foreground hover:text-foreground hover:shadow-e2 hover:-translate-y-px transition-all duration-fast ease-standard inline-flex items-center"
-                title="Discover specs, manage integrations"
-              >
-                <SettingsIcon className="w-3.5 h-3.5" />
-              </Link>
+              {/* Changeset Spec + Settings are in the primary nav (left side).
+                  This cluster holds only controls: theme / help / scroll-lock. */}
 
               {/* Theme toggle */}
               <button
