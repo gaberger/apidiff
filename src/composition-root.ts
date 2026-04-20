@@ -21,7 +21,7 @@ import { SupabaseIntegrationAdapter } from "./adapters/secondary/supabase/integr
 import { SupabaseSchemaCacheAdapter } from "./adapters/secondary/supabase/schema-cache-adapter.js";
 import { SupabaseSchemaUrlAdapter } from "./adapters/secondary/supabase/schema-url-adapter.js";
 import { hasSupabase } from "./adapters/secondary/supabase/client.js";
-import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
+import { BrowserChangelogParserAdapter } from "./adapters/secondary/browser-changelog-parser-adapter.js";
 import { DiscoveryService } from "./core/usecases/discovery-service.js";
 import type {
   ApiDiscoveryPort,
@@ -105,7 +105,10 @@ export function createBrowserStores(): {
     new UrlDiscoveryAdapter(),
     new DocusaurusDiscoveryAdapter(),
   ];
-  const changelogParser = new ChangelogParserAdapter();
+  // Browser changelog parser routes through /api/proxy-fetch so upstream
+  // CORS rejections (docs.fwd.app, github.blog, stripe.com/docs, etc.) don't
+  // turn every changelog fetch into a TypeError in the console.
+  const changelogParser = new BrowserChangelogParserAdapter();
   // Registry is optional on DiscoveryService; passing it makes every
   // discovered version URL land in schema_urls (Supabase or localStorage).
   const discoveryService = new DiscoveryService(
