@@ -138,3 +138,33 @@ export interface ProxyFetchResult {
   readonly contentType?: string;
   readonly status: number;
 }
+
+/**
+ * A schema source URL tracked in the runtime registry — may or may not be
+ * owned by a specific Integration. Free-standing URLs (e.g. ad-hoc diffs
+ * pasted into Compare) can be pinned here for reuse.
+ */
+export interface SchemaUrl {
+  readonly id: string;
+  readonly url: string;
+  readonly label?: string;
+  readonly ownerIntegrationId?: string;
+  readonly addedAt: string; // ISO 8601
+  readonly lastFetchedAt?: string;
+}
+
+export type SchemaUrlDraft = Omit<SchemaUrl, "id" | "addedAt">;
+
+/** A locally-cached schema document. `content` is serialized JSON/YAML text. */
+export interface CachedSchema {
+  readonly url: string;
+  readonly content: string;
+  readonly fetchedAt: number; // epoch ms
+  readonly expiresAt: number; // epoch ms
+  readonly sizeBytes: number;
+}
+
+export interface SchemaCacheStats {
+  readonly count: number;
+  readonly totalBytes: number;
+}

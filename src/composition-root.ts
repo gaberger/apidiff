@@ -15,9 +15,17 @@ import { UrlDiscoveryAdapter } from "./adapters/secondary/url-discovery-adapter.
 import { DocusaurusDiscoveryAdapter } from "./adapters/secondary/docusaurus-discovery-adapter.js";
 import { LocalStorageIntegrationAdapter } from "./adapters/secondary/localstorage-integration-adapter.js";
 import { BrowserProxyAdapter } from "./adapters/secondary/browser-proxy-adapter.js";
+import { LocalStorageSchemaCacheAdapter } from "./adapters/secondary/localstorage-schema-cache-adapter.js";
+import { LocalStorageSchemaUrlAdapter } from "./adapters/secondary/localstorage-schema-url-adapter.js";
 import { ChangelogParserAdapter } from "./adapters/secondary/changelog-parser-adapter.js";
 import { DiscoveryService } from "./core/usecases/discovery-service.js";
-import type { ApiDiscoveryPort, IntegrationStoragePort, SpecProxyPort } from "./core/ports/index.js";
+import type {
+  ApiDiscoveryPort,
+  IntegrationStoragePort,
+  SpecProxyPort,
+  SchemaCachePort,
+  SchemaUrlRegistryPort,
+} from "./core/ports/index.js";
 import type { SpecSource } from "./core/domain/discovery-types.js";
 
 export function createCliApp() {
@@ -55,6 +63,8 @@ export function createWebApp() {
 export function createBrowserStores(): {
   integrationStore: IntegrationStoragePort;
   specProxy: SpecProxyPort;
+  schemaCache: SchemaCachePort;
+  schemaUrlRegistry: SchemaUrlRegistryPort;
   discoveryService: DiscoveryService;
 } {
   const integrationStore = new LocalStorageIntegrationAdapter();
@@ -62,6 +72,13 @@ export function createBrowserStores(): {
   // never hit browser CORS rejections for non-CORS-friendly hosts (docs.fwd.app,
   // most vendor docs sites). The server has no origin restriction.
   const specProxy = new BrowserProxyAdapter({ alwaysProxy: true });
+
+  // Data layer — cache for fetched schemas, registry for tracked URLs.
+  // The cache operates on the same apidiff:spec:* keyspace used by the
+  // legacy src/lib/spec-cache.js module, so fetch-spec.js and this adapter
+  // stay in sync without either one owning the storage exclusively.
+  const schemaCache = new LocalStorageSchemaCacheAdapter();
+  const schemaUrlRegistry = new LocalStorageSchemaUrlAdapter();
 
   // Browser-safe discovery adapters. No GitHub token — the client bundle
   // must not ship credentials; 60 req/hr unauthenticated is sufficient for

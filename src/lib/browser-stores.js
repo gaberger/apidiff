@@ -8,4 +8,6 @@ const stores = createBrowserStores();
 
 export const integrationStore = stores.integrationStore;
 export const specProxy = stores.specProxy;
+export const schemaCache = stores.schemaCache;
+export const schemaUrlRegistry = stores.schemaUrlRegistry;
 export const discoveryService = stores.discoveryService;

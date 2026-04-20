@@ -11,6 +11,10 @@ import type {
   Integration,
   IntegrationDraft,
   ProxyFetchResult,
+  SchemaUrl,
+  SchemaUrlDraft,
+  CachedSchema,
+  SchemaCacheStats,
 } from "../domain/types.js";
 
 import type {
@@ -78,6 +82,24 @@ export interface ChangelogParserPort {
  */
 export interface SpecProxyPort {
   fetch(url: string): Promise<ProxyFetchResult>;
+}
+
+/** Caches fetched schema documents by URL, with TTL-based expiry. */
+export interface SchemaCachePort {
+  get(url: string): Promise<CachedSchema | null>;
+  put(url: string, content: string): Promise<boolean>;
+  invalidate(url: string): Promise<void>;
+  purge(): Promise<SchemaCacheStats & { freedBytes: number }>;
+  stats(): Promise<SchemaCacheStats>;
+}
+
+/** Persists the set of schema source URLs the user has tracked. */
+export interface SchemaUrlRegistryPort {
+  list(): Promise<SchemaUrl[]>;
+  add(draft: SchemaUrlDraft): Promise<SchemaUrl>;
+  remove(id: string): Promise<void>;
+  findByUrl(url: string): Promise<SchemaUrl | null>;
+  touchFetched(url: string): Promise<void>;
 }
 
 /** Persists user-configured API integrations (name, version URLs, comparison pairs). */
