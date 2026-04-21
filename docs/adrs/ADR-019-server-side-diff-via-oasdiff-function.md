@@ -13,6 +13,9 @@ oasdiff can be drafted if/when that work is picked up.
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 Even after offloading `$RefParser.dereference` + `computeDiff` to a Web Worker (post-ADR-018 work), the compute itself is the bottleneck for multi-MB real-world API specs:
 

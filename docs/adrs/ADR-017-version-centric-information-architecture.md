@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 APIDIFF's purpose is to help developers **understand schema changes between API version updates** so they can plan code changes. The current UI does not fully grasp this purpose:
 

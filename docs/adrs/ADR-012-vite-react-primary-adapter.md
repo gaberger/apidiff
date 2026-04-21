@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-09
 
+## Authors
+Gary Berger
+
 ## Context
 
 The project currently has two UI implementations:

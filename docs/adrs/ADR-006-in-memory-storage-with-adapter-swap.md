@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The migration guide viewer has a checklist feature where users mark items as complete. The DESIGN.md specifies localStorage persistence in the browser. The CLI has no persistence requirement. The question is how to model storage in the hex architecture.
 

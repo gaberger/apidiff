@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The toolkit needs a JavaScript/TypeScript runtime for the diff engine and web UI, plus a build tool for compiling the CLI to a distributable binary. Node.js + esbuild/webpack is the traditional choice. Bun offers an integrated runtime, bundler, test runner, and package manager.
 

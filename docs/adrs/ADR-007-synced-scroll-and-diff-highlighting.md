@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The web adapter displays two side-by-side JSON editors ("Old Response" / "New Response"). Currently:
 

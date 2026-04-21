@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-09
 
+## Authors
+Gary Berger
+
 ## Context
 
 The current diff algorithm (`diff-algorithm.ts`) detects renames and moves by requiring **exact value equality** between the old and new key:

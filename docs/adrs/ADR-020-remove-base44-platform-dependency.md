@@ -3,6 +3,9 @@
 ## Status
 Accepted — 2026-04-20
 
+## Authors
+Gary Berger
+
 ## Context
 The web shell was originally scaffolded as a base44 app. That created four hard
 couplings to the base44 SDK:

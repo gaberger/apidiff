@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-09
 
+## Authors
+Gary Berger
+
 ## Context
 
 ADR-009 introduced a hardcoded `PROVIDERS` registry inside the web adapter (`web-adapter.ts:275-310`). This works for the initial provider set (Stripe, GitHub, Twilio, Forward Networks) but has several problems:

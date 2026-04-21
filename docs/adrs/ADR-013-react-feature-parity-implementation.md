@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-09
 
+## Authors
+Gary Berger
+
 ## Context
 ADR-012 proposed migrating to Vite + React. During implementation, we discovered that the `apidiff-1` repo was Base44 boilerplate (LLM-based diffing), not our actual app. We needed to port the real vanilla HTML UI to React components that import our Coq-verified domain functions directly.
 

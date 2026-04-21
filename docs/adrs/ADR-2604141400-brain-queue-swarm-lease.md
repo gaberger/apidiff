@@ -8,6 +8,9 @@
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 
 The `hex brain` daemon manages an autonomous task queue (`hex brain enqueue`) that drains work items — workplans, shell commands, and hex commands — without human intervention. Two problems have emerged:

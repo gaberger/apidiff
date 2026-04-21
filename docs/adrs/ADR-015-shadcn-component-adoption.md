@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 `package.json` includes the full Radix primitive set and `src/components/ui/` holds shadcn-generated components, but the application pages only use a narrow subset. Several UI surfaces use hand-rolled markup where a shadcn component would be stronger:
 

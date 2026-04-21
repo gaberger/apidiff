@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 Spec downloads are APIDIFF's biggest perceived-latency source:
 

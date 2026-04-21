@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 APIDIFF currently accepts raw JSON responses pasted into textareas. To compare full OpenAPI 2.0 and 3.0 specifications, users need two input methods:
 

@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The web UI renders user-pasted JSON values in a diff table. These values originate entirely from user input (external to the domain layer). Using `innerHTML` to render them would create a direct XSS vector — a malicious JSON value like `"<img onerror=alert(1) src=x>"` would execute arbitrary JavaScript.
 

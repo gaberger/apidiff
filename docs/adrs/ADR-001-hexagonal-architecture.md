@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The API migration toolkit has three distinct interface surfaces (CLI, Web UI, Library) and multiple external dependencies (oasdiff binary, HTTP schema fetching, browser localStorage). The core diff algorithm and guide generation logic must remain testable in isolation, independent of how they are invoked or where data is stored.
 

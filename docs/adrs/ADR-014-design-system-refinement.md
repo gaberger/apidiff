@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 The React UI (ADR-012, ADR-013) is functionally complete but visually flat. Shadcn primitives, Tailwind, `tailwindcss-animate`, `framer-motion`, and a full HSL token palette in `src/index.css` are already wired — but the pages under `src/pages/` and `src/components/diff,sidebar,guide` use a narrow slice of the design language:
 

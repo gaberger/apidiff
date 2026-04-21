@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 Users currently load API comparisons by pasting raw JSON or selecting from a small dropdown of generic samples. Real-world API migration work targets specific providers — Stripe, HubSpot, Twilio, GitHub, Shopify, Slack — each with well-documented version histories and publicly available OpenAPI specs.
 

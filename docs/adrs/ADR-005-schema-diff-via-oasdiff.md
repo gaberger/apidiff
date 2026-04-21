@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 Schema-level API diffing (comparing two OpenAPI specs) is a solved problem. The oasdiff project (Go binary) provides comprehensive OpenAPI diff with breaking change detection, deprecation tracking, and multiple output formats. Reimplementing this in TypeScript would be significant effort for inferior results.
 

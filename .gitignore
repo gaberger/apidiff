@@ -18,3 +18,4 @@ proofs/.*.aux
 .vercel
 .env*.local
 supabase/.temp/
+supabase/supabase/

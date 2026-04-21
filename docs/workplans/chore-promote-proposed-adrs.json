@@ -1,0 +1,51 @@
+{
+  "id": "chore-promote-proposed-adrs",
+  "title": "Promote shipped-but-proposed ADRs to accepted (or supersede if stale)",
+  "adr": "meta",
+  "created": "2026-04-21",
+  "status": "pending",
+  "topology": "hierarchical",
+  "budget": "~15000 tokens",
+  "context": {
+    "problem": "12 of 21 ADRs sit in 'proposed' status. hex adr list on 2026-04-21 showed ADRs 008, 010-012, 014-018 as proposed despite most decisions being live in code (React app, provider registry, spec caching, version-centric IA). 'proposed' is drift, not deliberation. Audit each, promote the shipped ones, supersede the stale ones.",
+    "evidence_command": "hex adr list"
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Audit each proposed ADR against current code",
+      "description": "For each of ADR-008, ADR-010, ADR-011, ADR-012, ADR-014, ADR-015, ADR-016, ADR-017, ADR-018: read the ADR body, then grep the codebase for the decision's load-bearing artifact (e.g. ADR-012 → src/App.jsx + vite.config; ADR-010 → provider-registry.js; ADR-017 → version-centric routes; ADR-018 → SchemaCache port + adapter). Classify each as: (a) shipped-and-current → promote to accepted, (b) shipped-but-diverged → accept-with-amendment, (c) abandoned → supersede with a brief ADR explaining why.",
+      "layer": "docs",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "docs/workplans/adr-audit-2026-04-21.md exists with one row per proposed ADR: status verdict + evidence file:line + recommended action."
+    },
+    {
+      "id": "step-2",
+      "name": "Promote shipped ADRs to accepted via hex adr update",
+      "description": "For every ADR classified 'shipped-and-current' in step-1, run `hex adr update <ID> --status accepted` (or equivalent tool). For 'shipped-but-diverged' ADRs, append a dated 'Amendments' section documenting the divergence before accepting.",
+      "layer": "docs",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "hex adr list shows no proposed ADRs for shipped decisions. Each newly-accepted ADR has a commit trail."
+    },
+    {
+      "id": "step-3",
+      "name": "Supersede abandoned ADRs",
+      "description": "For every ADR classified 'abandoned' in step-1, write a successor ADR via `hex adr create` that explains what replaced it (or that the feature was dropped), then mark the old one superseded.",
+      "layer": "docs",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "Every previously-proposed ADR is either accepted or superseded. hex adr list shows proposed count === 0 (excluding any intentionally-open proposals)."
+    },
+    {
+      "id": "step-4",
+      "name": "Commit and verify",
+      "description": "Single commit: 'chore(adr): promote shipped proposals to accepted + supersede stale'. Run hex analyze . to confirm no architectural regressions.",
+      "layer": "ops",
+      "dependencies": ["step-2", "step-3"],
+      "tier": 2,
+      "done_condition": "Commit pushed. hex analyze clean. hex adr list proposed-count matches audit expectations."
+    }
+  ]
+}

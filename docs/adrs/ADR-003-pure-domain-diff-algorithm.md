@@ -6,6 +6,9 @@ Accepted
 ## Date
 2026-04-08
 
+## Authors
+Gary Berger
+
 ## Context
 The response diff engine must compare two JSON objects and classify each change semantically (renamed, moved, type-changed, etc.) rather than syntactically. This is the core value proposition of the toolkit. The algorithm needs to be deterministic, side-effect-free, and fast for typical API responses (< 200 fields).
 

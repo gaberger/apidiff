@@ -6,6 +6,9 @@ Proposed
 ## Date
 2026-04-14
 
+## Authors
+Gary Berger
+
 ## Context
 Even with ADR-014 (tokens) and ADR-015 (component adoption), the app still reads primitive because of **information-architecture gaps** that no token or component swap fixes:
 
