@@ -1,0 +1,60 @@
+{
+  "id": "wp-triage-sidebar-and-diff-component-churn",
+  "title": "Triage uncommitted src/ churn: ProviderSidebar deletion + diff component edits + provider-registry + dereference-worker",
+  "adr": "pending",
+  "created": "2026-04-21",
+  "status": "pending",
+  "topology": "hierarchical",
+  "budget": "~18000 tokens",
+  "context": {
+    "problem": "Seven files in src/ are uncommitted with no ADR rationale: (1) src/components/sidebar/ProviderSidebar.jsx DELETED (-222 lines) — last touched in 337d7e9 (dark-mode tokenization) so this is a deliberate removal, not a merge artifact. Zero remaining references to ProviderSidebar in src/ after deletion, which means something else now owns the sidebar UI or the feature is gone. (2) src/components/diff/DiffResults.jsx +133/-? — substantial addition, unknown intent. (3) DiffSummary.jsx, FetchProgress.jsx, VersionTimeline.jsx — small tweaks. (4) src/lib/domain/provider-registry.js — 17 LOC changed in a domain/ file; must verify no imports outside domain/ per hex rule. (5) src/workers/dereference-worker.js — 9 LOC changed. Either these are drafts that should be reverted, or they are shipped behavior that needs an ADR + commit trail before landing.",
+    "evidence_command": "git status --short src/ && git diff HEAD -- src/",
+    "files_at_risk": [
+      "src/components/sidebar/ProviderSidebar.jsx",
+      "src/components/diff/DiffResults.jsx",
+      "src/components/diff/DiffSummary.jsx",
+      "src/components/diff/FetchProgress.jsx",
+      "src/components/diff/VersionTimeline.jsx",
+      "src/lib/domain/provider-registry.js",
+      "src/workers/dereference-worker.js"
+    ]
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Classify each file: keep-and-document vs revert",
+      "description": "For every file in files_at_risk, read `git diff HEAD` output and run the app locally (or at least `bun run build` + `hex analyze .`) to decide: (a) KEEP — behavior is correct and intended, needs ADR rationale; (b) REVERT — a draft or accidental edit; (c) SPLIT — part keep, part revert. Produce docs/workplans/src-churn-triage-2026-04-21.md with one row per file.",
+      "layer": "docs",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "Triage file exists with a verdict for every entry in files_at_risk. Each KEEP row cites the feature it supports. Each REVERT row cites no remaining references."
+    },
+    {
+      "id": "step-2",
+      "name": "ProviderSidebar removal — ADR or revert",
+      "description": "ProviderSidebar.jsx deletion is the single largest change (-222 LOC) and has zero remaining references in src/. Either (a) write a new ADR that supersedes ADR-009 (popular-api-integrations-sidebar) explaining what replaced the sidebar and why, or (b) git restore src/components/sidebar/ProviderSidebar.jsx if this was accidental. Decision must match what the live app does — run the dev server and confirm whether any sidebar UI is still present.",
+      "layer": "docs",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "Either a new ADR exists superseding ADR-009 with commit trail, or the file is restored. Not both, not neither."
+    },
+    {
+      "id": "step-3",
+      "name": "Domain-purity check on provider-registry.js diff",
+      "description": "src/lib/domain/provider-registry.js sits in domain/. Read the uncommitted diff and verify: no new imports from outside domain/, no adapter coupling, no framework deps. If the 17-line diff violates hex rule 1, revert the offending portion or move it to a usecases/ or adapters/ file.",
+      "layer": "validation",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "hex analyze . reports clean for domain/. `grep -E \"^import\" src/lib/domain/provider-registry.js` shows only domain-internal paths or stdlib."
+    },
+    {
+      "id": "step-4",
+      "name": "Commit or revert per step-1 verdicts",
+      "description": "Execute the triage decisions. One commit per coherent group (e.g. 'feat(diff): <what DiffResults adds>', 'refactor(worker): <dereference-worker change>'). Any KEEP row must map to a commit; any REVERT row must result in `git restore`.",
+      "layer": "ops",
+      "dependencies": ["step-2", "step-3"],
+      "tier": 2,
+      "done_condition": "git status src/ shows zero uncommitted modifications. hex analyze . clean. All reachable routes render without console errors."
+    }
+  ]
+}

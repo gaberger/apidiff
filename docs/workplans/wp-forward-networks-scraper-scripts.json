@@ -1,0 +1,42 @@
+{
+  "id": "wp-forward-networks-scraper-scripts",
+  "title": "Land Forward Networks provider scraper scripts with ADR — or delete them",
+  "adr": "pending",
+  "created": "2026-04-21",
+  "status": "pending",
+  "topology": "hierarchical",
+  "budget": "~10000 tokens",
+  "context": {
+    "problem": "Three untracked scripts/ files exist without an ADR: (1) scripts/analyze-release-notes.js — uses agent-browser CLI to scrape https://docs.fwd.app/release-notes/api; (2) scripts/generate-fwd-provider.js — turns release-notes-diff.json into a provider registry entry; (3) scripts/add-fwd-urls.js — mutates src/data/fwdnetworks.json to add a `date` field for VersionTimeline. They form a one-shot data-generation pipeline for the Forward Networks provider. Either they are reusable scripts that belong in scripts/ with documentation, or they are throwaway and should be deleted now that their output has been committed.",
+    "evidence_command": "ls -la scripts/*.js && head -20 scripts/add-fwd-urls.js scripts/analyze-release-notes.js scripts/generate-fwd-provider.js"
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Decide: keep as reusable tooling or delete as throwaway",
+      "description": "Ask: will these scripts be re-run when Forward Networks publishes new release notes? If yes → promote to tracked scripts/ with a README block explaining inputs/outputs/dependencies (agent-browser CLI, release-notes-diff.json source). If no → the output data (src/data/fwdnetworks.json) is already committed; delete the scripts.",
+      "layer": "ops",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "Decision recorded in step-2 action."
+    },
+    {
+      "id": "step-2",
+      "name": "If KEEP: add docstring header + commit; if DELETE: rm + commit",
+      "description": "KEEP path: add a 3-line header comment to each script documenting purpose, required env (BUN, agent-browser), and output file. Append an entry to scripts/README.md (create if absent). Commit: 'chore(scripts): land forward-networks provider scraper pipeline'. DELETE path: rm the three files. Commit: 'chore(scripts): remove one-shot forward-networks scraper — output already captured in src/data/fwdnetworks.json'.",
+      "layer": "ops",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "git status scripts/ shows zero untracked files. Either the scripts are committed with documentation, or they are removed."
+    },
+    {
+      "id": "step-3",
+      "name": "Write a brief ADR if KEEP path was chosen",
+      "description": "If the scripts were kept, write a short ADR (~1 page) declaring the scripts/ directory as a tooling sandbox for provider data generation — not a primary adapter, not a production code path. Note that agent-browser is a non-build dependency. Skip if DELETE path was chosen.",
+      "layer": "docs",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "Either ADR exists declaring scripts/ conventions, or step-2 took the DELETE path and no ADR is needed."
+    }
+  ]
+}
