@@ -72,23 +72,26 @@ const REGISTRY_COLORS = {
 
 /**
  * Convert a PROVIDER_REGISTRY entry into the shape IntegrationList renders.
- * Only kind:'url' sources can surface directly — they ship explicit spec URLs
- * that map 1:1 to versions. Other kinds (github, apis-guru, docusaurus) need
- * a runtime discovery call, not done here.
+ * kind:'url' sources ship explicit spec URLs and map 1:1 to versions.
+ * Other kinds (github, apis-guru, docusaurus) appear with empty versions —
+ * the user runs discovery from /discovery to populate them, after which
+ * a real Integration row from integrationStore wins by slug merge below.
  */
 function registryEntryToIntegration(p) {
-  if (p.specSource.kind !== "url") return null;
-  return {
+  const base = {
     id: `registry:${p.slug}`,
     name: p.name,
     slug: p.slug,
     category: p.category,
     color: REGISTRY_COLORS[p.slug] || "#78716c",
     logo_url: "",
-    versions: p.specSource.specUrls.map((u) => ({ label: u.label, url: u.url })),
     comparisons: [],
     __source: "registry",
   };
+  if (p.specSource.kind === "url") {
+    return { ...base, versions: p.specSource.specUrls.map((u) => ({ label: u.label, url: u.url })) };
+  }
+  return { ...base, versions: [] };
 }
 
 export default function IntegrationList({ selected, onSelect, initialSlug, collapsed, onToggleCollapse }) {
