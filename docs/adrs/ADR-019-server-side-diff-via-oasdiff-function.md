@@ -1,7 +1,14 @@
 # ADR-019: Server-Side Diff via base44 Function + oasdiff
 
 ## Status
-Proposed
+Superseded by ADR-020 (2026-04-21) — base44 platform was removed, so the
+"base44 function" runtime this ADR proposed no longer exists. The
+underlying need (server-side diff to cut wall-clock cost on multi-MB
+specs) remains valid; a replacement ADR targeting Vercel Functions +
+oasdiff can be drafted if/when that work is picked up.
+
+## Date
+2026-04-14
 
 ## Date
 2026-04-14
