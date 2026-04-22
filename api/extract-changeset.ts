@@ -329,7 +329,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Extract JSON from the response. Accept either raw JSON or JSON wrapped
     // in ```json fences, since some runs may add them despite the prompt.
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonText = (fenced ? fenced[1] : text).trim();
+    const jsonText = (fenced?.[1] ?? text).trim();
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonText);
