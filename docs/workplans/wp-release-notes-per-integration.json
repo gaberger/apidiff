@@ -1,0 +1,179 @@
+{
+  "adr": "ADR-010",
+  "created_at": "2026-04-22T18:15:00Z",
+  "created_by": "human",
+  "description": "Today the release-notes → Changeset v0.2 flow only fires for Forward Networks (hardcoded via integration.slug === 'forward-networks' + the static src/data/fwdnetworks.json scrape). Every other integration in provider-registry.js (Stripe, PayPal, Adyen, Twilio, SendGrid, GitHub, GitLab, AWS, Azure, OpenAI, etc.) has no release-notes path at all — clicking them produces the 'No versions discovered yet' dead-end. Generalize the flow: define a ReleaseNotesPort, implement per-provider adapters, wire via composition-root, and replace the FWD hardcoding in IntegrationHeader with a port lookup.",
+  "feature": "Generalize release-notes parsing across every registered integration",
+  "id": "wp-release-notes-per-integration",
+  "phases": [
+    {
+      "description": "Define ReleaseNotesPort in src/core/ports/. Shape the contract around the existing fwdnetworks-diff JSON so the two-version aggregation path in IntegrationHeader keeps working unchanged. Add ReleaseNotesService use-case in src/core/usecases/ that holds a slug→adapter map, parallel to DiscoveryService.",
+      "gate": {
+        "blocking": true,
+        "command": "bun run typecheck",
+        "type": "typecheck"
+      },
+      "id": "P0",
+      "name": "Port + registry scaffold",
+      "tasks": [
+        {
+          "id": "P0.1",
+          "layer": "ports",
+          "name": "ReleaseNotesPort interface: fetchRange(slug, fromLabel, toLabel) → AggregateDiff"
+        },
+        {
+          "id": "P0.2",
+          "layer": "usecases",
+          "name": "ReleaseNotesService use-case with Map<slug, adapter> lookup + aggregate-range method"
+        },
+        {
+          "id": "P0.3",
+          "layer": "domain",
+          "name": "AggregateDiff + ReleaseNoteVersion types in src/core/domain/release-notes-types.ts"
+        }
+      ],
+      "tier": 0
+    },
+    {
+      "description": "Move the current static fwdData.versions + aggregation logic out of IntegrationList.jsx/IntegrationHeader.jsx and into src/adapters/secondary/forward-networks-release-notes-adapter.ts implementing ReleaseNotesPort. Keep the offline fallback (src/data/fwdnetworks.json) as the adapter's data source.",
+      "gate": {
+        "blocking": true,
+        "command": "bun test",
+        "type": "test"
+      },
+      "id": "P1",
+      "name": "Refactor Forward Networks into a proper adapter",
+      "tasks": [
+        {
+          "id": "P1.1",
+          "layer": "secondary-adapter",
+          "name": "Write forward-networks-release-notes-adapter.ts"
+        },
+        {
+          "id": "P1.2",
+          "layer": "test",
+          "name": "Adapter test: loading fwdData + aggregating 25.10 → 26.3 returns 93 changes"
+        },
+        {
+          "id": "P1.3",
+          "layer": "composition-root",
+          "name": "Register adapter in composition-root.ts; expose releaseNotesService via browser-stores"
+        }
+      ],
+      "tier": 1
+    },
+    {
+      "description": "Replace the `isFwdNetworks = slug === 'forward-networks'` gates and inline aggregation in IntegrationHeader.jsx with a releaseNotesService.fetchRange(slug, ...) call. When no adapter is registered for a slug, fall back to the existing Discover-versions flow.",
+      "gate": {
+        "blocking": true,
+        "command": "bun run build",
+        "type": "build"
+      },
+      "id": "P2",
+      "name": "Generalize IntegrationHeader to use the port",
+      "tasks": [
+        {
+          "id": "P2.1",
+          "layer": "primary-adapter",
+          "name": "IntegrationHeader: remove isFwdNetworks hardcodes, call releaseNotesService.fetchRange"
+        },
+        {
+          "id": "P2.2",
+          "layer": "primary-adapter",
+          "name": "Empty-state fallback when no release-notes adapter is registered"
+        }
+      ],
+      "tier": 2
+    },
+    {
+      "description": "Each provider publishes release notes in a different format. Write one adapter per integration, wired as a secondary adapter implementing ReleaseNotesPort. Each adapter bundles a per-provider scraper (or consumes static JSON under src/data/). Scripts/analyze-release-notes.js should be generalized to scripts/release-notes-scraper/ with one module per provider.",
+      "id": "P3",
+      "name": "Per-provider release-notes adapters (one task per provider)",
+      "tasks": [
+        {
+          "id": "P3.1",
+          "layer": "secondary-adapter",
+          "name": "Stripe adapter — github.com/stripe/openapi release tags + CHANGELOG.md parse"
+        },
+        {
+          "id": "P3.2",
+          "layer": "secondary-adapter",
+          "name": "GitHub adapter — docs.github.com REST API changelog pages (https://docs.github.com/en/rest/overview/breaking-changes)"
+        },
+        {
+          "id": "P3.3",
+          "layer": "secondary-adapter",
+          "name": "PayPal adapter — developer.paypal.com/api/rest/release-notes"
+        },
+        {
+          "id": "P3.4",
+          "layer": "secondary-adapter",
+          "name": "Twilio adapter — twilio.com/docs/api/changelog"
+        },
+        {
+          "id": "P3.5",
+          "layer": "secondary-adapter",
+          "name": "SendGrid adapter — docs.sendgrid.com → changelog"
+        },
+        {
+          "id": "P3.6",
+          "layer": "secondary-adapter",
+          "name": "Adyen adapter — docs.adyen.com → release notes"
+        },
+        {
+          "id": "P3.7",
+          "layer": "secondary-adapter",
+          "name": "AWS adapter — sampling via docs.aws.amazon.com/general/latest/gr/whats-new.html"
+        },
+        {
+          "id": "P3.8",
+          "layer": "secondary-adapter",
+          "name": "OpenAI adapter — platform.openai.com/docs/changelog"
+        },
+        {
+          "id": "P3.9",
+          "layer": "secondary-adapter",
+          "name": "Slack adapter — api.slack.com/changelog"
+        },
+        {
+          "id": "P3.10",
+          "layer": "secondary-adapter",
+          "name": "Remaining providers — batch (Square, Vonage, GitLab, Jira, PagerDuty, Azure, GCP, DigitalOcean, Cloudflare, Okta, Discord)"
+        }
+      ],
+      "tier": 2
+    },
+    {
+      "description": "Replace scripts/analyze-release-notes.js with scripts/release-notes-scraper/<provider>.js modules, each producing src/data/<slug>.json. Add a GitHub Action (or cron hook) that re-runs scrapers weekly and opens a PR when new versions appear.",
+      "id": "P4",
+      "name": "Scraper pipeline + CI refresh",
+      "tasks": [
+        {
+          "id": "P4.1",
+          "layer": "tooling",
+          "name": "scripts/release-notes-scraper/{provider}.js modules"
+        },
+        {
+          "id": "P4.2",
+          "layer": "tooling",
+          "name": "weekly cron workflow that opens PRs on data changes"
+        }
+      ],
+      "tier": 3
+    },
+    {
+      "description": "Pick 3 providers that ship adapters in P3 (Stripe, GitHub, Twilio). Open each in the UI, select two versions, click Diff Release Notes, verify a Changeset v0.2 view renders with real data — not the Discover-versions empty state.",
+      "id": "P5",
+      "name": "Validate: end-to-end across 3+ providers",
+      "tasks": [
+        {
+          "id": "P5.1",
+          "layer": "validation",
+          "name": "e2e check at /stripe, /github, /twilio"
+        }
+      ],
+      "tier": 4
+    }
+  ],
+  "priority": "high"
+}
