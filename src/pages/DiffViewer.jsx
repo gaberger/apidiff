@@ -734,13 +734,13 @@ export default function DiffViewer() {
                       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                         Generate Migration Guide
                       </h3>
-                      <div className="flex items-end gap-2 sm:gap-3 flex-wrap">
+                      <div className="grid grid-cols-2 sm:flex sm:items-end gap-2 sm:gap-3">
                         <div>
                           <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Base</label>
                           <input
                             value={guideForm.baseVersion}
                             onChange={(e) => setGuideForm({ ...guideForm, baseVersion: e.target.value })}
-                            className="w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
+                            className="w-full sm:w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
                           />
                         </div>
                         <div>
@@ -748,23 +748,23 @@ export default function DiffViewer() {
                           <input
                             value={guideForm.revisionVersion}
                             onChange={(e) => setGuideForm({ ...guideForm, revisionVersion: e.target.value })}
-                            className="w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
+                            className="w-full sm:w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
                           />
                         </div>
-                        <div>
+                        <div className="col-span-2 sm:col-auto">
                           <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Sunset</label>
                           <input
                             type="date"
                             value={guideForm.sunsetDate}
                             onChange={(e) => setGuideForm({ ...guideForm, sunsetDate: e.target.value })}
-                            className="px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40"
+                            className="w-full sm:w-auto px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40"
                           />
                         </div>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={handleGenerateGuide}
-                          className="h-8 text-xs"
+                          className="col-span-2 sm:col-auto h-8 text-xs"
                         >
                           <FileText className="w-3.5 h-3.5 mr-1.5" />
                           Generate
