@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Loader2, X, GitCompareArrows } from "lucide-react";
+import { Loader2, X, GitCompareArrows, Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
 import { fetchSpec } from "@/lib/fetch-spec.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
+import { discoveryService } from "@/lib/browser-stores";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
 
@@ -18,8 +19,40 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
   const [v1Idx, setV1Idx] = useState(null);
   const [v2Idx, setV2Idx] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [discoveredVersions, setDiscoveredVersions] = useState(null);
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverError, setDiscoverError] = useState(null);
 
-  const versions = integration.versions || [];
+  // Reset discovery state when the integration changes
+  useEffect(() => {
+    setDiscoveredVersions(null);
+    setDiscoverError(null);
+  }, [integration.slug]);
+
+  async function handleDiscover() {
+    setDiscovering(true);
+    setDiscoverError(null);
+    try {
+      const result = await discoveryService.discoverProvider(integration.slug);
+      const vers = (result?.versions || []).map((v) => ({
+        label: v.label || v.version || v.url || "unknown",
+        url: v.url,
+        from: v.released_at || v.date,
+        to: v.released_at || v.date,
+      }));
+      if (vers.length === 0) {
+        setDiscoverError("Discovery returned 0 versions. Try the Discovery page to debug.");
+      } else {
+        setDiscoveredVersions(vers);
+      }
+    } catch (err) {
+      setDiscoverError(err instanceof Error ? err.message : "Discovery failed");
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
+  const versions = discoveredVersions ?? integration.versions ?? [];
   const color = integration.color || "#666";
   const slug = (integration.slug || integration.name || "").toLowerCase();
 
@@ -414,9 +447,28 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
           </div>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground italic">
-          No versions discovered yet. Use Settings to run discovery or paste specs manually below.
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-muted-foreground italic">
+            No versions discovered yet. Discover them now or paste specs manually below.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDiscover}
+              disabled={discovering}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {discovering ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Discovering…</>
+              ) : (
+                <><Search className="w-3.5 h-3.5" /> Discover versions</>
+              )}
+            </button>
+            {discoverError && (
+              <span className="text-xs text-red-600 dark:text-red-400">{discoverError}</span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
