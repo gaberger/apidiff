@@ -97,6 +97,15 @@ function registryEntryToIntegration(p) {
 export default function IntegrationList({ selected, onSelect, initialSlug, collapsed, onToggleCollapse }) {
   const [integrations, setIntegrations] = useState([]);
   const [collapsedCats, setCollapsedCats] = useState(() => new Set());
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const handler = (e) => setIsNarrow(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   useEffect(() => {
     integrationStore.list().then((items) => {
@@ -229,7 +238,7 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
       className={`flex flex-col border-r border-border bg-muted/40 dark:bg-background overflow-hidden ${
         collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl'
       }`}
-      animate={{ width: collapsed ? 48 : 220 }}
+      animate={{ width: collapsed ? (isNarrow ? 0 : 48) : 220 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Header */}

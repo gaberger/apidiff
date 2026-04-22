@@ -393,7 +393,7 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
             accentColor={color}
           />
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-start sm:justify-end gap-2">
             {isFwdNetworks && v1Idx !== null && !canDiffWithSpecs(versions[v1Idx]?.label || "") && !versions[v1Idx]?.diff && (
               <span className="text-xs text-amber-600 dark:text-amber-400 mr-auto">
                 No specs or release notes available for this version

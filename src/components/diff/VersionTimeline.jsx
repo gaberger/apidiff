@@ -82,7 +82,7 @@ export default function VersionTimeline({
                 key={`${v.url ?? ''}-${v.label ?? ''}-${i}`}
                 type="button"
                 onClick={() => handleClick(v.idx)}
-                className="group relative flex flex-col items-center px-2 py-1 outline-none"
+                className="group relative flex flex-col items-center px-2 py-2 min-w-[44px] outline-none"
                 title={`${v.label}${v.date ? ` \u00b7 ${formatDate(v.date)}` : ""}`}
               >
                 <span

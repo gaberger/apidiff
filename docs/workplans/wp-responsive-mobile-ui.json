@@ -1,0 +1,76 @@
+{
+  "id": "wp-responsive-mobile-ui",
+  "title": "Mobile responsive fixes — DiffViewer + IntegrationList + IntegrationHeader + VersionTimeline",
+  "adr": "ADR-016",
+  "created": "2026-04-22",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~18000 tokens",
+  "context": {
+    "problem": "User reports 'this site needs responsive design agents to fix mobile ui'. Audit (agent, 2026-04-22) confirmed: tablet (768) and desktop (1280) are clean; mobile (375) has 5 structural problems concentrated in the compare-surface chrome. Verdict: moderate-refactor, no new breakpoints needed — Tailwind sm: (640) covers every fix. Scope ~4 files, ~15 className edits, 0 JS logic changes apart from a mobile menu toggle.",
+    "screenshots": "/tmp/apidiff-responsive/*.png — 14 PNGs across 375×812, 768×1024, 1280×800 for / /forward-networks /settings /discovery /changeset-spec",
+    "risk": "low — additive Tailwind prefixes don't alter desktop behavior"
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Collapse left sidebar to 0px on phones instead of 48px rail",
+      "description": "IntegrationList.jsx:229-234 animates width 48↔220. Initial state is `window.innerWidth < 768` so mobile users always see the 48px rail of colored dots, eating 13% of a 375px screen. Change: on max-sm viewports, collapsed width → 0. Consider opening the integration picker as a full-screen sheet/drawer on mobile (shadcn Sheet).",
+      "files": ["src/components/sidebar/IntegrationList.jsx"],
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "At 375px wide, the integration sidebar either occupies 0px or is hidden behind a mobile menu affordance. Compare surface gets the full viewport width."
+    },
+    {
+      "id": "step-2",
+      "name": "Truncate 'Diff <label> Release Notes' button text on mobile + wrap header action row",
+      "description": "IntegrationHeader.jsx:396-408 — the long label pushes the button off-screen on 375, truncating the 25.12 end of the timeline. Fix (a): shorten label to 'Diff {label}' under sm:. Fix (b): change header action row to `flex-wrap gap-2 justify-start sm:justify-end` so elements stack cleanly when narrow.",
+      "files": ["src/components/diff/IntegrationHeader.jsx"],
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "At 375px the Diff button is fully visible and the timeline scrolls without overlap."
+    },
+    {
+      "id": "step-3",
+      "name": "VersionTimeline scroll affordance + tap-target enlargement",
+      "description": "VersionTimeline.jsx:61-62 horizontally scrolls silently; on mobile only ~4 of 39 dots are visible and the scrollbar isn't obviously interactive. Dots are 10-12px — below the 44px minimum tap target. Fix: (a) wrap each dot-button in `p-2` or use `min-w-[44px] min-h-[44px]` for a real touch target while keeping visual size; (b) add a right-edge gradient fade + `← earlier / later →` chevrons under sm: hinting at horizontal overflow; (c) consider `snap-x snap-mandatory` on the outer scroll container so swipes page through a small group at a time.",
+      "files": ["src/components/diff/VersionTimeline.jsx"],
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 1,
+      "done_condition": "Every timeline dot has a ≥44px² tap target. Viewers can tell the row is scrollable (gradient or chevron). Clicking works at 375px."
+    },
+    {
+      "id": "step-4",
+      "name": "Collapse header nav into a hamburger/popover under sm:",
+      "description": "DiffViewer.jsx:405-447 renders Compare/Guide/Changeset Spec/Discovery/Settings as inline flex-row links at all widths. On 375, right-cluster buttons (theme, shortcuts, lock, Compare-action) overlap the 'Changeset Spec'/'Discovery' links. Fix: wrap the link cluster with `hidden sm:flex` and render a mobile `<button>` menu toggle `sm:hidden` that opens a shadcn DropdownMenu or Sheet with the same links. Add one useState for menu open/close.",
+      "files": ["src/pages/DiffViewer.jsx", "src/App.jsx"],
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 1,
+      "done_condition": "At 375px, right-cluster action icons don't overlap any text. Primary nav is reachable via a clearly-labeled hamburger menu. Tablet + desktop layout unchanged."
+    },
+    {
+      "id": "step-5",
+      "name": "Guide-gen form — two-column grid at <sm, flex-row at sm+",
+      "description": "DiffViewer.jsx:673-713 wraps a flex-end row with three w-24 inputs + date picker + button. Date input's native width (~180px) blows the row apart into 4 lines on 375. Fix: `grid grid-cols-2 sm:flex sm:items-end gap-2` on the wrapper; `w-full sm:w-24` on the two version inputs; `col-span-2` on the date.",
+      "files": ["src/pages/DiffViewer.jsx"],
+      "layer": "primary-adapter",
+      "dependencies": [],
+      "tier": 2,
+      "done_condition": "At 375px the guide-gen form renders as a tidy 2-col grid; at sm+ renders as the prior single-row layout."
+    },
+    {
+      "id": "step-6",
+      "name": "Manual QA at 375/768/1280",
+      "description": "After all edits, start bun run dev and use agent-browser to screenshot each route at all three viewports. Compare to /tmp/apidiff-responsive/* baseline. Paste diffs into commit message.",
+      "files": [],
+      "layer": "validation",
+      "dependencies": ["step-1", "step-2", "step-3", "step-4", "step-5"],
+      "tier": 2,
+      "done_condition": "Fresh screenshots show no overlapping text, no horizontal page scroll on 375, all touch targets ≥44px, desktop layout unchanged."
+    }
+  ]
+}
