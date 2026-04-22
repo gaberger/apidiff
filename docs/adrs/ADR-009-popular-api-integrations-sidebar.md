@@ -86,3 +86,11 @@ The page layout shifts from single-column to sidebar + main:
 - Adding new providers requires only adding an entry to the registry object — no backend changes
 - The layout shift from single-column to sidebar+main is a visual breaking change for existing users
 - SVG icon data increases the HTML payload by ~2-3KB (acceptable for 6 providers)
+
+## Amendments
+
+### 2026-04-22 — Replaced `ProviderSidebar.jsx` with `IntegrationList.jsx`
+
+The original React component (`src/components/sidebar/ProviderSidebar.jsx`, 222 LOC) was removed in favor of `src/components/sidebar/IntegrationList.jsx`, which consumes the domain-layer provider registry directly and integrates with the Docusaurus discovery adapter added for ADR-008 / spec-input expansion. The sidebar decision itself — curated provider registry, left-nav layout, version-pair click-to-load — is unchanged. The replacement was a component-level refactor, not a reversal of this ADR.
+
+Concurrent change to `src/lib/domain/provider-registry.js`: Forward Networks switched from a hardcoded 13-URL `specUrls` array to `{ kind: "docusaurus", baseUrl: "https://docs.fwd.app" }` + `changelogUrl`. This is a data-shape change within the same registry; adapters (`docusaurus-discovery-adapter.ts`) fan out the concrete URLs at runtime.

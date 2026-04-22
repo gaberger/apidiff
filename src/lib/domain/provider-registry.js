@@ -150,21 +150,8 @@ var PROVIDER_REGISTRY = [
     name: "Forward Networks",
     slug: "forward-networks",
     category: "infrastructure",
-    specSource: { kind: "url", specUrls: [
-      { label: "v26.3 · Complete", url: "https://docs.fwd.app/26.3/api/spec/complete.json" },
-      { label: "v26.2 · Complete", url: "https://docs.fwd.app/26.2/api/spec/complete.json" },
-      { label: "v26.3 · Checks", url: "https://docs.fwd.app/26.3/api/spec/checks.json" },
-      { label: "v26.2 · Checks", url: "https://docs.fwd.app/26.2/api/spec/checks.json" },
-      { label: "v26.3 · Networks", url: "https://docs.fwd.app/26.3/api/spec/networks.json" },
-      { label: "v26.2 · Networks", url: "https://docs.fwd.app/26.2/api/spec/networks.json" },
-      { label: "v26.3 · NQE", url: "https://docs.fwd.app/26.3/api/spec/nqe.json" },
-      { label: "v26.2 · NQE", url: "https://docs.fwd.app/26.2/api/spec/nqe.json" },
-      { label: "v26.3 · Aliases", url: "https://docs.fwd.app/26.3/api/spec/aliases.json" },
-      { label: "v26.2 · Aliases", url: "https://docs.fwd.app/26.2/api/spec/aliases.json" },
-      { label: "v26.3 · Credentials", url: "https://docs.fwd.app/26.3/api/spec/credentials.json" },
-      { label: "v26.2 · Credentials", url: "https://docs.fwd.app/26.2/api/spec/credentials.json" },
-      { label: "v26.3 · Path Search", url: "https://docs.fwd.app/26.3/api/spec/path-search.json" }
-    ] },
+    specSource: { kind: "docusaurus", baseUrl: "https://docs.fwd.app" },
+    changelogUrl: "https://docs.fwd.app/release-notes/api",
     docsUrl: "https://docs.fwd.app/latest/api/"
   }
 ];
