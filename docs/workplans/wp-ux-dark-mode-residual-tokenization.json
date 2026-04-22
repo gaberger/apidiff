@@ -3,7 +3,13 @@
   "title": "Replace bare stone-* classes with semantic shadcn tokens in 8 remaining components",
   "adr": "ADR-012",
   "created": "2026-04-15",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-22",
+  "completion_evidence": {
+    "scope_actual": "Expanded beyond the 8 listed files to all 12 files with stone-* refs (187 refs total — ChangesetSpec.jsx had grown to 58 refs since workplan creation; DiffResults.jsx +13 from today's release-notes commit 07d6ca2). Done-condition was grep-zero across src/components + src/pages.",
+    "mechanism": "Single-pass sed via /tmp/stone-to-tokens.sed applying the pattern map documented in prior_work, plus coverage for dark: overrides (removed — semantic tokens auto-adapt).",
+    "verification": "hex analyze . → A+ 100/100, 0 boundary violations. grep -rn 'stone-' src/components src/pages → 0 matches."
+  },
   "topology": "pipeline",
   "budget": "~20000 tokens",
   "prior_work": {

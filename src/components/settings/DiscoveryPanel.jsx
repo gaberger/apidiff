@@ -109,7 +109,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
       {/* Inputs */}
       <div className="space-y-2">
         <div>
-          <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">
+          <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
             API / GitHub URL
           </label>
           <input
@@ -117,18 +117,18 @@ export default function DiscoveryPanel({ onAddComparisons }) {
             onChange={(e) => setBaseUrl(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleDiscover()}
             placeholder="Stripe, Twilio, GitHub API… or paste a URL"
-            className="w-full px-2.5 py-1.5 text-xs font-mono border border-stone-200 rounded-md bg-white focus:outline-none focus:border-amber-400"
+            className="w-full px-2.5 py-1.5 text-xs font-mono border border-border rounded-md bg-white focus:outline-none focus:border-amber-400"
           />
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">
-            Changelog URL <span className="text-stone-400 font-normal normal-case">(optional)</span>
+          <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+            Changelog URL <span className="text-muted-foreground/70 font-normal normal-case">(optional)</span>
           </label>
           <input
             value={changelogUrl}
             onChange={(e) => setChangelogUrl(e.target.value)}
             placeholder="https://stripe.com/docs/upgrades"
-            className="w-full px-2.5 py-1.5 text-xs font-mono border border-stone-200 rounded-md bg-white focus:outline-none focus:border-amber-400"
+            className="w-full px-2.5 py-1.5 text-xs font-mono border border-border rounded-md bg-white focus:outline-none focus:border-amber-400"
           />
         </div>
       </div>
@@ -147,7 +147,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
         )}
       </Button>
       {source && (
-        <span className="text-[10px] text-stone-400 ml-2">source: {source}</span>
+        <span className="text-[10px] text-muted-foreground/70 ml-2">source: {source}</span>
       )}
 
       {error && (
@@ -159,10 +159,10 @@ export default function DiscoveryPanel({ onAddComparisons }) {
         <div className="space-y-3">
           {results.versions?.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 <GitBranch className="w-3 h-3" /> Discovered Specs ({results.versions.length})
                 {hasProducts && (
-                  <span className="ml-1 text-[10px] font-normal normal-case text-stone-400">
+                  <span className="ml-1 text-[10px] font-normal normal-case text-muted-foreground/70">
                     across {versionGroups.length} products
                   </span>
                 )}
@@ -174,25 +174,25 @@ export default function DiscoveryPanel({ onAddComparisons }) {
                     const name = group.product?.name ?? "Other";
                     const isCollapsed = collapsedProducts.has(key);
                     return (
-                      <div key={key} className="border border-stone-200 rounded bg-stone-50/60">
+                      <div key={key} className="border border-border rounded bg-muted/60">
                         <button
                           onClick={() => toggleProduct(key)}
-                          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-semibold text-stone-700 hover:bg-stone-100"
+                          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-[11px] font-semibold text-foreground hover:bg-secondary"
                         >
                           {isCollapsed
                             ? <ChevronRight className="w-3 h-3" />
                             : <ChevronDown className="w-3 h-3" />}
                           <span>{name}</span>
-                          <span className="ml-auto font-mono text-[10px] text-stone-400">
+                          <span className="ml-auto font-mono text-[10px] text-muted-foreground/70">
                             {group.versions.length} version{group.versions.length !== 1 ? "s" : ""}
                           </span>
                         </button>
                         {!isCollapsed && (
                           <div className="space-y-1 px-2 pb-2">
                             {group.versions.map((v, i) => (
-                              <div key={i} className="flex items-center gap-2 text-xs bg-white border border-stone-200 rounded px-2.5 py-1.5">
-                                <span className="font-mono font-semibold text-stone-700 truncate flex-1">{v.label}</span>
-                                <a href={v.url} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-amber-600">
+                              <div key={i} className="flex items-center gap-2 text-xs bg-white border border-border rounded px-2.5 py-1.5">
+                                <span className="font-mono font-semibold text-foreground truncate flex-1">{v.label}</span>
+                                <a href={v.url} target="_blank" rel="noreferrer" className="text-muted-foreground/70 hover:text-amber-600">
                                   <ExternalLink className="w-3 h-3" />
                                 </a>
                               </div>
@@ -206,9 +206,9 @@ export default function DiscoveryPanel({ onAddComparisons }) {
               ) : (
                 <div className="space-y-1">
                   {results.versions.map((v, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs bg-white border border-stone-200 rounded px-2.5 py-1.5">
-                      <span className="font-mono font-semibold text-stone-700 truncate flex-1">{v.label}</span>
-                      <a href={v.url} target="_blank" rel="noreferrer" className="text-stone-400 hover:text-amber-600">
+                    <div key={i} className="flex items-center gap-2 text-xs bg-white border border-border rounded px-2.5 py-1.5">
+                      <span className="font-mono font-semibold text-foreground truncate flex-1">{v.label}</span>
+                      <a href={v.url} target="_blank" rel="noreferrer" className="text-muted-foreground/70 hover:text-amber-600">
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
@@ -220,12 +220,12 @@ export default function DiscoveryPanel({ onAddComparisons }) {
 
           {results.changelog_versions?.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 <BookOpen className="w-3 h-3" /> Changelog Versions ({results.changelog_versions.length})
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {results.changelog_versions.map((v, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-stone-100 text-stone-600 border border-stone-200">
+                  <span key={i} className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-secondary text-foreground/80 border border-border">
                     {v}
                   </span>
                 ))}
@@ -235,7 +235,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
 
           {results.pairs?.length > 0 ? (
             <div>
-              <div className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-2">
+              <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 Select Comparisons to Add
               </div>
               <div className="space-y-1.5">
@@ -245,14 +245,14 @@ export default function DiscoveryPanel({ onAddComparisons }) {
                       type="checkbox"
                       checked={selected.has(i)}
                       onChange={() => togglePair(i)}
-                      className="rounded border-stone-300"
+                      className="rounded border-input"
                     />
-                    <span className="text-xs font-mono text-stone-700 group-hover:text-stone-900">{pair.label}</span>
+                    <span className="text-xs font-mono text-foreground group-hover:text-foreground">{pair.label}</span>
                   </label>
                 ))}
               </div>
               {results.versions?.length > 0 && (
-                <p className="text-[11px] text-stone-500 mt-2">
+                <p className="text-[11px] text-muted-foreground mt-2">
                   {results.versions.length} individual version{results.versions.length !== 1 ? 's' : ''} will also be saved for any-to-any comparison.
                 </p>
               )}
@@ -267,7 +267,7 @@ export default function DiscoveryPanel({ onAddComparisons }) {
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-stone-500 italic">
+            <p className="text-xs text-muted-foreground italic">
               No comparison pairs found. The AI may need a more specific URL.
             </p>
           )}

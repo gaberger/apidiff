@@ -87,7 +87,7 @@ function colorizeJsonLine(line) {
       return tokens;
     } else if (/^null/.test(rest)) {
       const nullMatch = rest.match(/^(null)(.*)/);
-      tokens.push(<span key={key++} className="text-stone-400">{nullMatch[1]}</span>);
+      tokens.push(<span key={key++} className="text-muted-foreground/70">{nullMatch[1]}</span>);
       tokens.push(<span key={key++}>{nullMatch[2]}</span>);
       return tokens;
     } else if (/^-?\d/.test(rest)) {
@@ -99,7 +99,7 @@ function colorizeJsonLine(line) {
   }
 
   // Fallback — plain text
-  tokens.push(<span key={key++} className="text-stone-700 dark:text-stone-300">{rest}</span>);
+  tokens.push(<span key={key++} className="text-foreground dark:text-muted-foreground/70">{rest}</span>);
   return tokens;
 }
 
@@ -173,7 +173,7 @@ const SpecInputRaw = React.memo(function SpecInput({
     // Large spec: render raw text as a single div (zero per-line elements). The
     // PathHighlightOverlay component handles the path-click highlight independently.
     if (isLargeSpec) {
-      setHighlightedLines([<div key="plain" className="text-stone-700 dark:text-stone-300" style={{ whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>{value}</div>]);
+      setHighlightedLines([<div key="plain" className="text-foreground dark:text-muted-foreground/70" style={{ whiteSpace: "pre-wrap", wordWrap: "break-word", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 13, lineHeight: 1.6 }}>{value}</div>]);
       return;
     }
 
@@ -407,10 +407,10 @@ const SpecInputRaw = React.memo(function SpecInput({
           {/* Line number gutter */}
           <div
             ref={lineGutterRef}
-            className="flex-shrink-0 w-10 bg-stone-100 dark:bg-stone-900 border-r border-stone-200 dark:border-stone-700 overflow-hidden select-none"
+            className="flex-shrink-0 w-10 bg-secondary dark:bg-background border-r border-border overflow-hidden select-none"
             aria-hidden="true"
           >
-            <div className="py-2 sm:py-3 pr-2 text-right font-mono text-[10px] sm:text-[11px] leading-[1.6] text-stone-400">
+            <div className="py-2 sm:py-3 pr-2 text-right font-mono text-[10px] sm:text-[11px] leading-[1.6] text-muted-foreground/70">
               {Array.from({ length: Math.max(lineCount, 1) }, (_, i) => (
                 <div key={i + 1}>{i + 1}</div>
               ))}
@@ -422,7 +422,7 @@ const SpecInputRaw = React.memo(function SpecInput({
             {/* Syntax-highlighted + diff-colored pre (behind textarea) */}
             <pre
               ref={preRef}
-              className="absolute inset-0 py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0 text-stone-700 dark:text-stone-300"
+              className="absolute inset-0 py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] whitespace-pre overflow-auto pointer-events-none m-0 z-0 text-foreground dark:text-muted-foreground/70"
               aria-hidden="true"
             >
               <div style={{minWidth: "max-content"}}>{highlightedLines}</div>
@@ -449,7 +449,7 @@ const SpecInputRaw = React.memo(function SpecInput({
               onChange={(e) => onChange(e.target.value)}
               onScroll={handleScroll}
               placeholder={`Paste JSON, drop a file, or fetch from URL...\n\nSupports OpenAPI 3.x / Swagger 2.0\nJSON or YAML format`}
-              className="relative z-10 w-full h-full resize-none bg-transparent py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] text-transparent caret-stone-800 dark:caret-stone-100 placeholder:text-stone-400 dark:placeholder:text-stone-500 focus:outline-none"
+              className="relative z-10 w-full h-full resize-none bg-transparent py-2 sm:py-3 px-2 sm:px-3 font-mono text-[11px] sm:text-[13px] leading-[1.6] text-transparent caret-foreground placeholder:text-muted-foreground/70 dark:placeholder:text-muted-foreground focus:outline-none"
               style={{ caretColor: "#1c1917", WebkitTextFillColor: "transparent" }}
               spellCheck={false}
             />
@@ -459,7 +459,7 @@ const SpecInputRaw = React.memo(function SpecInput({
 
       {/* Editor info bar */}
       {editorInfo && (
-        <div className="flex gap-3 mt-1.5 px-1 font-mono text-[11px] text-stone-500">
+        <div className="flex gap-3 mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
           <span>{editorInfo.lines} lines</span>
           <span>{editorInfo.size}</span>
         </div>
@@ -475,12 +475,12 @@ const SpecInputRaw = React.memo(function SpecInput({
             if (e.key === "Enter") handleFetch();
           }}
           placeholder="https://api.example.com/openapi.json"
-          className="flex-1 min-w-0 font-mono text-[11px] sm:text-[13px] bg-stone-50 border border-stone-200 rounded-md px-2 sm:px-2.5 py-1.5 text-foreground placeholder:text-stone-400 outline-none focus:border-amber-400 transition-colors"
+          className="flex-1 min-w-0 font-mono text-[11px] sm:text-[13px] bg-muted/40 border border-border rounded-md px-2 sm:px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground/70 outline-none focus:border-amber-400 transition-colors"
         />
         <Button
           variant="outline"
           size="sm"
-          className="h-8 px-2 sm:px-3 text-[11px] sm:text-[13px] font-semibold border-stone-200 hover:bg-stone-100"
+          className="h-8 px-2 sm:px-3 text-[11px] sm:text-[13px] font-semibold border-border hover:bg-secondary"
           onClick={handleFetch}
           disabled={isFetching || !fetchUrl.trim()}
         >

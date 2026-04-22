@@ -646,9 +646,9 @@ export default function DiffViewer() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-6"
                   >
-                    <h2 className="text-base sm:text-lg font-bold text-stone-800">
+                    <h2 className="text-base sm:text-lg font-bold text-foreground">
                       {isReleaseNotes ? releaseNotesChangeCount : (filteredResults ? filteredResults.length : 0)} changes detected
-                      {pathFilter && <span className="ml-2 text-sm font-normal text-stone-500">filtered by: {pathFilter}</span>}
+                      {pathFilter && <span className="ml-2 text-sm font-normal text-muted-foreground">filtered by: {pathFilter}</span>}
                     </h2>
 
                     <div className="mb-3">
@@ -657,7 +657,7 @@ export default function DiffViewer() {
                         value={pathFilter}
                         onChange={(e) => setPathFilter(e.target.value)}
                         placeholder="Filter by path (e.g. /users, /api/v1)"
-                        className="w-full px-3 py-2 text-sm border border-stone-200 rounded-md bg-stone-50 font-mono"
+                        className="w-full px-3 py-2 text-sm border border-border rounded-md bg-muted/40 font-mono"
                       />
                     </div>
 
@@ -670,34 +670,34 @@ export default function DiffViewer() {
                     />
 
                     {/* Guide generation form */}
-                    <div className="border border-stone-200 rounded-lg bg-white p-3 sm:p-4">
-                      <h3 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3">
+                    <div className="border border-border rounded-lg bg-white p-3 sm:p-4">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                         Generate Migration Guide
                       </h3>
                       <div className="flex items-end gap-2 sm:gap-3 flex-wrap">
                         <div>
-                          <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Base</label>
+                          <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Base</label>
                           <input
                             value={guideForm.baseVersion}
                             onChange={(e) => setGuideForm({ ...guideForm, baseVersion: e.target.value })}
-                            className="w-24 px-2 py-1.5 text-sm border border-stone-200 rounded-md bg-stone-50 font-mono"
+                            className="w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Revision</label>
+                          <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Revision</label>
                           <input
                             value={guideForm.revisionVersion}
                             onChange={(e) => setGuideForm({ ...guideForm, revisionVersion: e.target.value })}
-                            className="w-24 px-2 py-1.5 text-sm border border-stone-200 rounded-md bg-stone-50 font-mono"
+                            className="w-24 px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40 font-mono"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Sunset</label>
+                          <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Sunset</label>
                           <input
                             type="date"
                             value={guideForm.sunsetDate}
                             onChange={(e) => setGuideForm({ ...guideForm, sunsetDate: e.target.value })}
-                            className="px-2 py-1.5 text-sm border border-stone-200 rounded-md bg-stone-50"
+                            className="px-2 py-1.5 text-sm border border-border rounded-md bg-muted/40"
                           />
                         </div>
                         <Button

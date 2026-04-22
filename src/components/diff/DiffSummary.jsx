@@ -30,8 +30,8 @@ export default function DiffSummary({ results, summaryCounts, activeFilter, onFi
           onClick={() => onFilterChange("all")}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
             activeFilter === "all"
-              ? "bg-stone-800 text-white border-stone-800"
-              : "bg-stone-100 text-stone-600 border-stone-200 hover:bg-stone-200"
+              ? "bg-secondary text-white border-border"
+              : "bg-secondary text-foreground/80 border-border hover:bg-accent"
           }`}
         >
           All

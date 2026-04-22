@@ -188,18 +188,18 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-muted/40">
       {/* Header */}
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+      <header className="border-b border-border bg-white/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="px-4 sm:px-8 flex items-center justify-between h-14">
           <div className="flex items-center gap-3">
-            <Link to="/" className="p-1.5 rounded hover:bg-stone-100 text-stone-500 transition-colors">
+            <Link to="/" className="p-1.5 rounded hover:bg-secondary text-muted-foreground transition-colors">
               <ArrowLeft className="w-4 h-4" />
             </Link>
-            <h1 className="text-sm font-bold text-stone-800">Integration Settings</h1>
+            <h1 className="text-sm font-bold text-foreground">Integration Settings</h1>
             <Link
               to="/discovery"
-              className="ml-2 px-2.5 py-1 text-xs font-medium rounded-md text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+              className="ml-2 px-2.5 py-1 text-xs font-medium rounded-md text-foreground/80 hover:text-foreground hover:bg-secondary transition-colors"
             >
               Discovery
             </Link>
@@ -217,7 +217,7 @@ export default function Settings() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-8 py-8 space-y-4">
         {loading && (
-          <p className="text-sm text-stone-400">Loading integrations…</p>
+          <p className="text-sm text-muted-foreground/70">Loading integrations…</p>
         )}
 
         {/* Existing integrations */}
@@ -271,7 +271,7 @@ export default function Settings() {
         )}
 
         {!loading && mergedIntegrations.length === 0 && !newIntegration && (
-          <div className="text-center py-16 text-stone-400 text-sm">
+          <div className="text-center py-16 text-muted-foreground/70 text-sm">
             No integrations yet. Click "Add Integration" to create one.
           </div>
         )}
@@ -301,10 +301,10 @@ function IntegrationCard({
     setShowDiscovery(false);
   }
   return (
-    <div className="border border-stone-200 rounded-lg bg-white overflow-hidden">
+    <div className="border border-border rounded-lg bg-white overflow-hidden">
       {/* Card header */}
       <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/40 transition-colors"
         onClick={onToggle}
         style={{ borderLeft: `3px solid ${integration.color || "#888"}` }}
       >
@@ -312,44 +312,44 @@ function IntegrationCard({
           <img src={integration.logo_url} alt={integration.name} className="w-[18px] h-[18px] object-contain rounded flex-shrink-0" />
         ) : (
           <div
-            className="w-4 h-4 rounded-full border border-stone-200 flex-shrink-0"
+            className="w-4 h-4 rounded-full border border-border flex-shrink-0"
             style={{ background: integration.color || "#888" }}
           />
         )}
-        <span className="flex-1 text-sm font-medium text-stone-700">
-          {integration.name || <span className="text-stone-400 italic">New Integration</span>}
+        <span className="flex-1 text-sm font-medium text-foreground">
+          {integration.name || <span className="text-muted-foreground/70 italic">New Integration</span>}
         </span>
-        <span className="text-xs text-stone-400">
+        <span className="text-xs text-muted-foreground/70">
           {(integration.comparisons || []).length} comparison{(integration.comparisons || []).length !== 1 ? "s" : ""}
         </span>
         {expanded ? (
-          <ChevronUp className="w-4 h-4 text-stone-400" />
+          <ChevronUp className="w-4 h-4 text-muted-foreground/70" />
         ) : (
-          <ChevronDown className="w-4 h-4 text-stone-400" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground/70" />
         )}
       </div>
 
       {/* Expanded form */}
       {expanded && (
-        <div className="px-4 pb-4 pt-3 border-t border-stone-100 space-y-4">
+        <div className="px-4 pb-4 pt-3 border-t border-border space-y-4">
           {/* Name + color */}
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Name</label>
+              <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Name</label>
               <input
                 value={integration.name}
                 onChange={(e) => onFieldChange("name", e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm border border-stone-200 rounded-md bg-stone-50 focus:outline-none focus:border-amber-400"
+                className="w-full px-2.5 py-1.5 text-sm border border-border rounded-md bg-muted/40 focus:outline-none focus:border-amber-400"
                 placeholder="e.g. Stripe"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider mb-1">Color</label>
+              <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Color</label>
               <input
                 type="color"
                 value={integration.color || "#635BFF"}
                 onChange={(e) => onFieldChange("color", e.target.value)}
-                className="w-10 h-9 rounded border border-stone-200 cursor-pointer"
+                className="w-10 h-9 rounded border border-border cursor-pointer"
               />
             </div>
           </div>
@@ -358,20 +358,20 @@ function IntegrationCard({
           <div className="space-y-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
             <p className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">Auto-Discovery (runs daily)</p>
             <div>
-              <label className="block text-[11px] text-stone-500 mb-1">API / GitHub Base URL</label>
+              <label className="block text-[11px] text-muted-foreground mb-1">API / GitHub Base URL</label>
               <input
                 value={integration.base_url || ""}
                 onChange={(e) => onFieldChange("base_url", e.target.value)}
-                className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                className="w-full px-2 py-1 text-xs font-mono border border-border rounded bg-white focus:outline-none focus:border-amber-400"
                 placeholder="https://github.com/stripe/openapi"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-stone-500 mb-1">Changelog URL (optional)</label>
+              <label className="block text-[11px] text-muted-foreground mb-1">Changelog URL (optional)</label>
               <input
                 value={integration.changelog_url || ""}
                 onChange={(e) => onFieldChange("changelog_url", e.target.value)}
-                className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                className="w-full px-2 py-1 text-xs font-mono border border-border rounded bg-white focus:outline-none focus:border-amber-400"
                 placeholder="https://stripe.com/docs/upgrades"
               />
             </div>
@@ -380,7 +380,7 @@ function IntegrationCard({
           {/* Comparisons */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+              <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Version Comparisons
               </label>
               <button
@@ -399,17 +399,17 @@ function IntegrationCard({
 
             <div className="space-y-3">
               {(integration.comparisons || []).map((comp, idx) => (
-                <div key={idx} className="border border-stone-200 rounded-md p-3 bg-stone-50 space-y-2">
+                <div key={idx} className="border border-border rounded-md p-3 bg-muted/40 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={comp.label}
                       onChange={(e) => onComparisonChange(idx, "label", e.target.value)}
-                      className="flex-1 px-2 py-1 text-xs border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                      className="flex-1 px-2 py-1 text-xs border border-border rounded bg-white focus:outline-none focus:border-amber-400"
                       placeholder="Label (e.g. v1 → v2)"
                     />
                     <button
                       onClick={() => onRemoveComparison(idx)}
-                      className="p-1 rounded hover:bg-red-50 text-stone-400 hover:text-red-500 transition-colors"
+                      className="p-1 rounded hover:bg-red-50 text-muted-foreground/70 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -417,13 +417,13 @@ function IntegrationCard({
                   <input
                     value={comp.v1_url}
                     onChange={(e) => onComparisonChange(idx, "v1_url", e.target.value)}
-                    className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-2 py-1 text-xs font-mono border border-border rounded bg-white focus:outline-none focus:border-amber-400"
                     placeholder="Old spec URL (https://...)"
                   />
                   <input
                     value={comp.v2_url}
                     onChange={(e) => onComparisonChange(idx, "v2_url", e.target.value)}
-                    className="w-full px-2 py-1 text-xs font-mono border border-stone-200 rounded bg-white focus:outline-none focus:border-amber-400"
+                    className="w-full px-2 py-1 text-xs font-mono border border-border rounded bg-white focus:outline-none focus:border-amber-400"
                     placeholder="New spec URL (https://...)"
                   />
                 </div>

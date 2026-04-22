@@ -9,7 +9,7 @@ const typeConfig = {
   "type-change": { label: "Type Change", pill: "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800",  border: "border-l-amber-400 dark:border-l-amber-500" },
   added:         { label: "Added",       pill: "bg-green-100 text-green-700 border border-green-200 dark:bg-green-900/40 dark:text-green-200 dark:border-green-800",  border: "border-l-green-400 dark:border-l-green-500" },
   changed:       { label: "Changed",     pill: "bg-amber-100 text-amber-700 border border-amber-200 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-800",  border: "border-l-amber-400 dark:border-l-amber-500" },
-  unchanged:     { label: "Unchanged",   pill: "bg-stone-100 text-stone-500 border border-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:border-stone-700",    border: "border-l-stone-300 dark:border-l-stone-600" },
+  unchanged:     { label: "Unchanged",   pill: "bg-secondary text-muted-foreground border border-border dark:bg-secondary dark:text-muted-foreground/70",    border: "border-l-input" },
 };
 
 function formatValue(val) {
@@ -74,7 +74,7 @@ function DiffValuePill({ value, variant }) {
         <button
           type="button"
           aria-label={`Expand ${variant} value`}
-          className={`text-left px-1.5 py-0.5 rounded ${tone} w-fit max-w-[280px] line-clamp-2 whitespace-pre-wrap break-words cursor-pointer hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus:ring-1 focus:ring-stone-400 dark:focus:ring-stone-500`}
+          className={`text-left px-1.5 py-0.5 rounded ${tone} w-fit max-w-[280px] line-clamp-2 whitespace-pre-wrap break-words cursor-pointer hover:brightness-95 dark:hover:brightness-110 focus:outline-none focus:ring-1 focus:ring-ring dark:focus:ring-ring`}
         >
           {text}
         </button>
@@ -82,10 +82,10 @@ function DiffValuePill({ value, variant }) {
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="w-[min(520px,90vw)] p-0 bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700"
+        className="w-[min(520px,90vw)] p-0 bg-white dark:bg-background border-border"
       >
-        <div className="flex items-center justify-between px-3 py-2 border-b border-stone-200 dark:border-stone-700">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground dark:text-muted-foreground/70">
             {variant === "removed" ? "Old value" : "New value"}
           </span>
           <Button
@@ -93,7 +93,7 @@ function DiffValuePill({ value, variant }) {
             variant="ghost"
             size="sm"
             onClick={onCopy}
-            className="h-7 px-2 text-xs text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+            className="h-7 px-2 text-xs text-foreground/80 dark:text-muted-foreground/70 hover:bg-secondary dark:hover:bg-secondary"
           >
             {copied ? "Copied" : "Copy"}
           </Button>
@@ -134,13 +134,13 @@ function PathBreadcrumb({ segs, highlightFrom = segs.length - 1, side, onPathCli
         const isDiff = i >= highlightFrom;
         return (
           <React.Fragment key={i}>
-            {i > 0 && <span className="text-stone-300 dark:text-stone-600 select-none">/</span>}
+            {i > 0 && <span className="text-muted-foreground/70 dark:text-foreground/80 select-none">/</span>}
             <span
               onClick={() => onPathClick && onPathClick(partialPath, side)}
               className={`cursor-pointer px-0.5 rounded transition-colors ${
                 isDiff
-                  ? "font-semibold text-stone-800 bg-stone-100 hover:bg-stone-200 dark:text-stone-100 dark:bg-stone-800 dark:hover:bg-stone-700"
-                  : "text-stone-400 hover:text-stone-600 dark:text-stone-500 dark:hover:text-stone-300"
+                  ? "font-semibold text-foreground bg-secondary hover:bg-accent dark:text-foreground dark:bg-secondary dark:hover:bg-accent"
+                  : "text-muted-foreground/70 hover:text-foreground/80 dark:text-muted-foreground dark:hover:text-muted-foreground/70"
               }`}
               title={partialPath}
             >
@@ -169,7 +169,7 @@ function DiffItem({ result, onPathClick }) {
     : "both";
 
   return (
-    <tr className={`border-b border-stone-100 dark:border-stone-800 hover:bg-stone-50/80 dark:hover:bg-stone-800/50 transition-colors border-l-2 ${config.border}`}>
+    <tr className={`border-b border-border dark:border-border hover:bg-muted/80 dark:hover:bg-secondary/50 transition-colors border-l-2 ${config.border}`}>
 
       {/* Path column */}
       <td className="px-4 py-3">
@@ -223,7 +223,7 @@ function DiffItem({ result, onPathClick }) {
         {result.type === "type-change" && result.oldType && result.newType ? (
           <div className="flex items-center gap-2">
             <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 line-through dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/70">{result.oldType}</span>
-            <span className="text-stone-400 dark:text-stone-500">→</span>
+            <span className="text-muted-foreground/70 dark:text-muted-foreground">→</span>
             <span className="px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800/70">{result.newType}</span>
           </div>
         ) : (
@@ -235,7 +235,7 @@ function DiffItem({ result, onPathClick }) {
               <DiffValuePill value={result.new} variant="added" />
             )}
             {result.old === undefined && result.new === undefined && (
-              <span className="text-stone-300 dark:text-stone-600">—</span>
+              <span className="text-muted-foreground/70 dark:text-foreground/80">—</span>
             )}
           </div>
         )}

@@ -53,7 +53,7 @@ export default function CodeBlock({ code, lang, maxHeight = "32rem", className =
 
   if (!state) {
     return (
-      <pre className={`${sharedClass} bg-stone-900 text-stone-100 p-4`} style={sharedStyle}>
+      <pre className={`${sharedClass} bg-background text-foreground p-4`} style={sharedStyle}>
         {code}
       </pre>
     );

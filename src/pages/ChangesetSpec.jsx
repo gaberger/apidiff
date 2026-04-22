@@ -93,8 +93,8 @@ export default function ChangesetSpec() {
       to={to}
       className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
         pathname === to
-          ? "text-stone-900 bg-stone-200"
-          : "text-stone-500 hover:text-stone-800 hover:bg-stone-100"
+          ? "text-foreground bg-accent"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
       }`}
     >
       {label}
@@ -182,12 +182,12 @@ export default function ChangesetSpec() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      <header className="border-b border-stone-200 bg-white/80 backdrop-blur-sm sticky top-0 z-20">
+    <div className="min-h-screen bg-muted/40">
+      <header className="border-b border-border bg-white/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="px-4 sm:px-8 flex items-center justify-between h-14">
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="text-sm font-bold tracking-tight whitespace-nowrap">
-              <span className="text-stone-800">api</span>
+              <span className="text-foreground">api</span>
               <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
             </h1>
             <nav className="ml-2 sm:ml-6 flex items-center gap-1">
@@ -195,18 +195,18 @@ export default function ChangesetSpec() {
               {navItem("/changeset-spec", "Changeset Spec")}
               {navItem("/settings", "Settings")}
             </nav>
-            <span className="hidden sm:inline text-[11px] font-mono text-stone-400 px-1.5 py-0.5 bg-stone-100 rounded ml-2">Spec v0.2</span>
+            <span className="hidden sm:inline text-[11px] font-mono text-muted-foreground/70 px-1.5 py-0.5 bg-secondary rounded ml-2">Spec v0.2</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => downloadBlob(schemaJson, "api-changeset-schema.json", "application/json")}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
             >
               <FileJson className="w-3.5 h-3.5" /> Schema
             </button>
             <button
               onClick={() => downloadBlob(exampleYaml, "example-changeset.yaml", "application/yaml")}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
             >
               <FileCode className="w-3.5 h-3.5" /> Example
             </button>
@@ -214,10 +214,10 @@ export default function ChangesetSpec() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-10 text-stone-700">
+      <main className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-10 text-foreground">
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">What is a Changeset?</h2>
+          <h2 className="text-xl font-semibold text-foreground">What is a Changeset?</h2>
           <p className="leading-relaxed">
             A <strong>changeset</strong> is a structured document describing <em>how we got from OpenAPI spec A to spec B</em>.
             It is both human-readable and machine-parseable, and validates against a JSON Schema (Draft 2020-12).
@@ -229,16 +229,16 @@ export default function ChangesetSpec() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Why this format exists alongside the specs</h2>
+          <h2 className="text-xl font-semibold text-foreground">Why this format exists alongside the specs</h2>
           <p className="leading-relaxed">
-            You can diff two OpenAPI documents with a tool like <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">oasdiff</code> and
+            You can diff two OpenAPI documents with a tool like <code className="text-xs px-1 py-0.5 bg-secondary rounded">oasdiff</code> and
             recover most structural and constraint changes automatically. But some classes of change are <strong>invisible to spec diff</strong>:
           </p>
           <ul className="list-disc pl-5 space-y-1 leading-relaxed">
-            <li><code className="text-xs px-1 py-0.5 bg-stone-100 rounded">resemanticize</code> — same shape, new meaning (<code>pending</code> used to mean "not yet paid"; it now means "paid, awaiting fulfillment").</li>
-            <li><code className="text-xs px-1 py-0.5 bg-stone-100 rounded">retime</code> — timing/consistency semantics shift (read-your-writes → eventually consistent).</li>
-            <li><code className="text-xs px-1 py-0.5 bg-stone-100 rounded">reorder</code> — ordering guarantees change.</li>
-            <li><code className="text-xs px-1 py-0.5 bg-stone-100 rounded">annotate</code> — pure documentation clarifications with no wire-format change.</li>
+            <li><code className="text-xs px-1 py-0.5 bg-secondary rounded">resemanticize</code> — same shape, new meaning (<code>pending</code> used to mean "not yet paid"; it now means "paid, awaiting fulfillment").</li>
+            <li><code className="text-xs px-1 py-0.5 bg-secondary rounded">retime</code> — timing/consistency semantics shift (read-your-writes → eventually consistent).</li>
+            <li><code className="text-xs px-1 py-0.5 bg-secondary rounded">reorder</code> — ordering guarantees change.</li>
+            <li><code className="text-xs px-1 py-0.5 bg-secondary rounded">annotate</code> — pure documentation clarifications with no wire-format change.</li>
           </ul>
           <p className="leading-relaxed">
             These are <strong>author-only</strong> operations. A changeset document is the only place they can live.
@@ -247,23 +247,23 @@ export default function ChangesetSpec() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-stone-900">Operation families</h2>
+          <h2 className="text-xl font-semibold text-foreground">Operation families</h2>
           <div className="grid sm:grid-cols-2 gap-3">
             {FAMILIES.map((f) => (
               <div
                 key={f.name}
-                className="border border-stone-200 rounded-lg bg-white p-4"
+                className="border border-border rounded-lg bg-white p-4"
                 style={{ borderLeft: `3px solid ${f.color}` }}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <h3 className="text-sm font-semibold text-stone-800">{f.name}</h3>
+                  <h3 className="text-sm font-semibold text-foreground">{f.name}</h3>
                 </div>
-                <p className="text-xs text-stone-500 mb-3 leading-relaxed">{f.blurb}</p>
+                <p className="text-xs text-muted-foreground mb-3 leading-relaxed">{f.blurb}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {f.ops.map((op) => (
                     <span
                       key={op}
-                      className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-stone-100 text-stone-700"
+                      className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-secondary text-foreground"
                     >
                       {op}
                     </span>
@@ -275,7 +275,7 @@ export default function ChangesetSpec() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Target kinds</h2>
+          <h2 className="text-xl font-semibold text-foreground">Target kinds</h2>
           <p className="leading-relaxed text-sm">
             Orthogonal to the operation. Answers <em>what kind of thing is being operated on</em>.
           </p>
@@ -283,7 +283,7 @@ export default function ChangesetSpec() {
             {TARGET_KINDS.map((t) => (
               <span
                 key={t}
-                className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white border border-stone-200 text-stone-600"
+                className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-white border border-border text-foreground/80"
               >
                 {t}
               </span>
@@ -292,24 +292,24 @@ export default function ChangesetSpec() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold text-stone-900">Open questions, resolved</h2>
+          <h2 className="text-xl font-semibold text-foreground">Open questions, resolved</h2>
           <div className="space-y-4">
             {QUESTIONS.map((item, i) => (
               <div key={i} className="border-l-2 border-amber-300 pl-4 py-1">
-                <p className="text-sm font-semibold text-stone-800 mb-1">{item.q}</p>
-                <p className="text-sm leading-relaxed text-stone-600">{item.a}</p>
+                <p className="text-sm font-semibold text-foreground mb-1">{item.q}</p>
+                <p className="text-sm leading-relaxed text-foreground/80">{item.a}</p>
               </div>
             ))}
           </div>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Gaps filled in v0.2</h2>
+          <h2 className="text-xl font-semibold text-foreground">Gaps filled in v0.2</h2>
           <ul className="space-y-2">
             {GAPS_FILLED.map((g) => (
               <li key={g.label} className="text-sm leading-relaxed">
-                <code className="text-xs font-mono px-1.5 py-0.5 bg-stone-100 rounded text-stone-800">{g.label}</code>
-                <span className="ml-2 text-stone-600">— {g.note}</span>
+                <code className="text-xs font-mono px-1.5 py-0.5 bg-secondary rounded text-foreground">{g.label}</code>
+                <span className="ml-2 text-foreground/80">— {g.note}</span>
               </li>
             ))}
           </ul>
@@ -318,25 +318,25 @@ export default function ChangesetSpec() {
         <section className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <h2 className="text-xl font-semibold text-stone-900">Generated from real release notes</h2>
+            <h2 className="text-xl font-semibold text-foreground">Generated from real release notes</h2>
           </div>
-          <p className="text-sm leading-relaxed text-stone-600">
+          <p className="text-sm leading-relaxed text-foreground/80">
             Forward Networks publishes versioned release notes with categorized changes
             (new operations, new models, model changes, breaking changes, scheduled
-            deprecations). The transformer at <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">src/lib/release-notes-to-changeset.js</code> maps
+            deprecations). The transformer at <code className="text-xs px-1 py-0.5 bg-secondary rounded">src/lib/release-notes-to-changeset.js</code> maps
             those buckets onto v0.2 operations — a rough first pass that preserves
-            ticket IDs as change IDs and tags, and emits <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointers
+            ticket IDs as change IDs and tags, and emits <code className="text-xs px-1 py-0.5 bg-secondary rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointers
             since release notes don't carry OpenAPI JSON Pointers.
           </p>
 
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
+            <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Release
             </label>
             <select
               value={pairIdx}
               onChange={(e) => setPairIdx(Number(e.target.value))}
-              className="text-xs font-mono px-2.5 py-1.5 border border-stone-200 rounded-md bg-white focus:outline-none focus:border-amber-400"
+              className="text-xs font-mono px-2.5 py-1.5 border border-border rounded-md bg-white focus:outline-none focus:border-amber-400"
             >
               {diffs.map((d, i) => (
                 <option key={i} value={i}>
@@ -346,9 +346,9 @@ export default function ChangesetSpec() {
             </select>
             {generatedStats && (
               <div className="flex flex-wrap gap-1.5 text-[11px]">
-                <span className="text-stone-500">{generatedDoc.changes.length} change{generatedDoc.changes.length !== 1 ? "s" : ""}:</span>
+                <span className="text-muted-foreground">{generatedDoc.changes.length} change{generatedDoc.changes.length !== 1 ? "s" : ""}:</span>
                 {Object.entries(generatedStats).map(([op, n]) => (
-                  <span key={op} className="font-mono px-1.5 py-0.5 bg-stone-100 rounded text-stone-700">
+                  <span key={op} className="font-mono px-1.5 py-0.5 bg-secondary rounded text-foreground">
                     {op} ×{n}
                   </span>
                 ))}
@@ -357,7 +357,7 @@ export default function ChangesetSpec() {
             {generatedYaml && (
               <button
                 onClick={() => downloadBlob(generatedYamlFull, `fwd-${selectedDiff.from}-to-${selectedDiff.to}.yaml`, "application/yaml")}
-                className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+                className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
                 title="Download includes JSON Pointer affectedOperations"
               >
                 <Download className="w-3.5 h-3.5" /> Download
@@ -368,10 +368,10 @@ export default function ChangesetSpec() {
           {generatedYaml ? (
             <CodeBlock code={generatedYaml} lang="yaml" />
           ) : (
-            <p className="text-xs text-stone-500 italic">No release-notes data available.</p>
+            <p className="text-xs text-muted-foreground italic">No release-notes data available.</p>
           )}
 
-          <div className="border-t border-stone-200 pt-4 mt-4 space-y-3">
+          <div className="border-t border-border pt-4 mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={runAiExtraction}
@@ -382,8 +382,8 @@ export default function ChangesetSpec() {
                   ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Extracting…</>
                   : <><Bot className="w-3.5 h-3.5" /> Re-extract with AI</>}
               </button>
-              <p className="text-[11px] text-stone-500 leading-relaxed flex-1 min-w-[12rem]">
-                Sends the release-notes HTML to <code className="text-[10px] px-1 bg-stone-100 rounded">/api/extract-changeset</code>{" "}
+              <p className="text-[11px] text-muted-foreground leading-relaxed flex-1 min-w-[12rem]">
+                Sends the release-notes HTML to <code className="text-[10px] px-1 bg-secondary rounded">/api/extract-changeset</code>{" "}
                 (Vercel Function, Claude via AI Gateway) with the v0.2 schema as structured-output shape.
                 Catches prose-only changes the heuristic misses (field renames described in sentences,
                 sunset dates in phrasing, stricter-vs-looser classification).
@@ -396,12 +396,12 @@ export default function ChangesetSpec() {
             )}
             {aiDoc && aiYaml && (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[11px] text-stone-500">
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <Bot className="w-3 h-3 text-amber-500" />
                   <span>AI extraction · {aiDoc.changes.length} change{aiDoc.changes.length !== 1 ? "s" : ""}</span>
                   <button
                     onClick={() => downloadBlob(aiYamlFull, `fwd-${selectedDiff.from}-to-${selectedDiff.to}-ai.yaml`, "application/yaml")}
-                    className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+                    className="ml-auto inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded bg-secondary text-foreground hover:bg-accent transition-colors"
                     title="Download includes JSON Pointer affectedOperations"
                   >
                     <Download className="w-3 h-3" /> Download
@@ -412,44 +412,44 @@ export default function ChangesetSpec() {
             )}
           </div>
 
-          <p className="text-[11px] text-stone-500 leading-relaxed">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
             <strong>Heuristic extraction (above):</strong> HTTP verb + path from each release note's affected-operations list,
-            emitted as RFC 6901 JSON Pointers (<code className="text-[10px] px-1 bg-stone-100 rounded">#/paths/~1api~1collector-tasks/post</code>).
+            emitted as RFC 6901 JSON Pointers (<code className="text-[10px] px-1 bg-secondary rounded">#/paths/~1api~1collector-tasks/post</code>).
             Multi-op notes become a single change entry with a pointer array.
             <br />
             <strong>Still best-effort:</strong> items without an explicit path (most model changes)
-            fall back to an opaque <code className="text-[10px] px-1 bg-stone-100 rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointer;
+            fall back to an opaque <code className="text-[10px] px-1 bg-secondary rounded">#/changelog/&lt;bucket&gt;/&lt;FWD-xxx&gt;</code> pointer;
             sunset phrases like <em>"will be removed in release 26.6"</em> flow to
-            <code className="text-[10px] px-1 bg-stone-100 rounded">lifecycle.reason</code> but don't yet resolve to a date;
-            <code className="text-[10px] px-1 bg-stone-100 rounded">breakingChanges</code> all collapse to <code className="text-[10px] px-1 bg-stone-100 rounded">constrain</code>{" "}
-            since the description phrasing isn't classified into <code className="text-[10px] px-1 bg-stone-100 rounded">retype</code> /{" "}
-            <code className="text-[10px] px-1 bg-stone-100 rounded">tighten</code> / <code className="text-[10px] px-1 bg-stone-100 rounded">recode</code>.
+            <code className="text-[10px] px-1 bg-secondary rounded">lifecycle.reason</code> but don't yet resolve to a date;
+            <code className="text-[10px] px-1 bg-secondary rounded">breakingChanges</code> all collapse to <code className="text-[10px] px-1 bg-secondary rounded">constrain</code>{" "}
+            since the description phrasing isn't classified into <code className="text-[10px] px-1 bg-secondary rounded">retype</code> /{" "}
+            <code className="text-[10px] px-1 bg-secondary rounded">tighten</code> / <code className="text-[10px] px-1 bg-secondary rounded">recode</code>.
           </p>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Curated example</h2>
-          <p className="text-sm leading-relaxed text-stone-600">
-            A hand-authored example exercising all four families, multi-target renames, cross-changeset supersedes, severity, and <code className="text-xs px-1 py-0.5 bg-stone-100 rounded">detectable: false</code> on semantic ops.
+          <h2 className="text-xl font-semibold text-foreground">Curated example</h2>
+          <p className="text-sm leading-relaxed text-foreground/80">
+            A hand-authored example exercising all four families, multi-target renames, cross-changeset supersedes, severity, and <code className="text-xs px-1 py-0.5 bg-secondary rounded">detectable: false</code> on semantic ops.
           </p>
           <CodeBlock code={exampleYaml} lang="yaml" />
           <button
             onClick={() => downloadBlob(exampleYaml, "example-changeset.yaml", "application/yaml")}
-            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
           >
             <Download className="w-3.5 h-3.5" /> Download example
           </button>
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-xl font-semibold text-stone-900">Schema</h2>
-          <p className="text-sm leading-relaxed text-stone-600">
+          <h2 className="text-xl font-semibold text-foreground">Schema</h2>
+          <p className="text-sm leading-relaxed text-foreground/80">
             Draft 2020-12 JSON Schema. Use any standard validator to check a changeset document.
           </p>
           <CodeBlock code={schemaJson} lang="json" />
           <button
             onClick={() => downloadBlob(schemaJson, "api-changeset-schema.json", "application/json")}
-            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-stone-100 text-stone-700 hover:bg-stone-200 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
           >
             <Download className="w-3.5 h-3.5" /> Download schema
           </button>

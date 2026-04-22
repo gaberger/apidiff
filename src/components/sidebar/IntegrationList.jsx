@@ -226,22 +226,22 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
 
   return (
     <motion.aside
-      className={`flex flex-col border-r border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900 overflow-hidden ${
+      className={`flex flex-col border-r border-border bg-muted/40 dark:bg-background overflow-hidden ${
         collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl'
       }`}
       animate={{ width: collapsed ? 48 : 220 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-stone-200 dark:border-stone-700">
+      <div className="flex items-center justify-between px-3 py-3 border-b border-border">
         {!collapsed && (
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-400">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             Integrations
           </span>
         )}
         <button
           onClick={onToggleCollapse}
-          className="p-1 rounded hover:bg-stone-200 text-stone-400 transition-colors"
+          className="p-1 rounded hover:bg-accent text-muted-foreground/70 transition-colors"
           title={collapsed ? "Expand" : "Collapse"}
         >
           {collapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
@@ -258,13 +258,13 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
               {!collapsed && (
                 <button
                   onClick={() => toggleCategory(cat)}
-                  className="flex w-full items-center gap-1 px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-stone-400 hover:text-stone-600 transition-colors"
+                  className="flex w-full items-center gap-1 px-3 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground/80 transition-colors"
                 >
                   {isCatCollapsed
                     ? <ChevronRight className="h-3 w-3" />
                     : <ChevronDown className="h-3 w-3" />}
                   <span>{label}</span>
-                  <span className="ml-auto font-mono text-[10px] text-stone-300">{list.length}</span>
+                  <span className="ml-auto font-mono text-[10px] text-muted-foreground/70">{list.length}</span>
                 </button>
               )}
               {!isCatCollapsed && list.map((integration) => {
@@ -275,8 +275,8 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
                     onClick={() => onSelect(isActive ? null : integration)}
                     className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors ${
                       isActive
-                        ? "bg-white dark:bg-stone-800 border-r-2 font-semibold text-stone-900 dark:text-stone-100"
-                        : "text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                        ? "bg-white dark:bg-secondary border-r-2 font-semibold text-foreground dark:text-foreground"
+                        : "text-foreground/80 dark:text-muted-foreground/70 hover:bg-secondary dark:hover:bg-secondary"
                     }`}
                     style={isActive ? { borderRightColor: integration.color || "#666" } : {}}
                     title={collapsed ? integration.name : undefined}
@@ -296,10 +296,10 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
       </div>
 
       {/* Footer */}
-      <div className="border-t border-stone-200 dark:border-stone-700">
+      <div className="border-t border-border">
         <Link
           to="/settings"
-          className="flex items-center gap-2 px-3 py-2.5 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-700 dark:hover:text-stone-200 transition-colors"
+          className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground dark:text-muted-foreground/70 hover:bg-secondary dark:hover:bg-secondary hover:text-foreground dark:hover:text-foreground transition-colors"
           title={collapsed ? "Settings" : undefined}
         >
           <Settings className="h-3.5 w-3.5 flex-shrink-0" />

@@ -85,13 +85,13 @@ export default function VersionPicker({ provider, onSelectComparison }) {
     <div className="px-3 pl-6 py-2 space-y-1.5">
       {hasProducts && (
         <>
-          <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+          <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             Product ({groups.length})
           </div>
           <select
             value={productKey}
             onChange={(e) => handleProductChange(e.target.value)}
-            className="w-full text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
+            className="w-full text-[11px] px-1.5 py-1 rounded border border-border bg-white dark:bg-secondary text-foreground focus:outline-none focus:border-ring dark:focus:border-ring truncate"
           >
             {groups.map((g) => {
               const key = g.product?.key ?? "";
@@ -105,14 +105,14 @@ export default function VersionPicker({ provider, onSelectComparison }) {
           </select>
         </>
       )}
-      <div className="text-[10px] font-semibold text-stone-400 uppercase tracking-wider">
+      <div className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
         Pick two versions{hasProducts ? ` · ${versions.length} available` : ""}
       </div>
       <div className="flex gap-1.5 items-center">
         <select
           value={v1Idx ?? ""}
           onChange={(e) => setV1Idx(e.target.value === "" ? null : Number(e.target.value))}
-          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
+          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-border bg-white dark:bg-secondary text-foreground focus:outline-none focus:border-ring dark:focus:border-ring truncate"
         >
           <option value="">Old…</option>
           {versions.map((v, i) => (
@@ -121,11 +121,11 @@ export default function VersionPicker({ provider, onSelectComparison }) {
             </option>
           ))}
         </select>
-        <ArrowRight className="w-3 h-3 text-stone-400 flex-shrink-0" />
+        <ArrowRight className="w-3 h-3 text-muted-foreground/70 flex-shrink-0" />
         <select
           value={v2Idx ?? ""}
           onChange={(e) => setV2Idx(e.target.value === "" ? null : Number(e.target.value))}
-          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-200 focus:outline-none focus:border-stone-400 dark:focus:border-stone-500 truncate"
+          className="flex-1 text-[11px] px-1.5 py-1 rounded border border-border bg-white dark:bg-secondary text-foreground focus:outline-none focus:border-ring dark:focus:border-ring truncate"
         >
           <option value="">New…</option>
           {versions.map((v, i) => (
@@ -138,7 +138,7 @@ export default function VersionPicker({ provider, onSelectComparison }) {
       <button
         onClick={handleCompare}
         disabled={v1Idx === null || v2Idx === null || v1Idx === v2Idx || loading}
-        className="w-full text-[11px] font-medium py-1 rounded bg-stone-800 text-white hover:bg-stone-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
+        className="w-full text-[11px] font-medium py-1 rounded bg-secondary text-white hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
       >
         {loading ? (
           <><Loader2 className="w-3 h-3 animate-spin" /> Loading…</>

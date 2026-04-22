@@ -56,7 +56,7 @@ export function EditorOverlay({ jsonString, results, scrollTop }) {
           return (
             <div key={i} className={`${bgClass} min-h-[1.6em]`}>
               <span
-                className="inline-block w-8 -ml-[38px] mr-[6px] text-right text-stone-400 opacity-50 text-[11px] select-none pointer-events-none"
+                className="inline-block w-8 -ml-[38px] mr-[6px] text-right text-muted-foreground/70 opacity-50 text-[11px] select-none pointer-events-none"
               >
                 {i + 1}
               </span>
