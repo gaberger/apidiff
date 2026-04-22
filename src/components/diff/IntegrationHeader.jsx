@@ -244,15 +244,21 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       // Fall back to release notes if no specs available
       if (hasFwdReleaseNotes && v.diff) {
         if (v2Idx !== null && v2Idx !== v1Idx) {
-          // Comparing two versions via release notes
+          // Two-version release-notes comparison. Synthesize a spec from
+          // each version so the BEFORE/AFTER editors have content; the
+          // prior code passed {}, {} and the editors rendered empty
+          // (user-facing "integrations discovered but no data" regression).
           const v1 = versions[v1Idx];
           const v2 = versions[v2Idx];
           const label = `${integration.name} ${v1.label} → ${v2.label} - Release Notes Comparison`;
-          
-          onLoadSpecs({}, {}, label, { 
-            type: "releaseNotes", 
-            diff: v1.diff || {}, 
-            stats: { ...v1.stats, breaking: v1.breaking } 
+
+          const beforeSpec = synthesizeSpecFromReleaseNotes(v1, null);
+          const afterSpec = synthesizeSpecFromReleaseNotes(v2, v1);
+
+          onLoadSpecs(beforeSpec, afterSpec, label, {
+            type: "releaseNotes",
+            diff: v2.diff || {},
+            stats: { ...v2.stats, breaking: v2.breaking }
           });
           return;
         } else {

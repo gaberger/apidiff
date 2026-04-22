@@ -1,0 +1,65 @@
+{
+  "id": "wp-fix-integration-data-loading",
+  "title": "Fix: integrations discovered but no data loads on version click",
+  "adr": "ADR-010",
+  "created": "2026-04-22",
+  "status": "partial",
+  "completed_steps": ["step-1", "step-2"],
+  "completion_evidence": {
+    "step-1": "docs/workplans/fix-integration-data-loading-rootcause.md",
+    "step-2": "commit in progress — IntegrationHeader.jsx:246-262 synthesizes both specs instead of passing {}, {}",
+    "remaining": "step-3 (stronger empty-state for no-spec providers), step-4 (regression test)"
+  },
+  "topology": "pipeline",
+  "budget": "~15000 tokens",
+  "context": {
+    "problem": "On https://apidiff-cyan.vercel.app and locally, selecting an integration (e.g. Forward Networks) shows '39 VERSIONS DISCOVERED' and a full VersionTimeline, but clicking a version (or two for From+To) does not populate the BEFORE/AFTER editor panes. Editors stay empty. Regression from the 2026-04-22 change of Forward Networks specSource from { kind:'url', specUrls:[...13 urls] } to { kind:'docusaurus', baseUrl:... } (commit 07d6ca2) — the docusaurus code path doesn't surface spec URLs to the version-click → fetchSpec flow that the 'url' path relied on.",
+    "scope": [
+      "Forward Networks (primary repro — kind:docusaurus + fwdData.versions merged in by IntegrationList.jsx)",
+      "Any other provider with specSource.kind ∈ { docusaurus, github, apis-guru } that IntegrationList currently synthesizes with 'versions: []'"
+    ],
+    "evidence": {
+      "repro_url": "https://apidiff-cyan.vercel.app/forward-networks",
+      "diagnostic_agent": "spawned 2026-04-22 — see task output for root cause + file:line citations",
+      "related_commits": ["07d6ca2 feat(discovery): release-notes diff view + docusaurus provider registry", "57dc391 fix(sidebar): surface non-url providers"]
+    }
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Confirm the failure path with the diagnostic agent's findings",
+      "description": "Read the diagnostic agent's report. Confirm which of the candidate causes is real: (a) versions have no `url` field so fetchSpec silently bails; (b) handleLoadSpecs in DiffViewer.jsx has no branch for kind:docusaurus; (c) docusaurus-discovery-adapter.ts was written but never wired into the click path. Update this workplan with the confirmed root cause before step-2.",
+      "layer": "docs",
+      "dependencies": [],
+      "tier": 0,
+      "done_condition": "docs/workplans/fix-integration-data-loading-rootcause.md exists with a one-paragraph summary citing files:lines."
+    },
+    {
+      "id": "step-2",
+      "name": "Implement the minimal fix",
+      "description": "Based on step-1, write the fix. If (a): backfill url in fwdnetworks.json or synthesize one at merge-time in IntegrationList.jsx. If (b): add a kind:docusaurus branch to handleLoadSpecs that delegates to docusaurus-discovery-adapter.discoverSpecs before fetchSpec. If (c): wire the adapter into the composition-root and thread it to the DiffViewer page. One commit per logical change.",
+      "layer": "adapter|usecase|domain",
+      "dependencies": ["step-1"],
+      "tier": 1,
+      "done_condition": "Clicking From+To on VersionTimeline for /forward-networks loads real spec content into the BEFORE/AFTER editors. Empty-state replaced by populated spec text within 2 seconds of second click. Stripe and any other non-url-kind providers either load data or show a clearer 'no specs available — add via Settings' empty-state, not a silent noop."
+    },
+    {
+      "id": "step-3",
+      "name": "Strengthen the empty-state for providers with no discovered specs",
+      "description": "For providers whose registry entry has no versions (or discovery returned 0), replace the generic 'No versions discovered yet. Use Settings to run discovery or paste specs manually below' with a context-specific state. If Stripe has no discovery wired, the CTA should be either (a) 'Add spec URL' direct action that bypasses Settings, or (b) a link to Settings that pre-selects Stripe. Currently Settings doesn't include Stripe at all — dead end.",
+      "layer": "primary-adapter",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "No integration in the sidebar, when clicked, produces an empty screen the user cannot make progress from. Every empty-state links to a concrete next action."
+    },
+    {
+      "id": "step-4",
+      "name": "Regression guard",
+      "description": "Add a test (or behavioral spec) asserting that for every provider with specSource.kind ∈ { url, docusaurus, github, apis-guru }, selecting v1+v2 on the VersionTimeline either (a) loads spec text within 2s of the second click, or (b) surfaces a visible error/empty state. Prevents silent-failure regressions.",
+      "layer": "test",
+      "dependencies": ["step-2"],
+      "tier": 2,
+      "done_condition": "Test exists under tests/ or src/adapters/**/*.test.ts. Passes before and after adding a forcibly-broken registry entry (negative control)."
+    }
+  ]
+}
