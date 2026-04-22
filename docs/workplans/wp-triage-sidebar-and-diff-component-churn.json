@@ -3,7 +3,15 @@
   "title": "Triage uncommitted src/ churn: ProviderSidebar deletion + diff component edits + provider-registry + dereference-worker",
   "adr": "pending",
   "created": "2026-04-21",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-22",
+  "completion_evidence": {
+    "commits": [
+      "07d6ca2 feat(discovery): release-notes diff view + docusaurus provider registry",
+      "fc369a0 fix(ui): robustness — case-insensitive filters, error msg fallback, react keys, circular-ref guard"
+    ],
+    "verdicts": "All 7 files classified KEEP. ProviderSidebar.jsx deletion documented via ADR-009 2026-04-22 amendment. provider-registry.js remained domain-pure (data-only shape change). No reverts."
+  },
   "topology": "hierarchical",
   "budget": "~18000 tokens",
   "context": {

@@ -3,7 +3,12 @@
   "title": "Land Forward Networks provider scraper scripts with ADR — or delete them",
   "adr": "pending",
   "created": "2026-04-21",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-22",
+  "completion_evidence": {
+    "commits": ["5825a86 chore(scripts): land forward-networks release-notes pipeline + README"],
+    "decision": "KEEP — re-runnable pipeline for Forward Networks release-notes updates. Documented in scripts/README.md alongside sync-lib-domain.js and hex-statusline.cjs. No standalone ADR written (step-3) — scripts/ is conventional tooling, not a port/adapter; ADR would be ceremony without load-bearing constraint."
+  },
   "topology": "hierarchical",
   "budget": "~10000 tokens",
   "context": {
