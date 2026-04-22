@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, HelpCircle } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, HelpCircle, Menu } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts.js";
@@ -402,7 +403,8 @@ export default function DiffViewer() {
                 <span className="text-foreground">api</span>
                 <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
               </h1>
-              <nav className="ml-2 sm:ml-6 flex items-center gap-1">
+              {/* Desktop / tablet nav — hidden under sm: (mobile uses the hamburger Sheet below) */}
+              <nav className="ml-2 sm:ml-6 hidden sm:flex items-center gap-1">
                 <button
                   onClick={() => setActiveTab("compare")}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer transition-all duration-fast ease-standard ${
@@ -445,6 +447,64 @@ export default function DiffViewer() {
                   Settings
                 </Link>
               </nav>
+
+              {/* Mobile nav — hamburger opens a Sheet with the same links */}
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button
+                    aria-label="Open menu"
+                    className="sm:hidden ml-2 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                  >
+                    <Menu className="w-4 h-4" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-0">
+                  <nav className="flex flex-col p-4 gap-1 pt-10">
+                    <button
+                      onClick={() => setActiveTab("compare")}
+                      className={`text-left px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
+                        activeTab === "compare"
+                          ? "text-foreground bg-secondary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                      }`}
+                    >
+                      Compare
+                    </button>
+                    <button
+                      onClick={() => guide && setActiveTab("guide")}
+                      disabled={!guide}
+                      className={`text-left px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
+                        activeTab === "guide"
+                          ? "text-foreground bg-secondary"
+                          : guide
+                            ? "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                            : "text-muted-foreground/50 cursor-not-allowed"
+                      }`}
+                    >
+                      Guide
+                    </button>
+                    <div className="h-px bg-border my-1" aria-hidden="true" />
+                    <Link
+                      to="/changeset-spec"
+                      className="px-3 py-2.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                    >
+                      Changeset Spec
+                    </Link>
+                    <Link
+                      to="/discovery"
+                      className="px-3 py-2.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                    >
+                      Discovery
+                    </Link>
+                    <Link
+                      to="/settings"
+                      className="px-3 py-2.5 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+                    >
+                      Settings
+                    </Link>
+                  </nav>
+                </SheetContent>
+              </Sheet>
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2">
