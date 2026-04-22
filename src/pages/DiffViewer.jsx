@@ -218,6 +218,7 @@ export default function DiffViewer() {
         label,
         diff: extra.diff,
         stats: extra.stats,
+        changeset: extra.changeset,
         isEmpty: false,
       };
       setResults([releaseNotesResult]);

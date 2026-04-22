@@ -5,6 +5,7 @@ import { groupByProduct } from "@/lib/domain/product-extractor.js";
 import { fetchSpec } from "@/lib/fetch-spec.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
 import { discoveryService } from "@/lib/browser-stores";
+import { releaseNotesToChangeset } from "@/lib/release-notes-to-changeset.js";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
 
@@ -277,10 +278,13 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       // Fall back to release notes if no specs available
       if (hasFwdReleaseNotes && v.diff) {
         if (v2Idx !== null && v2Idx !== v1Idx) {
-          // Two-version release-notes comparison. Synthesize a spec from
-          // each version so the BEFORE/AFTER editors have content; the
-          // prior code passed {}, {} and the editors rendered empty
-          // (user-facing "integrations discovered but no data" regression).
+          // Two-version release-notes comparison. Convert the v2 release-notes
+          // diff into a Changeset v0.2 document (the project's canonical
+          // apispec definition for describing API transitions) — the UI
+          // reads from `meta.changeset` to render structured op/target/
+          // severity rows with JSON Pointers, rather than the loose
+          // newOperations/breakingChanges buckets. Still synthesize specs
+          // for the BEFORE/AFTER editors so the raw view remains populated.
           const v1 = versions[v1Idx];
           const v2 = versions[v2Idx];
           const label = `${integration.name} ${v1.label} → ${v2.label} - Release Notes Comparison`;
@@ -288,10 +292,30 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
           const beforeSpec = synthesizeSpecFromReleaseNotes(v1, null);
           const afterSpec = synthesizeSpecFromReleaseNotes(v2, v1);
 
+          // Build the minimum data shape releaseNotesToChangeset() expects
+          // (it only looks up releaseDate/year for the `to` version via
+          // fields named version/releaseDate/year — mirror our `label`/`from`).
+          const changesetData = {
+            versions: versions.map((vx) => ({
+              version: vx.label,
+              releaseDate: vx.from,
+              year: vx.from ? new Date(vx.from).getFullYear() : undefined,
+            })),
+          };
+          const changesetDiff = {
+            ...(v2.diff || {}),
+            from: v1.label,
+            to: v2.label,
+          };
+          const changeset = releaseNotesToChangeset(changesetData, changesetDiff, {
+            apiName: integration.name,
+          });
+
           onLoadSpecs(beforeSpec, afterSpec, label, {
             type: "releaseNotes",
             diff: v2.diff || {},
-            stats: { ...v2.stats, breaking: v2.breaking }
+            stats: { ...v2.stats, breaking: v2.breaking },
+            changeset,
           });
           return;
         } else {
