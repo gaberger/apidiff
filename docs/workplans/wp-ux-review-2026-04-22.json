@@ -1,0 +1,86 @@
+{
+  "id": "wp-ux-review-2026-04-22",
+  "title": "UX review findings (2026-04-22) — navigation chrome, empty-state dead-ends, affordance ambiguity",
+  "adr": "ADR-016",
+  "created": "2026-04-22",
+  "status": "pending",
+  "topology": "pipeline",
+  "budget": "~25000 tokens",
+  "context": {
+    "problem": "Visual walk-through of /, /discovery, /settings, /changeset-spec, /stripe, /forward-networks at localhost:5173 surfaced six UX issues. The highest-ROI one — VersionTimeline dots all labeled '0' due to HOST_PATTERN regex backtracking on SemVer strings — was fixed in commit 4006ef4. The six below remain.",
+    "artifacts": {
+      "screenshots": "/tmp/apidiff-ux/*.png (01 home dark, 02 discovery/settings/changeset-spec light, 06 stripe empty, 07 forward-networks buggy labels, 09 forward-networks fixed)",
+      "dev_server": "bun run dev → http://localhost:5173",
+      "review_date": "2026-04-22"
+    }
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Unify app chrome across Discovery and Settings pages",
+      "description": "Currently the top-bar nav (apidiff / Compare / Guide / Changeset Spec / Discovery / Settings / theme / shortcuts / lock / Compare-action) renders only on /, /changeset-spec. Both /discovery and /settings render their own local chrome (a 'Back' link + page-specific buttons) and omit the main nav entirely. Users land on those pages and lose orientation. Decision: persistent app shell. Lift the top-bar into a layout component that wraps all routes. Subpages add contextual actions on the right (e.g. 'Add Integration' for /settings) but retain the same primary nav.",
+      "files": [
+        "src/App.jsx",
+        "src/pages/Discovery.jsx",
+        "src/pages/Settings.jsx",
+        "src/pages/DiffViewer.jsx",
+        "src/pages/ChangesetSpec.jsx"
+      ],
+      "tier": 0,
+      "done_condition": "Open each of /, /discovery, /settings, /changeset-spec: all show the same top-bar with the same primary nav items, active-tab indicator matches the current route. Visual diff: screenshots across routes show identical header band."
+    },
+    {
+      "id": "step-2",
+      "name": "Disambiguate two 'Compare' affordances in the top bar",
+      "description": "On / the header has both (a) a nav button 'Compare' styled as the active tab, and (b) a top-right toolbar button 'Compare' (disabled until specs loaded) that triggers the diff. Same label, different semantics. Rename the toolbar action to 'Run Diff' or 'Compare Specs' and keep the nav label 'Compare' for the tab indicator. Or drop the nav 'Compare' item entirely since / IS the compare page (users already understand they're there via the logo and active-state URL).",
+      "files": ["src/pages/DiffViewer.jsx", "src/App.jsx"],
+      "tier": 1,
+      "done_condition": "No two buttons in the header bar share the label 'Compare'. Disabled state of the action button visually distinct (opacity, cursor, aria-disabled)."
+    },
+    {
+      "id": "step-3",
+      "name": "Resolve 'Guide' nav link state",
+      "description": "Header shows 'Guide' rendered in muted/grey, looking disabled. Clarify: is this (a) a future feature not yet implemented, (b) a link that only activates when a diff result exists, or (c) dead code? If (a) or (b), route it through a MenuItem-with-disabled-tooltip pattern with a clear 'Run a diff first' hint. If (c), delete.",
+      "files": ["src/App.jsx", "src/pages/DiffViewer.jsx"],
+      "tier": 1,
+      "done_condition": "Guide link either routes to a real page, is conditionally enabled based on state with a visible tooltip, or is removed from the nav. No purely-decorative disabled links."
+    },
+    {
+      "id": "step-4",
+      "name": "Reconcile the three different 'integrations' lists",
+      "description": "Home-sidebar (IntegrationList.jsx) shows ~18 integrations grouped by category from provider-registry.js + fwdData. Settings page shows only 'OpenAI' (from a different localStorage-backed registry). Discovery page shows '0 providers · 0 specs' (a third source — the SchemaUrlRegistry). A user clicking Stripe → told 'use Settings to run discovery' → Stripe is not in Settings → dead end. Produce a single data-flow diagram of the three sources, choose one canonical list, and either merge the others into it or make it explicit which list each page owns. Likely outcome: provider-registry.js + fwdData is the catalog; Settings should show the same catalog with per-user state overlays; Discovery tracks which of those catalog entries have been discovered.",
+      "files": [
+        "src/lib/domain/provider-registry.js",
+        "src/components/sidebar/IntegrationList.jsx",
+        "src/pages/Settings.jsx",
+        "src/pages/Discovery.jsx"
+      ],
+      "tier": 0,
+      "done_condition": "Selecting Stripe (or any integration from the home sidebar) lands the user somewhere that has an actionable next step, not a dead end. Settings page enumerates the same integrations as the home sidebar (with their per-user discovery state)."
+    },
+    {
+      "id": "step-5",
+      "name": "Strengthen empty-state affordance in the BEFORE/AFTER editors",
+      "description": "When no integration is selected and no spec is loaded, the Monaco-like editors render a bare '1' gutter and a blank canvas. Add a placeholder overlay: 'Drop OpenAPI JSON here or click Upload above'. Use the same pattern in both panes. Remove the overlay once the editor receives content.",
+      "files": ["src/components/diff/SpecInput.jsx", "src/components/diff/EditorOverlay.jsx"],
+      "tier": 2,
+      "done_condition": "Visual check on / with no integration selected: both editor panes show an overlay with drop-here language. Overlay disappears once spec text is pasted or file is dropped."
+    },
+    {
+      "id": "step-6",
+      "name": "Make 'Diff Release Notes' button state match reality",
+      "description": "On /forward-networks the 'Diff Release Notes' button appears slightly faded but still looks clickable when no versions are selected. Clicking it with no selection is a no-op or error. Wire its disabled state to (v1Idx !== null && v2Idx !== null). Add a tooltip: 'Select a From and To version on the timeline first'.",
+      "files": ["src/components/diff/IntegrationHeader.jsx"],
+      "tier": 2,
+      "done_condition": "Button visibly disabled (reduced opacity + aria-disabled + cursor:not-allowed) until both v1Idx and v2Idx are set. Tooltip on hover explains why. Click is a no-op when disabled."
+    },
+    {
+      "id": "step-7",
+      "name": "Surface breaking-change counts on VersionTimeline dots",
+      "description": "fwdnetworks.json carries a `breaking` count per version (3 on 26.3.0, etc.). VersionTimeline ignores this and shows only the label + date. Add a small numeric badge above each dot when breaking > 0 (colored red, aria-label 'N breaking changes'). This surfaces the main diff signal visually without requiring the user to click through.",
+      "files": ["src/components/diff/VersionTimeline.jsx"],
+      "tier": 2,
+      "done_condition": "Dots with breaking > 0 show a colored badge; dots with 0 show no badge (not a '0' badge). Hover tooltip on the badge reads 'N breaking changes in <version>'."
+    }
+  ]
+}
