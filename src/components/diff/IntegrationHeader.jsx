@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { groupByProduct } from "@/lib/domain/product-extractor.js";
 import { fetchSpec } from "@/lib/fetch-spec.js";
 import VersionTimeline from "@/components/diff/VersionTimeline.jsx";
-import { discoveryService } from "@/lib/browser-stores";
+import { discoveryService, releaseNotesService } from "@/lib/browser-stores";
 import { releaseNotesToChangeset } from "@/lib/release-notes-to-changeset.js";
 
 const STORAGE_PREFIX = "apidiff:lastProduct:";
@@ -142,7 +142,13 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
 
   const isReleaseNotes = integration.isReleaseNotes;
   const isFwdNetworks = integration.slug === "forward-networks";
-  const hasFwdReleaseNotes = isFwdNetworks && versions.some((v) => v?.diff);
+  // Generalized: any provider with a registered ReleaseNotesPort adapter
+  // participates in the release-notes flow. isFwdNetworks stays for the
+  // FWD-specific spec-URL shortcut path (versionHasSpecs / getFwdUrls),
+  // which is a distinct concern from release-notes and will migrate out
+  // when a "direct-spec-URLs" port lands.
+  const hasReleaseNotesAdapter = releaseNotesService.has(slug);
+  const hasFwdReleaseNotes = hasReleaseNotesAdapter && versions.some((v) => v?.diff);
 
   // Synthesize OpenAPI spec from release notes diff
   function synthesizeSpecFromReleaseNotes(version, prevVersion) {
@@ -278,40 +284,21 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       // Fall back to release notes if no specs available
       if (hasFwdReleaseNotes && v.diff) {
         if (v2Idx !== null && v2Idx !== v1Idx) {
-          // Two-version release-notes comparison.
-          // versions[] is newest-first (idx 0 = most recent). VersionTimeline
-          // sorts selections by index ascending, so `v1Idx < v2Idx` means
-          // v1 is the *newer* release and v2 is the *older*. Relabel to
-          // chronological order (older → newer) and aggregate every
-          // intermediate single-step diff so the Changeset reflects the
-          // full delta across the range, not just one step.
+          // Two-version release-notes comparison. The port handles range
+          // aggregation per provider — IntegrationHeader no longer knows
+          // whether the underlying data is newest-first / oldest-first or
+          // whether any particular bucket applies. Adapter returns a
+          // canonical AggregateDiff with chronological from/to.
           const idxNewer = Math.min(v1Idx, v2Idx);
           const idxOlder = Math.max(v1Idx, v2Idx);
           const newer = versions[idxNewer];
           const older = versions[idxOlder];
-          const label = `${integration.name} ${older.label} → ${newer.label} - Release Notes Comparison`;
+
+          const aggregatedDiff = await releaseNotesService.fetchRange(slug, older.label, newer.label);
+          const label = `${integration.name} ${aggregatedDiff.from} → ${aggregatedDiff.to} - Release Notes Comparison`;
 
           const beforeSpec = synthesizeSpecFromReleaseNotes(older, null);
           const afterSpec = synthesizeSpecFromReleaseNotes(newer, older);
-
-          // Aggregate every incoming diff from idxNewer (inclusive) up to
-          // idxOlder (exclusive). versions[i].diff represents the step
-          // versions[i+1].label → versions[i].label; iterating i in
-          // [idxNewer, idxOlder) covers every step between older and newer.
-          const buckets = ["breakingChanges", "scheduledBreakingChanges", "newOperations", "newModels", "modelChanges"];
-          const aggregatedDiff = {
-            from: older.label,
-            to: newer.label,
-          };
-          for (const b of buckets) aggregatedDiff[b] = { added: [], removed: [] };
-          for (let i = idxNewer; i < idxOlder; i++) {
-            const d = versions[i]?.diff;
-            if (!d) continue;
-            for (const b of buckets) {
-              if (Array.isArray(d[b]?.added)) aggregatedDiff[b].added.push(...d[b].added);
-              if (Array.isArray(d[b]?.removed)) aggregatedDiff[b].removed.push(...d[b].removed);
-            }
-          }
 
           const changesetData = {
             versions: versions.map((vx) => ({
