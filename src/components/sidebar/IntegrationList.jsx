@@ -234,9 +234,20 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
   };
 
   return (
+    <>
+      {/* Mobile backdrop — visible only when sidebar is expanded on <md viewports.
+          Tapping closes the sidebar. Gives users a click-outside affordance
+          in addition to the built-in PanelLeftClose button inside the sidebar. */}
+      {!collapsed && (
+        <div
+          aria-hidden="true"
+          onClick={onToggleCollapse}
+          className="hidden max-md:block fixed inset-0 z-20 bg-black/50"
+        />
+      )}
     <motion.aside
       className={`flex flex-col border-r border-border bg-muted/40 dark:bg-background overflow-hidden ${
-        collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl'
+        collapsed ? '' : 'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-30 max-md:shadow-xl max-md:bg-background'
       }`}
       animate={{ width: collapsed ? (isNarrow ? 0 : 48) : 220 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -316,5 +327,6 @@ export default function IntegrationList({ selected, onSelect, initialSlug, colla
         </Link>
       </div>
     </motion.aside>
+    </>
   );
 }
