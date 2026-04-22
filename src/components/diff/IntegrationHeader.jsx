@@ -278,23 +278,41 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
       // Fall back to release notes if no specs available
       if (hasFwdReleaseNotes && v.diff) {
         if (v2Idx !== null && v2Idx !== v1Idx) {
-          // Two-version release-notes comparison. Convert the v2 release-notes
-          // diff into a Changeset v0.2 document (the project's canonical
-          // apispec definition for describing API transitions) — the UI
-          // reads from `meta.changeset` to render structured op/target/
-          // severity rows with JSON Pointers, rather than the loose
-          // newOperations/breakingChanges buckets. Still synthesize specs
-          // for the BEFORE/AFTER editors so the raw view remains populated.
-          const v1 = versions[v1Idx];
-          const v2 = versions[v2Idx];
-          const label = `${integration.name} ${v1.label} → ${v2.label} - Release Notes Comparison`;
+          // Two-version release-notes comparison.
+          // versions[] is newest-first (idx 0 = most recent). VersionTimeline
+          // sorts selections by index ascending, so `v1Idx < v2Idx` means
+          // v1 is the *newer* release and v2 is the *older*. Relabel to
+          // chronological order (older → newer) and aggregate every
+          // intermediate single-step diff so the Changeset reflects the
+          // full delta across the range, not just one step.
+          const idxNewer = Math.min(v1Idx, v2Idx);
+          const idxOlder = Math.max(v1Idx, v2Idx);
+          const newer = versions[idxNewer];
+          const older = versions[idxOlder];
+          const label = `${integration.name} ${older.label} → ${newer.label} - Release Notes Comparison`;
 
-          const beforeSpec = synthesizeSpecFromReleaseNotes(v1, null);
-          const afterSpec = synthesizeSpecFromReleaseNotes(v2, v1);
+          const beforeSpec = synthesizeSpecFromReleaseNotes(older, null);
+          const afterSpec = synthesizeSpecFromReleaseNotes(newer, older);
 
-          // Build the minimum data shape releaseNotesToChangeset() expects
-          // (it only looks up releaseDate/year for the `to` version via
-          // fields named version/releaseDate/year — mirror our `label`/`from`).
+          // Aggregate every incoming diff from idxNewer (inclusive) up to
+          // idxOlder (exclusive). versions[i].diff represents the step
+          // versions[i+1].label → versions[i].label; iterating i in
+          // [idxNewer, idxOlder) covers every step between older and newer.
+          const buckets = ["breakingChanges", "scheduledBreakingChanges", "newOperations", "newModels", "modelChanges"];
+          const aggregatedDiff = {
+            from: older.label,
+            to: newer.label,
+          };
+          for (const b of buckets) aggregatedDiff[b] = { added: [], removed: [] };
+          for (let i = idxNewer; i < idxOlder; i++) {
+            const d = versions[i]?.diff;
+            if (!d) continue;
+            for (const b of buckets) {
+              if (Array.isArray(d[b]?.added)) aggregatedDiff[b].added.push(...d[b].added);
+              if (Array.isArray(d[b]?.removed)) aggregatedDiff[b].removed.push(...d[b].removed);
+            }
+          }
+
           const changesetData = {
             versions: versions.map((vx) => ({
               version: vx.label,
@@ -302,19 +320,22 @@ export default function IntegrationHeader({ integration, onLoadSpecs, onClear, o
               year: vx.from ? new Date(vx.from).getFullYear() : undefined,
             })),
           };
-          const changesetDiff = {
-            ...(v2.diff || {}),
-            from: v1.label,
-            to: v2.label,
-          };
-          const changeset = releaseNotesToChangeset(changesetData, changesetDiff, {
+          const changeset = releaseNotesToChangeset(changesetData, aggregatedDiff, {
             apiName: integration.name,
           });
 
+          const aggregatedStats = {
+            breaking: aggregatedDiff.breakingChanges.added.length,
+            scheduledBreaking: aggregatedDiff.scheduledBreakingChanges.added.length,
+            newOperations: aggregatedDiff.newOperations.added.length,
+            newModels: aggregatedDiff.newModels.added.length,
+            modelChanges: aggregatedDiff.modelChanges.added.length,
+          };
+
           onLoadSpecs(beforeSpec, afterSpec, label, {
             type: "releaseNotes",
-            diff: v2.diff || {},
-            stats: { ...v2.stats, breaking: v2.breaking },
+            diff: aggregatedDiff,
+            stats: aggregatedStats,
             changeset,
           });
           return;
