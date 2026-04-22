@@ -23,12 +23,16 @@ import { SupabaseSchemaUrlAdapter } from "./adapters/secondary/supabase/schema-u
 import { hasSupabase } from "./adapters/secondary/supabase/client.js";
 import { BrowserChangelogParserAdapter } from "./adapters/secondary/browser-changelog-parser-adapter.js";
 import { DiscoveryService } from "./core/usecases/discovery-service.js";
+import { ReleaseNotesService } from "./core/usecases/release-notes-service.js";
+import { ForwardNetworksReleaseNotesAdapter } from "./adapters/secondary/forward-networks-release-notes-adapter.js";
+import fwdData from "./data/fwdnetworks.json";
 import type {
   ApiDiscoveryPort,
   IntegrationStoragePort,
   SpecProxyPort,
   SchemaCachePort,
   SchemaUrlRegistryPort,
+  ReleaseNotesPort,
 } from "./core/ports/index.js";
 import type { SpecSource } from "./core/domain/discovery-types.js";
 
@@ -70,6 +74,7 @@ export function createBrowserStores(): {
   schemaCache: SchemaCachePort;
   schemaUrlRegistry: SchemaUrlRegistryPort;
   discoveryService: DiscoveryService;
+  releaseNotesService: ReleaseNotesService;
 } {
   // Persistence layer — pick Supabase if env is configured (VITE_SUPABASE_URL
   // + VITE_SUPABASE_ANON_KEY present at build time), otherwise fall back to
@@ -117,7 +122,16 @@ export function createBrowserStores(): {
     schemaUrlRegistry,
   );
 
-  return { integrationStore, specProxy, schemaCache, schemaUrlRegistry, discoveryService };
+  // Release-notes adapters — one per integration. Each wraps a provider-
+  // specific data source (static JSON today for Forward Networks; future
+  // adapters can scrape at runtime or bundle per-provider data). Adding a
+  // new provider means dropping a new adapter here; no UI code change.
+  const releaseNotesAdapters: ReleaseNotesPort[] = [
+    new ForwardNetworksReleaseNotesAdapter(fwdData.versions),
+  ];
+  const releaseNotesService = new ReleaseNotesService(releaseNotesAdapters);
+
+  return { integrationStore, specProxy, schemaCache, schemaUrlRegistry, discoveryService, releaseNotesService };
 }
 
 /** Registry of discovery adapters keyed by the SpecSource kind they handle. */

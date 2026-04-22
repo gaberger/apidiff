@@ -11,3 +11,4 @@ export const specProxy = stores.specProxy;
 export const schemaCache = stores.schemaCache;
 export const schemaUrlRegistry = stores.schemaUrlRegistry;
 export const discoveryService = stores.discoveryService;
+export const releaseNotesService = stores.releaseNotesService;

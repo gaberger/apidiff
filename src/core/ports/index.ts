@@ -23,6 +23,11 @@ import type {
   SpecSource,
 } from "../domain/discovery-types.js";
 
+import type {
+  AggregateDiff,
+  ReleaseNoteVersion,
+} from "../domain/release-notes-types.js";
+
 /** Fetches an OpenAPI spec from a URL or file path, returns local file path */
 export interface SchemaFetchPort {
   fetch(urlOrPath: string, label: string): Promise<string>;
@@ -68,6 +73,27 @@ export interface SpecInputPort {
 export interface ApiDiscoveryPort {
   discover(source: SpecSource): Promise<DiscoveredVersion[]>;
   readonly sourceKind: SpecSource["kind"];
+}
+
+/**
+ * Parses and aggregates release-notes for a single provider. One
+ * implementation per integration (Forward Networks, Stripe, GitHub, etc.);
+ * adapters register their slug so ReleaseNotesService can look up by
+ * provider. Adapters may back onto static JSON under src/data/ or scrape
+ * at request time.
+ */
+export interface ReleaseNotesPort {
+  /** Integration slug this adapter handles (e.g. "forward-networks", "stripe"). */
+  readonly slug: string;
+  /** Full version timeline with per-version single-step diffs, newest first. */
+  listVersions(): Promise<readonly ReleaseNoteVersion[]>;
+  /**
+   * Concatenate every single-step diff between fromLabel (older) and
+   * toLabel (newer) into one AggregateDiff. Implementations must handle
+   * the case where fromLabel == toLabel (return empty diff) and where
+   * either label is unknown (throw).
+   */
+  fetchRange(fromLabel: string, toLabel: string): Promise<AggregateDiff>;
 }
 
 /** Parses changelog pages for version identifiers */
