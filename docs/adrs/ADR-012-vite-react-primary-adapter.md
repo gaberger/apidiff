@@ -1,7 +1,7 @@
 # ADR-012: Vite + React as Primary Web Adapter
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-09

@@ -1,7 +1,7 @@
 # ADR-018: Spec Caching and Progress Surfacing
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-14

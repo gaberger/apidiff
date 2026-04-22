@@ -1,7 +1,7 @@
 # ADR-008: OpenAPI Spec Input via REST API and File Drop
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-08

@@ -3,7 +3,22 @@
   "title": "Promote shipped-but-proposed ADRs to accepted (or supersede if stale)",
   "adr": "meta",
   "created": "2026-04-21",
-  "status": "pending",
+  "status": "done",
+  "completed": "2026-04-22",
+  "completion_evidence": {
+    "audit_result": "All 9 proposed ADRs had live load-bearing code — zero abandoned, zero superseded. 6 fully shipped (008, 010, 011, 012, 017, 018), 3 partial-shipped (014, 015, 016) where the core decision is live in code but rollout is tracked in pending workplans.",
+    "promotions": {
+      "ADR-008": "shipped-and-current — spec-input-adapter.ts, browser-proxy-adapter.ts",
+      "ADR-010": "shipped-and-current — provider-registry.ts/.js, discovery-service.ts, IntegrationList.jsx",
+      "ADR-011": "shipped-and-current — levenshtein.ts + test, wired in diff-algorithm.ts",
+      "ADR-012": "shipped-and-current — vite.config.ts, App.jsx, main.jsx",
+      "ADR-014": "shipped-with-amendment — tokens in src/index.css, framer-motion in 5+ components. Residue in wp-ux-dark-mode-residual-tokenization (pending)",
+      "ADR-015": "shipped-with-amendment — components.json + 50 components in src/components/ui/. Rollout in wp-adr-015-shadcn-adoption (pending)",
+      "ADR-016": "shipped-with-amendment — EmptyState.jsx wired in DiffViewer. Full surface coverage in wp-adr-016-ia-and-states (pending)",
+      "ADR-017": "shipped-and-current — /:integration route, VersionTimeline component",
+      "ADR-018": "shipped-and-current — SchemaCache port + localstorage + supabase adapters, FetchProgress component"
+    }
+  },
   "topology": "hierarchical",
   "budget": "~15000 tokens",
   "context": {

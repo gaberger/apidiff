@@ -1,7 +1,7 @@
 # ADR-014: Design System Refinement — Tokens, Elevation, Motion, Density
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-14
@@ -94,3 +94,9 @@ See `docs/workplans/wp-adr-014-design-tokens.json` (enqueued via `hex brain`).
 - ADR-013 — React feature parity implementation
 - `src/index.css` — current token definitions
 - `tailwind.config.js` — current Tailwind theme extensions
+
+## Amendments
+
+### 2026-04-22 — Status flip: proposed → accepted
+
+Core decision is live: framer-motion integrated across `MigrationGuide.jsx`, `IntegrationList.jsx`, `DiffSummary.jsx`, `EmptyState.jsx`, `DiffViewer.jsx`; token system in `src/index.css`. Residual work — converting 8 remaining bare `stone-*` class uses to semantic shadcn tokens — is tracked in `docs/workplans/wp-ux-dark-mode-residual-tokenization.json` (status: pending). Accepting the ADR does not imply rollout complete; it acknowledges the decision is load-bearing in current code.

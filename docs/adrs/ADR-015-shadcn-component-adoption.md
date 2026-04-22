@@ -1,7 +1,7 @@
 # ADR-015: shadcn/ui Component Adoption Pass
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-14
@@ -81,3 +81,9 @@ See `docs/workplans/wp-adr-015-shadcn-adoption.json` (enqueued via `hex brain`).
 - ADR-014 — Design system refinement (prerequisite)
 - `src/components/ui/` — existing shadcn components
 - shadcn/ui docs — https://ui.shadcn.com
+
+## Amendments
+
+### 2026-04-22 — Status flip: proposed → accepted
+
+shadcn is the installed component system: `components.json` configured with the `new-york` style; 50 components live under `src/components/ui/` (accordion, alert, alert-dialog, avatar, badge, breadcrumb, button, calendar, card, checkbox, collapsible, …). Residual adoption work — migrating provider sidebar, diff chips, spec input, settings, toasts, states, and command palette to shadcn primitives — is tracked in `docs/workplans/wp-adr-015-shadcn-adoption.json` (status: pending). Accepting the ADR acknowledges shadcn as the chosen system; completion of the full rollout is the workplan's responsibility.

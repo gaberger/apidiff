@@ -1,7 +1,7 @@
 # ADR-011: Fuzzy Rename Detection via Levenshtein Distance
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-09

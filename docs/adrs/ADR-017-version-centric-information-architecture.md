@@ -1,7 +1,7 @@
 # ADR-017: Version-Centric Information Architecture
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-14

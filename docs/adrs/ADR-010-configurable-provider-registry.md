@@ -1,7 +1,7 @@
 # ADR-010: Configurable and Discoverable Provider Registry
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-09

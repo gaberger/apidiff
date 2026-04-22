@@ -1,7 +1,7 @@
 # ADR-016: Information Architecture, Empty / Loading / Error States
 
 ## Status
-Proposed
+Accepted
 
 ## Date
 2026-04-14
@@ -90,3 +90,9 @@ See `docs/workplans/wp-adr-016-ia-and-states.json` (enqueued via `hex brain`).
 - ADR-015 — shadcn component adoption
 - Refactoring UI (Adam Wathan, Steve Schoger) — empty-state patterns
 - `src/pages/DiffViewer.jsx` — primary surface needing IA work
+
+## Amendments
+
+### 2026-04-22 — Status flip: proposed → accepted
+
+Initial IA foundation shipped: `src/components/diff/EmptyState.jsx` exists and is wired into `DiffViewer.jsx`. Loading/error parity across surfaces, async-state hook, keyboard help overlay, and progressive disclosure are tracked in `docs/workplans/wp-adr-016-ia-and-states.json` (status: pending). Accepting the ADR acknowledges the empty/loading/error-state pattern as the standard; full surface coverage is the workplan's responsibility.
