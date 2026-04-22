@@ -4,17 +4,17 @@
   "specs": "docs/specs/spec-input.json",
   "adr": "ADR-008",
   "created": "2026-04-08",
-  "status": "planned",
+  "status": "done",
   "topology": "hierarchical",
   "budget": "~50000 tokens",
   "prior_work": {
     "done": [
-      "src/core/domain/types.ts — existing domain types",
-      "src/core/ports/index.ts — existing port interfaces",
-      "src/adapters/secondary/schema-fetch-adapter.ts — URL fetch for CLI (reusable logic)",
-      "src/adapters/primary/web-adapter.ts — existing web adapter with /api/guide and /api/diff",
-      "src/composition-root.ts — existing wiring",
-      "proofs/OpenAPIConstraints.v — Coq preconditions (well_formed, bounded_depth)"
+      "src/core/domain/types.ts \u2014 existing domain types",
+      "src/core/ports/index.ts \u2014 existing port interfaces",
+      "src/adapters/secondary/schema-fetch-adapter.ts \u2014 URL fetch for CLI (reusable logic)",
+      "src/adapters/primary/web-adapter.ts \u2014 existing web adapter with /api/guide and /api/diff",
+      "src/composition-root.ts \u2014 existing wiring",
+      "proofs/OpenAPIConstraints.v \u2014 Coq preconditions (well_formed, bounded_depth)"
     ]
   },
   "steps": [
@@ -27,7 +27,12 @@
       "port": null,
       "dependencies": [],
       "tier": 0,
-      "specs": ["S01", "S02", "S03", "S04"],
+      "specs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04"
+      ],
       "worktree_branch": "feat/spec-input/domain",
       "done_condition": "types.ts compiles with ResolvedSpec exported, hex analyze passes",
       "tasks": [],
@@ -40,9 +45,14 @@
       "layer": "ports",
       "adapter": null,
       "port": "SpecInputPort",
-      "dependencies": ["step-1"],
+      "dependencies": [
+        "step-1"
+      ],
       "tier": 0,
-      "specs": ["S01", "S03"],
+      "specs": [
+        "S01",
+        "S03"
+      ],
       "worktree_branch": "feat/spec-input/ports",
       "done_condition": "ports/index.ts compiles with SpecInputPort exported, hex analyze passes",
       "tasks": [],
@@ -51,13 +61,25 @@
     {
       "id": "step-3",
       "name": "Implement SpecInputAdapter (secondary)",
-      "description": "Implement SpecInputAdapter as a secondary adapter. fromUrl: HTTP GET, detect JSON/YAML, parse, detect OpenAPI version (swagger:'2.0' or openapi:'3.x'), resolve $ref via @apidevtools/json-schema-ref-parser, validate well-formedness (unique keys, bounded depth), extract title/version metadata. fromFile: detect format from extension (.yaml/.yml → YAML, else JSON), parse, same validation pipeline. Reject non-OpenAPI, empty files, malformed YAML with descriptive errors.",
+      "description": "Implement SpecInputAdapter as a secondary adapter. fromUrl: HTTP GET, detect JSON/YAML, parse, detect OpenAPI version (swagger:'2.0' or openapi:'3.x'), resolve $ref via @apidevtools/json-schema-ref-parser, validate well-formedness (unique keys, bounded depth), extract title/version metadata. fromFile: detect format from extension (.yaml/.yml \u2192 YAML, else JSON), parse, same validation pipeline. Reject non-OpenAPI, empty files, malformed YAML with descriptive errors.",
       "layer": "adapters/secondary",
       "adapter": "spec-input-adapter",
       "port": "SpecInputPort",
-      "dependencies": ["step-2"],
+      "dependencies": [
+        "step-2"
+      ],
       "tier": 1,
-      "specs": ["S01", "S02", "S03", "S04", "S07", "S08", "S10", "S11", "S12"],
+      "specs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S07",
+        "S08",
+        "S10",
+        "S11",
+        "S12"
+      ],
       "worktree_branch": "feat/spec-input/adapter-secondary",
       "done_condition": "Unit tests pass for: JSON URL fetch, YAML file parse, OpenAPI 2.0 detection, OpenAPI 3.0 detection, invalid URL error, malformed YAML error, $ref resolution, non-OpenAPI rejection, empty file rejection",
       "tasks": [],
@@ -70,9 +92,15 @@
       "layer": "adapters/primary",
       "adapter": "web-adapter",
       "port": "SpecInputPort",
-      "dependencies": ["step-2"],
+      "dependencies": [
+        "step-2"
+      ],
       "tier": 2,
-      "specs": ["S05", "S06", "S09"],
+      "specs": [
+        "S05",
+        "S06",
+        "S09"
+      ],
       "worktree_branch": "feat/spec-input/adapter-primary",
       "done_condition": "Web adapter compiles with new endpoints. HTML has drop zones and URL inputs. No innerHTML/outerHTML/insertAdjacentHTML used with external data. hex analyze passes.",
       "tasks": [],
@@ -85,9 +113,14 @@
       "layer": "composition-root",
       "adapter": null,
       "port": null,
-      "dependencies": ["step-3", "step-4"],
+      "dependencies": [
+        "step-3",
+        "step-4"
+      ],
       "tier": 4,
-      "specs": ["S13"],
+      "specs": [
+        "S13"
+      ],
       "worktree_branch": "feat/spec-input/wiring",
       "done_condition": "Full app builds and starts. composition-root.ts is the only file importing adapters. hex analyze passes.",
       "tasks": [],
@@ -96,13 +129,26 @@
     {
       "id": "step-6",
       "name": "Integration tests for spec input",
-      "description": "Integration tests: (1) Fetch a real OpenAPI spec URL (e.g. Petstore), verify ResolvedSpec has correct format and metadata. (2) Parse a YAML spec file, verify identical output to JSON equivalent. (3) End-to-end: two specs in → diff results out → guide generated with correct changes. (4) Verify error cases: 404 URL, malformed YAML, non-OpenAPI JSON, empty file.",
+      "description": "Integration tests: (1) Fetch a real OpenAPI spec URL (e.g. Petstore), verify ResolvedSpec has correct format and metadata. (2) Parse a YAML spec file, verify identical output to JSON equivalent. (3) End-to-end: two specs in \u2192 diff results out \u2192 guide generated with correct changes. (4) Verify error cases: 404 URL, malformed YAML, non-OpenAPI JSON, empty file.",
       "layer": "integration",
       "adapter": null,
       "port": null,
-      "dependencies": ["step-5"],
+      "dependencies": [
+        "step-5"
+      ],
       "tier": 5,
-      "specs": ["S01", "S02", "S03", "S04", "S07", "S08", "S10", "S11", "S12", "S13"],
+      "specs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S07",
+        "S08",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
       "worktree_branch": "feat/spec-input/integration",
       "done_condition": "All integration tests pass. bun test --filter spec-input exits 0.",
       "tasks": [],
@@ -111,12 +157,20 @@
   ],
   "dependencies": {
     "npm": [
-      { "name": "yaml", "version": "^2.4", "purpose": "Parse YAML OpenAPI specs to JSON" },
-      { "name": "@apidevtools/json-schema-ref-parser", "version": "^11.0", "purpose": "Resolve $ref pointers in OpenAPI documents" }
+      {
+        "name": "yaml",
+        "version": "^2.4",
+        "purpose": "Parse YAML OpenAPI specs to JSON"
+      },
+      {
+        "name": "@apidevtools/json-schema-ref-parser",
+        "version": "^11.0",
+        "purpose": "Resolve $ref pointers in OpenAPI documents"
+      }
     ]
   },
   "mergeOrder": [
-    "step-1 → step-2 (domain types then port interface)",
+    "step-1 \u2192 step-2 (domain types then port interface)",
     "step-3, step-4 parallel after step-2",
     "step-5 after step-3 + step-4 (wiring needs both adapters)",
     "step-6 last (integration validates everything)"
@@ -125,7 +179,7 @@
     {
       "risk": "$ref resolver pulls external URLs during file-drop parsing",
       "impact": "medium",
-      "mitigation": "Disable external $ref resolution for fromFile — only resolve internal refs. Document limitation."
+      "mitigation": "Disable external $ref resolution for fromFile \u2014 only resolve internal refs. Document limitation."
     },
     {
       "risk": "CORS blocks server-side spec fetch for certain hosts",
@@ -144,5 +198,7 @@
     "Diff and migration guide work correctly with fetched/dropped OpenAPI specs",
     "Invalid inputs produce clear error messages without crashing",
     "hex analyze reports zero architecture violations"
-  ]
+  ],
+  "completed": "2026-04-22",
+  "completion_evidence": "ADR-008 accepted; spec-input-adapter.ts + browser-proxy-adapter.ts + /api/proxy-fetch all shipped. Reconciled from planned \u2192 done."
 }

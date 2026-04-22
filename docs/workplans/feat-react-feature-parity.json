@@ -4,7 +4,7 @@
   "specs": "docs/specs/react-feature-parity.json",
   "adr": "ADR-012",
   "created": "2026-04-09",
-  "status": "in_progress",
+  "status": "done",
   "topology": "hierarchical",
   "budget": "~80000 tokens",
   "steps": [
@@ -16,7 +16,11 @@
       "port": null,
       "dependencies": [],
       "tier": 1,
-      "specs": ["S01", "S02", "S09"],
+      "specs": [
+        "S01",
+        "S02",
+        "S09"
+      ],
       "done_condition": "SpecInput renders URL input + Fetch button, drag-drop overlay, file size/version info. Vite builds clean.",
       "status": "in_progress"
     },
@@ -28,7 +32,10 @@
       "port": null,
       "dependencies": [],
       "tier": 1,
-      "specs": ["S03", "S04"],
+      "specs": [
+        "S03",
+        "S04"
+      ],
       "done_condition": "useSyncedScroll syncs two refs. useDiffHighlight maps results to line numbers. EditorOverlay renders colored line backgrounds.",
       "status": "in_progress"
     },
@@ -40,7 +47,11 @@
       "port": null,
       "dependencies": [],
       "tier": 1,
-      "specs": ["S05", "S06", "S07"],
+      "specs": [
+        "S05",
+        "S06",
+        "S07"
+      ],
       "done_condition": "MigrationGuide renders timeline dots, progress bar, change cards with checklists. Export downloads .md file. Checklist state persists in localStorage.",
       "status": "in_progress"
     },
@@ -50,9 +61,17 @@
       "layer": "adapters/primary",
       "adapter": "react-diff-viewer",
       "port": null,
-      "dependencies": ["step-1", "step-2", "step-3"],
+      "dependencies": [
+        "step-1",
+        "step-2",
+        "step-3"
+      ],
       "tier": 2,
-      "specs": ["S08", "S10", "S12"],
+      "specs": [
+        "S08",
+        "S10",
+        "S12"
+      ],
       "done_condition": "DiffViewer has Compare/Guide tab switching, synced scroll editors with diff highlighting, guide generation form, path click scrolls editors. Vite builds clean."
     },
     {
@@ -61,9 +80,24 @@
       "layer": "integration",
       "adapter": null,
       "port": null,
-      "dependencies": ["step-4"],
+      "dependencies": [
+        "step-4"
+      ],
       "tier": 5,
-      "specs": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"],
+      "specs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12"
+      ],
       "done_condition": "All 51 backend tests pass. Vite build succeeds. Manual verification of all 12 spec behaviors."
     }
   ],
@@ -83,5 +117,7 @@
     "Provider sidebar auto-compares on version select",
     "51 backend tests still pass",
     "Vite build succeeds"
-  ]
+  ],
+  "completed": "2026-04-22",
+  "completion_evidence": "React app is the shipped primary adapter \u2014 App.jsx, main.jsx, full DiffViewer, IntegrationList, IntegrationHeader all live. Feature parity with the deprecated vanilla HTML adapter is reached and surpassed (release-notes view, mobile responsive, changeset-spec page). Reconciled from in_progress \u2192 done."
 }
