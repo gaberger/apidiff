@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, HelpCircle, Menu } from "lucide-react";
+import { GitCompareArrows, RotateCcw, FileText, Loader2, Sun, Moon, HelpCircle, Menu, PanelLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme.js";
@@ -447,6 +447,15 @@ export default function DiffViewer() {
                   Settings
                 </Link>
               </nav>
+
+              {/* Mobile-only: toggle IntegrationList sidebar (hidden at 0px on <sm otherwise) */}
+              <button
+                aria-label="Show integrations"
+                onClick={() => setSidebarCollapsed(false)}
+                className="sm:hidden ml-2 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
 
               {/* Mobile nav — hamburger opens a Sheet with the same links */}
               <Sheet>
