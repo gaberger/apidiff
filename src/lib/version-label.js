@@ -1,4 +1,6 @@
-const HOST_PATTERN = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?:\/[a-z0-9-]+(?:\.[a-z0-9-]+)+)?[./_-]/i;
+// Each hostname segment must start with a letter so numeric-dotted inputs
+// like "26.3.0" (SemVer) don't backtrack-match as host-like.
+const HOST_PATTERN = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+(?:\/[a-z0-9-]+(?:\.[a-z0-9-]+)+)?[./_-]/i;
 const DOC_PREFIXES = /^(api|openapi|spec|swagger|docs?)[-._]/i;
 const FILE_EXT = /\.(json|ya?ml)$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
