@@ -44,10 +44,10 @@ export default function DiffSummary({ results, summaryCounts, activeFilter, onFi
       </motion.div>
 
       {chipConfig.map((chip) => {
-        const count = summaryCounts ? (summaryCounts[chip.key] ?? 0) : results.filter((r) => r.type === chip.key).length;
+        const count = summaryCounts ? (summaryCounts[chip.key] ?? 0) : results.filter((r) => r.type?.toLowerCase() === chip.key).length;
         if (count === 0) return null;
 
-        const isActive = activeFilter === chip.key;
+        const isActive = activeFilter?.toLowerCase() === chip.key.toLowerCase();
 
         return (
           <motion.div

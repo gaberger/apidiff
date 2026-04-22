@@ -79,7 +79,7 @@ export default function VersionTimeline({
             const role = isV1 ? "From" : isV2 ? "To" : null;
             return (
               <button
-                key={v.url ?? v.label ?? i}
+                key={`${v.url ?? ''}-${v.label ?? ''}-${i}`}
                 type="button"
                 onClick={() => handleClick(v.idx)}
                 className="group relative flex flex-col items-center px-2 py-1 outline-none"

@@ -47,7 +47,14 @@ self.addEventListener("message", async (e) => {
 
     // Stringify in the worker so the main thread never touches large spec objects.
     self.postMessage({ id, type: "progress", stage: "stringifying" });
-    const stringified = JSON.stringify(resolved, null, 2);
+    const seen = new WeakSet();
+    const stringified = JSON.stringify(resolved, (key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return "[circular]";
+        seen.add(value);
+      }
+      return value;
+    }, 2);
 
     // Only send the stringified form — resolved object is NOT sent back.
     // This eliminates the structured-clone cost of copying a large object graph

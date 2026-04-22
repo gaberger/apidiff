@@ -54,8 +54,8 @@ export default function FetchProgress({ stages, accentColor = "hsl(var(--primary
             )}
             <span className="font-semibold text-foreground">
               {hasError ? (
-                stages.find((s) => s.status === "error")?.error
-                  ? `Error: ${stages.find((s) => s.status === "error").error}`
+                stages.find((s) => s.status === "error")
+                  ? `Error: ${stages.find((s) => s.status === "error").message || stages.find((s) => s.status === "error").error || "Unknown error"}`
                   : `Failed at ${stages.find((s) => s.status === "error")?.label ?? "step"}`
               ) : anyCacheHit && allDone ? "Loaded from cache" : hasActive ? "Working…" : allDone ? "Ready" : "Preparing…"}
             </span>
@@ -109,7 +109,7 @@ export default function FetchProgress({ stages, accentColor = "hsl(var(--primary
 }
 
 function StagePill({ stage, accentColor }) {
-  const { label, status, cacheHit } = stage;
+  const { label, status, cacheHit, message, url } = stage;
   const Icon = status === "complete"
     ? CheckCircle2
     : status === "error"
@@ -127,11 +127,12 @@ function StagePill({ stage, accentColor }) {
         "text-muted-foreground/60"
       }`}
       style={status === "in-progress" ? { color: accentColor } : undefined}
+      title={url || message || ""}
     >
       {Icon && (
         <Icon className={`w-3 h-3 ${status === "in-progress" ? "animate-spin" : ""}`} />
       )}
-      <span>{label}{cacheHit ? " (cached)" : ""}</span>
+      <span>{label}{cacheHit ? " (cached)" : ""}{status === "error" && message ? ` - ${message}` : ""}</span>
     </span>
   );
 }
