@@ -2,6 +2,12 @@
 // CLI entry point
 
 import { createCliApp } from "./composition-root.js";
+import { stringify as yamlStringify } from "yaml";
+import {
+  parseHtml,
+  buildChangeset,
+  renderMarkdown,
+} from "./core/domain/release-notes-changeset.js";
 
 const { responseDiffService, schemaDiffService, presenter } = createCliApp();
 
@@ -83,6 +89,67 @@ if (command === "diff") {
   const guide = responseDiffService.generateGuide(v1, v2, baseVersion, revisionVersion, sunsetDate);
   presenter.presentGuide(guide);
 
+} else if (command === "report") {
+  // Release-notes report: apidiff report <url> [--out path] [--api-name name]
+  //                                            [--from ver] [--to ver]
+  //                                            [--released YYYY-MM-DD]
+  //                                            [--no-yaml] [--raw-html path]
+  const reportArgs = args.slice(1);
+  const VALUE_FLAGS = new Set(["--out", "--api-name", "--from", "--to", "--released", "--raw-html"]);
+  const BOOL_FLAGS = new Set(["--no-yaml"]);
+  const flags: Record<string, string | true> = {};
+  const positionals: string[] = [];
+  for (let i = 0; i < reportArgs.length; i++) {
+    const a = reportArgs[i]!;
+    if (VALUE_FLAGS.has(a)) flags[a] = reportArgs[++i] ?? "";
+    else if (BOOL_FLAGS.has(a)) flags[a] = true;
+    else if (a.startsWith("--")) {
+      presenter.presentError(`unknown flag: ${a}`);
+      process.exit(1);
+    } else positionals.push(a);
+  }
+
+  const url = positionals[0];
+  const rawHtmlPath = flags["--raw-html"] as string | undefined;
+  if (!url && !rawHtmlPath) {
+    presenter.presentError(
+      "Usage: apidiff report <url> [--out path] [--api-name name] [--from ver] [--to ver] [--released YYYY-MM-DD] [--no-yaml] [--raw-html path]",
+    );
+    process.exit(1);
+  }
+
+  const html = rawHtmlPath
+    ? await Bun.file(rawHtmlPath).text()
+    : await (async () => {
+        const res = await fetch(url!, { headers: { "User-Agent": "apidiff" } });
+        if (!res.ok) throw new Error(`fetch ${url}: ${res.status} ${res.statusText}`);
+        return res.text();
+      })();
+
+  const parsed = parseHtml(html);
+  const itemCount = Array.from(parsed.buckets.values()).reduce((a, b) => a + b.length, 0);
+  if (itemCount === 0) {
+    console.error(
+      "warn: no release-note items extracted. The page may be JS-rendered or use a layout this parser does not recognize. Pass --raw-html with pre-rendered HTML to retry.",
+    );
+  }
+
+  const cs = buildChangeset(parsed, {
+    source: url ?? rawHtmlPath,
+    apiName: flags["--api-name"] as string | undefined,
+    fromVersion: flags["--from"] as string | undefined,
+    toVersion: flags["--to"] as string | undefined,
+    released: flags["--released"] as string | undefined,
+  });
+
+  if (flags["--no-yaml"] !== true) {
+    const outPath = (flags["--out"] as string | undefined) ?? `changeset-${cs.api.to.version}.yaml`;
+    await Bun.write(outPath, yamlStringify(cs, { lineWidth: 0 }));
+    console.error(`✓ wrote ${outPath}  (${cs.changes.length} changes)`);
+  }
+
+  process.stdout.write(renderMarkdown(parsed, cs, url ?? rawHtmlPath));
+
 } else if (command === "schema") {
   // Schema diff: apidiff schema <base_url> <revision_url> [--mode changelog]
   const [, baseUrl, revisionUrl] = args;
@@ -110,6 +177,7 @@ if (command === "diff") {
     diff   --provider <name> <old_ver> <new_ver>       Fetch & compare provider specs
     guide  <v1.json> <v2.json> [--base v1] [--rev v2]  Generate migration guide
     schema <base_url> <revision_url> [--mode changelog] Compare OpenAPI schemas
+    report <url> [--out path] [--no-yaml]              Release-notes → changeset YAML + MD report
 
   Providers:
     stripe   — Stripe OpenAPI specs (versions: v2228, v2229, ...)
@@ -130,6 +198,7 @@ if (command === "diff") {
     apidiff diff --provider forward 26.2 26.3
     apidiff diff --provider stripe v2228 v2229
     apidiff guide old.json new.json --base v1 --revision v2 --sunset 2025-06-30
+    apidiff report https://docs.fwd.app/release-notes/api/2026/release.26.2.0/
   `);
 }
 

@@ -1,0 +1,74 @@
+name: Release binaries
+
+# Cross-compiles src/cli.ts into single-file binaries for Linux/macOS/Windows
+# (x64 + arm64) and uploads them. Tag-driven releases publish to GitHub Releases;
+# manual runs (workflow_dispatch) only upload artifacts.
+#
+# Tag format: v* (e.g. v0.1.0). Match scripts/build-binaries.ts output naming.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "src/**"
+      - "scripts/build-binaries.ts"
+      - ".github/workflows/release.yml"
+      - "package.json"
+      - "bun.lock"
+
+permissions:
+  contents: write  # required by softprops/action-gh-release to create the release
+
+jobs:
+  build:
+    name: Build binaries (all targets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Cross-compile all targets
+        run: bun scripts/build-binaries.ts
+
+      - name: Generate SHA256 checksums
+        working-directory: dist
+        run: sha256sum apidiff-* | tee SHA256SUMS
+
+      - name: Smoke-test linux-x64 binary
+        run: |
+          # Must launch and surface help (no args → exit 0, prints usage)
+          out=$(./dist/apidiff-linux-x64)
+          echo "$out" | head -10
+          echo "$out" | grep -q "apidiff — API migration toolkit"
+          echo "$out" | grep -q "report <url>"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apidiff-binaries
+          path: |
+            dist/apidiff-*
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/apidiff-*
+            dist/SHA256SUMS
+          generate_release_notes: true
+          fail_on_unmatched_files: true

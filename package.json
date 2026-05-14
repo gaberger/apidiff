@@ -31,6 +31,8 @@
     "dev:ui": "vite",
     "build": "bun run sync:lib && vite build",
     "build:cli": "bun build src/cli.ts --outdir dist --target bun",
+    "build:bin": "bun scripts/build-binaries.ts current",
+    "build:bin:all": "bun scripts/build-binaries.ts",
     "start:cli": "bun run src/cli.ts",
     "start:web": "bun run src/web.ts",
     "test": "bun test",
