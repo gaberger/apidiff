@@ -17,17 +17,84 @@ Compare OpenAPI specs across versions to detect renamed fields, type changes, re
 
 ## Quick Start
 
+### CLI — single-file binary (no toolchain needed)
+
+Download the binary for your platform from the [latest release](https://github.com/gaberger/apidiff/releases/latest) and drop it on your `PATH`:
+
 ```bash
-# Install dependencies
+# Linux x64
+gh release download --pattern 'apidiff-linux-x64' -O ~/.local/bin/apidiff && chmod +x ~/.local/bin/apidiff
+
+# macOS arm64
+gh release download --pattern 'apidiff-darwin-arm64' -O ~/.local/bin/apidiff && chmod +x ~/.local/bin/apidiff
+
+# Try it
+apidiff report https://docs.fwd.app/release-notes/api/2026/release.26.3.0/
+```
+
+Binaries are produced for `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`, `windows-x64`. They embed the Bun runtime — no Node, no install step.
+
+### From source
+
+```bash
 bun install
 
-# Start the web UI
+# Web UI (http://localhost:4747)
 bun run start:web
-# Open http://localhost:4747
 
-# Or use the CLI
-bun run start:cli
+# CLI from source
+bun src/cli.ts report https://docs.fwd.app/release-notes/api/2026/release.26.3.0/
+
+# Cross-compile binaries for all 5 platforms → dist/
+bun run build:bin:all
 ```
+
+## CLI
+
+```
+apidiff diff   <v1.json> <v2.json>                         # Compare two JSON spec files
+apidiff diff   --provider <name> <old_ver> <new_ver>       # Fetch & compare provider specs
+apidiff guide  <v1.json> <v2.json> [--base v1] [--rev v2]  # Generate migration guide
+apidiff schema <base_url> <revision_url> [--mode changelog]# Compare OpenAPI schemas via oasdiff
+apidiff report <url> [--out path] [--verbose] [--no-yaml]  # Release-notes → api-changeset YAML + summary
+```
+
+### `apidiff report` — release notes → api-changeset
+
+Fetches an HTML release-notes page, parses its sections (Breaking / Scheduled-breaking / New ops / New models / Model changes / Doc changes), and emits a YAML changeset that validates against [`apidiffspec/api-changeset-schema.json`](apidiffspec/api-changeset-schema.json) — plus a compact terminal summary.
+
+```bash
+apidiff report https://docs.fwd.app/release-notes/api/2026/release.26.3.0/
+
+# →
+# Forward Networks API  26.3.0
+# released 2026-03-17
+#
+#   breaking         1  [#.......................]
+#   deprecations     6  [########................]
+#   notice          15  [###################.....]
+#   info             3  [####....................]
+#   total           19  [########################]
+#
+# Breaking changes  (1)
+#   • FWD-41282
+#       POST /api/nqe  +1 more
+# ...
+# ✓ wrote changeset-26.3.0.yaml  (19 changes)
+```
+
+| Flag | Purpose |
+|---|---|
+| `--out <path>` | YAML output path (default: `./changeset-<version>.yaml`) |
+| `--no-yaml` | Skip writing YAML, terminal report only |
+| `--verbose` | Full per-item breakdown with descriptions + every affected op |
+| `--api-name <name>` | Override `api.name` in the changeset (default: inferred from URL host) |
+| `--from <ver>` / `--to <ver>` | Override `api.from.version` / `api.to.version` |
+| `--released <YYYY-MM-DD>` | Override release date |
+| `--raw-html <path>` | Skip fetch — parse local HTML (useful for JS-rendered pages) |
+| `--no-color` | Disable ANSI (auto-disabled when stdout is not a TTY) |
+
+The YAML conforms to API Changeset v0.2 — see [`apidiffspec/`](apidiffspec/) for the schema and an annotated example.
 
 ## Features
 
@@ -42,6 +109,8 @@ bun run start:cli
 | **Scroll Sync** | Optional lock/unlock synchronized scrolling between old and new editors |
 | **File Drop & URL Fetch** | Load specs by pasting, dragging files, or fetching from a URL |
 | **Markdown Export** | Download migration guides as `.md` files |
+| **Release-notes → Changeset** | `apidiff report <url>` parses release-notes HTML into a schema-valid api-changeset YAML |
+| **Cross-platform binaries** | Single-file executables for Linux/macOS/Windows (x64 + arm64), no runtime needed |
 
 ## Architecture
 
