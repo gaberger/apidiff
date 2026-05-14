@@ -9,10 +9,56 @@ import {
   renderMarkdown,
 } from "./core/domain/release-notes-changeset.js";
 
+// Top-level error handlers. Without these, top-level `await` failures dump a
+// minified Bun runtime stack to the user. We want one clean red line.
+function reportFatal(err: unknown): never {
+  const msg = err instanceof Error ? err.message : String(err);
+  process.stderr.write(`\x1b[31merror:\x1b[0m ${msg}\n`);
+  process.exit(1);
+}
+process.on("uncaughtException", reportFatal);
+process.on("unhandledRejection", reportFatal);
+
 const { responseDiffService, schemaDiffService, presenter } = createCliApp();
 
 const args = process.argv.slice(2);
 const command = args[0];
+
+/**
+ * Fetch an HTML page, retrying once with a trailing slash on 404. Docusaurus
+ * sites (fwd.app uses it) consistently 404 without the trailing slash even
+ * when the page exists, and users routinely omit it.
+ */
+const FILE_EXTENSIONS = new Set([
+  "html", "htm", "json", "yaml", "yml", "xml", "txt", "md", "pdf",
+]);
+function looksLikeFile(rawUrl: string): boolean {
+  const last = new URL(rawUrl).pathname.split("/").pop() ?? "";
+  const i = last.lastIndexOf(".");
+  if (i < 0) return false;
+  return FILE_EXTENSIONS.has(last.slice(i + 1).toLowerCase());
+}
+
+async function fetchHtml(rawUrl: string): Promise<string> {
+  const tryFetch = async (u: string) => {
+    const r = await fetch(u, { headers: { "User-Agent": "apidiff" } });
+    return { ok: r.ok, status: r.status, statusText: r.statusText, text: r.ok ? await r.text() : "" };
+  };
+  let res = await tryFetch(rawUrl);
+  if (!res.ok && res.status === 404 && !rawUrl.endsWith("/") && !looksLikeFile(rawUrl)) {
+    const withSlash = rawUrl + "/";
+    process.stderr.write(`note: ${rawUrl} → 404; retrying with trailing slash\n`);
+    res = await tryFetch(withSlash);
+  }
+  if (!res.ok) {
+    throw new Error(
+      res.status === 404
+        ? `not found: ${rawUrl} (HTTP 404). Check the version exists at this provider.`
+        : `fetch ${rawUrl}: HTTP ${res.status} ${res.statusText}`,
+    );
+  }
+  return res.text;
+}
 
 // Provider spec URL registry
 const PROVIDER_SPECS: Record<string, (v: string) => string> = {
@@ -118,13 +164,7 @@ if (command === "diff") {
     process.exit(1);
   }
 
-  const html = rawHtmlPath
-    ? await Bun.file(rawHtmlPath).text()
-    : await (async () => {
-        const res = await fetch(url!, { headers: { "User-Agent": "apidiff" } });
-        if (!res.ok) throw new Error(`fetch ${url}: ${res.status} ${res.statusText}`);
-        return res.text();
-      })();
+  const html = rawHtmlPath ? await Bun.file(rawHtmlPath).text() : await fetchHtml(url!);
 
   const parsed = parseHtml(html);
   const itemCount = Array.from(parsed.buckets.values()).reduce((a, b) => a + b.length, 0);
