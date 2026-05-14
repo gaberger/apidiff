@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import path from "path";
+import { safeFetch } from "./api/_lib/ssrf-guard.js";
 
 export default defineConfig(() => {
   return {
@@ -21,32 +22,26 @@ export default defineConfig(() => {
         name: "apidiff-proxy-fetch-dev",
         configureServer(server: import("vite").ViteDevServer) {
           server.middlewares.use("/api/proxy-fetch", async (req, res) => {
+            const sendJson = (status: number, body: unknown) => {
+              res.statusCode = status;
+              res.setHeader("content-type", "application/json");
+              res.end(JSON.stringify(body));
+            };
             try {
               const host = req.headers.host ?? "localhost";
               const fullUrl = new URL(req.url ?? "", `http://${host}`);
               const target = fullUrl.searchParams.get("url");
               if (!target) {
-                res.statusCode = 400;
-                res.setHeader("content-type", "application/json");
-                res.end(JSON.stringify({ error: "missing url query parameter" }));
+                sendJson(400, { error: "missing url query parameter" });
                 return;
               }
-              let parsed: URL;
-              try { parsed = new URL(target); } catch {
-                res.statusCode = 400;
-                res.setHeader("content-type", "application/json");
-                res.end(JSON.stringify({ error: "invalid url" }));
+              const result = await safeFetch(target);
+              if (!result.ok) {
+                sendJson(result.status, { error: result.error });
                 return;
               }
-              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-                res.statusCode = 400;
-                res.setHeader("content-type", "application/json");
-                res.end(JSON.stringify({ error: "only http/https urls are allowed" }));
-                return;
-              }
-              const upstream = await fetch(parsed.toString(), { redirect: "follow" });
-              const contentType = upstream.headers.get("content-type") ?? undefined;
-              const raw = await upstream.text();
+              const contentType = result.response.headers.get("content-type") ?? undefined;
+              const raw = await result.response.text();
               const looksJson = (contentType ?? "").toLowerCase().includes("json")
                 || raw.trimStart().startsWith("{")
                 || raw.trimStart().startsWith("[");
@@ -54,14 +49,10 @@ export default defineConfig(() => {
               if (looksJson) {
                 try { document = JSON.parse(raw); } catch { /* keep as string */ }
               }
-              res.statusCode = 200;
-              res.setHeader("content-type", "application/json");
-              res.end(JSON.stringify({ document, contentType, status: upstream.status }));
+              sendJson(200, { document, contentType, status: result.response.status });
             } catch (err: unknown) {
               const msg = err instanceof Error ? err.message : "unknown fetch error";
-              res.statusCode = 502;
-              res.setHeader("content-type", "application/json");
-              res.end(JSON.stringify({ error: `upstream fetch failed: ${msg}` }));
+              sendJson(502, { error: `upstream fetch failed: ${msg}` });
             }
           });
         },

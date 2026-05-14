@@ -2,8 +2,13 @@
 // Accepts GET /api/proxy-fetch?url=<encoded-url> and returns
 // { document, contentType, status } as JSON. `document` is a parsed object
 // when the upstream content-type is JSON, otherwise the raw string.
+//
+// SSRF guard (api/_lib/ssrf-guard.ts) blocks private/loopback/link-local/metadata
+// targets and revalidates every redirect hop. Keep the guard authoritative — do
+// not call fetch() directly here.
 
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { safeFetch } from "./_lib/ssrf-guard.js";
 
 function parseDocument(raw: string, contentType: string | null): unknown {
   const ct = (contentType ?? "").toLowerCase();
@@ -21,27 +26,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  let parsed: URL;
-  try { parsed = new URL(target); } catch {
-    res.status(400).json({ error: "invalid url" });
-    return;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    res.status(400).json({ error: "only http/https urls are allowed" });
+  const result = await safeFetch(target);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
     return;
   }
 
-  try {
-    const upstream = await fetch(parsed.toString(), { redirect: "follow" });
-    const contentType = upstream.headers.get("content-type") ?? undefined;
-    const raw = await upstream.text();
-    res.status(200).json({
-      document: parseDocument(raw, contentType ?? null),
-      contentType,
-      status: upstream.status,
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "unknown fetch error";
-    res.status(502).json({ error: `upstream fetch failed: ${msg}` });
-  }
+  const contentType = result.response.headers.get("content-type") ?? undefined;
+  const raw = await result.response.text();
+  res.status(200).json({
+    document: parseDocument(raw, contentType ?? null),
+    contentType,
+    status: result.response.status,
+  });
 }
