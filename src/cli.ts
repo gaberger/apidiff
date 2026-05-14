@@ -96,7 +96,7 @@ if (command === "diff") {
   //                                            [--no-yaml] [--raw-html path]
   const reportArgs = args.slice(1);
   const VALUE_FLAGS = new Set(["--out", "--api-name", "--from", "--to", "--released", "--raw-html"]);
-  const BOOL_FLAGS = new Set(["--no-yaml"]);
+  const BOOL_FLAGS = new Set(["--no-yaml", "--verbose", "--no-color"]);
   const flags: Record<string, string | true> = {};
   const positionals: string[] = [];
   for (let i = 0; i < reportArgs.length; i++) {
@@ -148,7 +148,14 @@ if (command === "diff") {
     console.error(`✓ wrote ${outPath}  (${cs.changes.length} changes)`);
   }
 
-  process.stdout.write(renderMarkdown(parsed, cs, url ?? rawHtmlPath));
+  const color = flags["--no-color"] !== true && Boolean(process.stdout.isTTY);
+  process.stdout.write(
+    renderMarkdown(parsed, cs, {
+      source: url ?? rawHtmlPath,
+      color,
+      verbose: flags["--verbose"] === true,
+    }),
+  );
 
 } else if (command === "schema") {
   // Schema diff: apidiff schema <base_url> <revision_url> [--mode changelog]
@@ -177,7 +184,7 @@ if (command === "diff") {
     diff   --provider <name> <old_ver> <new_ver>       Fetch & compare provider specs
     guide  <v1.json> <v2.json> [--base v1] [--rev v2]  Generate migration guide
     schema <base_url> <revision_url> [--mode changelog] Compare OpenAPI schemas
-    report <url> [--out path] [--no-yaml]              Release-notes → changeset YAML + MD report
+    report <url> [--out path] [--no-yaml] [--verbose]  Release-notes → changeset YAML + terminal summary
 
   Providers:
     stripe   — Stripe OpenAPI specs (versions: v2228, v2229, ...)
