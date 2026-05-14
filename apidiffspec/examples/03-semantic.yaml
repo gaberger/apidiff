@@ -1,0 +1,87 @@
+# Semantic family — meaning changed, shape didn't.
+# Ops: resemanticize, reorder, retime, annotate.
+#
+# These are AUTHOR-ONLY: a spec-diff tool cannot recover them by comparing
+# two OpenAPI documents because the wire format is identical. They exist
+# precisely because the OpenAPI documents alone cannot describe them.
+#
+# `detectable` defaults to FALSE for this family — validators should not
+# flag their absence from a diff as suspicious.
+#
+# Pointer convention: `at` (same location in both specs).
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  from: { version: "2.4.0" }
+  to:   { version: "2.5.0" }
+
+summary: Semantic-family operations — invisible to spec diff, must be authored.
+
+changes:
+
+  # resemanticize — same shape, different meaning. Classic example: a status
+  # enum value whose definition changes ("pending" used to mean "queued for
+  # processing"; now means "awaiting payment").
+  - id: CHG-001
+    op: resemanticize
+    target: enum-value
+    at: "#/components/schemas/Order/properties/status/enum/0"
+    severity: breaking
+    breaking: true
+    detectable: false
+    description: |
+      Order status "pending" now means "awaiting payment" rather than
+      "queued for processing." Clients filtering on "pending" to find
+      orders ready for fulfillment will silently get the wrong set.
+    rationale: Align with checkout-funnel terminology used in the dashboard.
+    migration:
+      client_action: |
+        If you previously filtered status=pending to find fulfillable
+        orders, switch to status=processing. status=pending now means
+        the customer hasn't paid yet.
+      automated: false
+
+  # reorder — ordering semantics changed. The schema describes an array;
+  # the contract about what its order means changed.
+  - id: CHG-002
+    op: reorder
+    target: response-field
+    at: "#/paths/~1orders/get/responses/200/content/application~1json/schema/properties/items"
+    severity: notice
+    detectable: false
+    description: |
+      Results are now sorted by created_at DESC (newest first). Previously
+      undefined / insertion order. Pagination clients depending on stable
+      order across pages MUST sort client-side or pass an explicit `sort=` param.
+
+  # retime — timing / consistency semantics changed.
+  - id: CHG-003
+    op: retime
+    target: operation
+    at: "#/paths/~1orders/post"
+    severity: breaking
+    breaking: true
+    detectable: false
+    description: |
+      POST /orders is now eventually consistent. Returns 202 Accepted
+      immediately; the created resource may not be queryable for up to
+      30 seconds.
+    migration:
+      client_action: |
+        Do not GET /orders/{id} immediately after POST. Poll with
+        exponential backoff, or subscribe to the order.created webhook.
+      automated: false
+
+  # annotate — documentation-only clarification, no wire-format change.
+  # The OpenAPI doc itself didn't change shape; only its prose did.
+  - id: CHG-004
+    op: annotate
+    target: schema-field
+    at: "#/components/schemas/Order/properties/external_id"
+    severity: info
+    detectable: false
+    description: |
+      Clarified that external_id is opaque to the server — no normalization,
+      case-sensitive comparison, max 255 chars. No code change required.

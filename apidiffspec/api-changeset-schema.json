@@ -7,6 +7,66 @@
   "required": ["changeset_version", "api", "changes"],
   "additionalProperties": false,
 
+  "examples": [
+    {
+      "changeset_version": "0.2",
+      "api": {
+        "name": "Orders API",
+        "from": { "version": "2.4.0" },
+        "to":   { "version": "2.5.0" }
+      },
+      "released": "2026-04-20",
+      "summary": "Minimal example covering one entry from each operation family.",
+      "changes": [
+        {
+          "id": "CHG-001",
+          "op": "add",
+          "target": "operation",
+          "to": "#/paths/~1orders~1{id}~1tags/post",
+          "severity": "notice",
+          "description": "New tag-management endpoint."
+        },
+        {
+          "id": "CHG-002",
+          "op": "tighten",
+          "target": "schema-field",
+          "at": "#/components/schemas/Order/properties/email",
+          "severity": "notice",
+          "description": "Email field now requires RFC 5322 format.",
+          "before": { "type": "string" },
+          "after":  { "type": "string", "format": "email" }
+        },
+        {
+          "id": "CHG-003",
+          "op": "retime",
+          "target": "operation",
+          "at": "#/paths/~1orders/post",
+          "severity": "breaking",
+          "breaking": true,
+          "description": "POST /orders now returns 202 + eventually-consistent reads.",
+          "migration": {
+            "client_action": "Poll GET /orders/{id} or subscribe to webhooks; do not assume the resource is queryable immediately after POST returns.",
+            "automated": false
+          }
+        },
+        {
+          "id": "CHG-004",
+          "op": "deprecate",
+          "target": "operation",
+          "at": "#/paths/~1search/get",
+          "severity": "notice",
+          "description": "Replaced by typed query DSL at /search/advanced.",
+          "lifecycle": {
+            "deprecated_date": "2026-04-20",
+            "sunset_date":     "2026-10-20",
+            "replacement":     "#/paths/~1search~1advanced/get",
+            "reason":          "Legacy free-text search produces ambiguous results."
+          }
+        }
+      ]
+    }
+  ],
+
   "properties": {
     "changeset_version": {
       "type": "string",

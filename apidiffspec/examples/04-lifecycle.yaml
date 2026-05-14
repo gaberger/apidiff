@@ -1,0 +1,84 @@
+# Lifecycle family — status changed, element stays put (mostly).
+# Ops: deprecate, sunset, restore, withdraw.
+#
+# Aligned with RFC 9745 (Deprecation header) + RFC 8594 (Sunset header).
+#
+# Pointer convention:
+#   deprecate / sunset / restore — `at` (still in both specs)
+#   withdraw                     — `from` only (emergency removal)
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  from: { version: "2.4.0" }
+  to:   { version: "2.5.0" }
+
+summary: Lifecycle-family operations — status transitions with timing metadata.
+
+changes:
+
+  # deprecate — element still works but is on its way out.
+  # Required: at + lifecycle.
+  - id: CHG-001
+    op: deprecate
+    target: operation
+    at: "#/paths/~1search/get"
+    severity: notice
+    description: Replaced by typed query DSL at /search/advanced.
+    lifecycle:
+      deprecated_date: 2026-04-20
+      sunset_date:     2026-10-20
+      replacement:     "#/paths/~1search~1advanced/get"
+      reason:          Legacy free-text search produces ambiguous results.
+
+  # sunset — removal date is committed. Tooling should set the RFC 8594
+  # Sunset response header. lifecycle.sunset_date is mandatory.
+  - id: CHG-002
+    op: sunset
+    target: operation
+    at: "#/paths/~1v1~1customers/get"
+    severity: breaking
+    breaking: true
+    description: v1 customer endpoint will be removed on the announced sunset.
+    lifecycle:
+      deprecated_date: 2025-10-01
+      sunset_date:     2026-10-01
+      replacement:     "#/paths/~1v2~1customers/get"
+      reason:          v1 schema can't represent multi-tenant ownership.
+    migration:
+      client_action: Switch base path from /v1 to /v2. Field shapes are identical except for `tenant_id` (new, required).
+      automated: false
+
+  # restore — element un-deprecated. Rare but happens when a deprecation
+  # is reversed (e.g. usage telemetry showed wider reliance than expected).
+  - id: CHG-003
+    op: restore
+    target: schema-field
+    at: "#/components/schemas/Order/properties/legacy_ref"
+    severity: info
+    description: Field un-deprecated; the planned removal in v2.6 is cancelled.
+    lifecycle:
+      reason: Telemetry showed 14 % of active clients still rely on this field.
+    supersedes:
+      - changeset: "2.3.0"
+        id: CHG-019
+        url: https://docs.example.com/changesets/2.3.0.yaml
+
+  # withdraw — EMERGENCY removal before the announced sunset.
+  # Use sparingly; this breaks the deprecation contract with consumers.
+  # Required: `from` (the element is GONE in the new spec, so no `at`).
+  - id: CHG-004
+    op: withdraw
+    target: operation
+    from: "#/paths/~1internal~1raw-export/get"
+    severity: breaking
+    breaking: true
+    description: Removed ahead of announced sunset due to security incident.
+    rationale: |
+      CVE-2026-XXXX disclosed an authentication bypass; the endpoint was
+      pulled rather than patched because audit found no legitimate
+      external consumers in the prior 12 months of logs.
+    migration:
+      client_action: Use POST /exports with format=raw and an authenticated job token.
+      automated: false

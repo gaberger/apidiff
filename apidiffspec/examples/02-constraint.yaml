@@ -1,0 +1,80 @@
+# Constraint family — validation rules changed, element stays put.
+# Ops: tighten, loosen, constrain, retype, redefault, recode.
+# Pointer convention: `at` (same location in both specs).
+#
+# All constraint-family ops require `at` per the schema's allOf clauses.
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  from: { version: "2.4.0" }
+  to:   { version: "2.5.0" }
+
+summary: Constraint-family operations only — pointer in `at`, element doesn't move.
+
+changes:
+
+  # tighten — stricter rules. Existing-consumer payloads MAY now be rejected.
+  - id: CHG-001
+    op: tighten
+    target: schema-field
+    at: "#/components/schemas/User/properties/email"
+    severity: notice
+    description: email field now requires RFC 5322 format.
+    before: { type: string }
+    after:  { type: string, format: email }
+
+  # loosen — more permissive. Safe for clients to keep doing what they did.
+  - id: CHG-002
+    op: loosen
+    target: schema-field
+    at: "#/components/schemas/User/properties/age"
+    severity: info
+    description: Upper bound removed; users beyond 120 years now accepted.
+    before: { type: integer, minimum: 0, maximum: 120 }
+    after:  { type: integer, minimum: 0 }
+
+  # retype — type changed. Always announce as breaking unless the new type
+  # round-trips losslessly to the old one (rare).
+  - id: CHG-003
+    op: retype
+    target: schema-field
+    at: "#/components/schemas/Order/properties/amount"
+    severity: breaking
+    breaking: true
+    description: amount is now an integer count of cents, not a decimal dollars value.
+    before: { type: number, format: float, example: 12.50 }
+    after:  { type: integer, minimum: 0, example: 1250 }
+    migration:
+      client_action: Multiply existing values by 100 and floor; drop format=float.
+      server_behavior: Accepts both during dual_support, normalized to cents.
+      dual_support: { start: 2026-04-20, end: 2026-10-20 }
+      example:
+        before: { amount: 12.50 }
+        after:  { amount: 1250 }
+      automated: true   # codegen can update SDK types + a value-conversion helper.
+
+  # redefault — same shape + type, different default. Easy to miss in code review.
+  - id: CHG-004
+    op: redefault
+    target: query-parameter
+    at: "#/paths/~1orders/get/parameters/0"
+    severity: notice
+    description: Default page size raised from 10 to 50.
+    before: { name: limit, in: query, schema: { type: integer, default: 10 } }
+    after:  { name: limit, in: query, schema: { type: integer, default: 50 } }
+
+  # recode — encoding/format/units changed. Looks similar; means different.
+  - id: CHG-005
+    op: recode
+    target: response-field
+    at: "#/paths/~1orders~1{id}/get/responses/200/content/application~1json/schema/properties/created"
+    severity: breaking
+    breaking: true
+    description: created changed from ISO 8601 string to Unix epoch seconds.
+    before: { type: string, format: date-time, example: "2026-04-20T10:00:00Z" }
+    after:  { type: integer, example: 1745146800 }
+    migration:
+      client_action: Parse as number; multiply by 1000 if your JS code expects Date(ms).
+      automated: false

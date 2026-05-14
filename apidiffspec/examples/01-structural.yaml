@@ -1,0 +1,73 @@
+# Structural family — shape changes.
+# Ops: add, remove, rename, move, split, merge, replace, recompose.
+# Pointer convention: `from` (older spec) + `to` (newer spec).
+#
+# Validates against ../api-changeset-schema.json (v0.2).
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  from: { version: "2.4.0" }
+  to:   { version: "2.5.0" }
+
+released: 2026-04-20
+
+summary: Structural-family operations only.
+
+changes:
+
+  # add — only `to` is required. The element didn't exist before.
+  - id: CHG-001
+    op: add
+    target: operation
+    to: "#/paths/~1orders~1{id}~1tags/post"
+    severity: notice
+    description: New endpoint for tagging an order.
+
+  # remove — only `from` is required. The element is gone in the new spec.
+  - id: CHG-002
+    op: remove
+    target: operation
+    from: "#/paths/~1legacy~1export/get"
+    severity: breaking
+    breaking: true
+    description: Legacy export endpoint removed.
+    migration:
+      client_action: Migrate to GET /exports?format=csv (see CHG-001 in v2.3.0).
+      automated: false
+
+  # rename — `from` and `to` differ. Same element, new identifier.
+  - id: CHG-003
+    op: rename
+    target: schema-field
+    from: "#/components/schemas/Order/properties/userName"
+    to:   "#/components/schemas/Order/properties/username"
+    severity: breaking
+    breaking: true
+    description: Field renamed to align with snake_case convention.
+    migration:
+      client_action: Rename references; server accepts both names during the dual-support window.
+      server_behavior: Accepts and returns either name until 2026-10-20.
+      dual_support:
+        start: 2026-04-20
+        end:   2026-10-20
+      automated: false
+
+  # split — one element became many. `to` is an array (minItems: 2 per schema).
+  - id: CHG-004
+    op: split
+    target: schema-field
+    from: "#/components/schemas/Contact/properties/name"
+    to:
+      - "#/components/schemas/Contact/properties/first_name"
+      - "#/components/schemas/Contact/properties/last_name"
+    severity: breaking
+    breaking: true
+    description: |
+      `name` conflated first and last names; split for culturally-correct rendering.
+    migration:
+      client_action: Split local `name` values on first whitespace, or collect separately.
+      server_behavior: Populates both representations during dual-support.
+      dual_support: { start: 2026-04-20, end: 2026-10-20 }
+      automated: false

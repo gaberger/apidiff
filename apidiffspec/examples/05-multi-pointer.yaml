@@ -1,0 +1,50 @@
+# Multi-pointer change — one logical change mirrored across N coordinated
+# locations. This is intentionally a SINGLE change entry with an N-element
+# pointer array, NOT N separate linked entries.
+#
+# When a field is renamed and it appears in 12 endpoint schemas, the
+# changeset describes 1 change with 12 pointers — not 12 changes.
+
+changeset_version: "0.2"
+
+api:
+  name: Orders API
+  from: { version: "2.4.0" }
+  to:   { version: "2.5.0" }
+
+summary: Demonstrates pointer arrays for coordinated multi-location changes.
+
+changes:
+
+  - id: CHG-001
+    op: rename
+    target: schema-field
+    from:
+      - "#/components/schemas/User/properties/userName"
+      - "#/paths/~1users/get/parameters/0/name"
+      - "#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/userName"
+      - "#/paths/~1users~1search/post/requestBody/content/application~1json/schema/properties/userName"
+    to:
+      - "#/components/schemas/User/properties/username"
+      - "#/paths/~1users/get/parameters/0/name"
+      - "#/paths/~1users~1{id}/get/responses/200/content/application~1json/schema/properties/username"
+      - "#/paths/~1users~1search/post/requestBody/content/application~1json/schema/properties/username"
+    severity: breaking
+    breaking: true
+    description: |
+      User-name field renamed to align with snake_case convention.
+      Mirrored across the schema definition + every endpoint that
+      surfaces it in a request or response.
+    rationale: |
+      Project-wide naming convention sweep. 4 surface points — one
+      change entry per project policy (not four linked entries).
+    migration:
+      client_action: |
+        Search-and-replace `userName` with `username` in request bodies,
+        query parameters, and response handlers. Server accepts and
+        returns both names during the dual-support window.
+      server_behavior: Dual-supports both names until 2026-10-20.
+      dual_support:
+        start: 2026-04-20
+        end:   2026-10-20
+      automated: false

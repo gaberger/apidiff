@@ -178,8 +178,42 @@ The `report` subcommand emits documents that conform to the **API Changeset** sp
 
 | File | Purpose |
 |---|---|
-| [`apidiffspec/api-changeset-schema.json`](apidiffspec/api-changeset-schema.json) | JSON Schema (Draft 2020-12) defining `changeset_version: "0.2"` |
-| [`apidiffspec/example-changeset.yaml`](apidiffspec/example-changeset.yaml) | Annotated example covering every operation family |
+| [`apidiffspec/api-changeset-schema.json`](apidiffspec/api-changeset-schema.json) | JSON Schema (Draft 2020-12) defining `changeset_version: "0.2"`. Includes a complete inline example under `schema.examples[0]` for doc viewers. |
+| [`apidiffspec/example-changeset.yaml`](apidiffspec/example-changeset.yaml) | Single comprehensive annotated example covering every operation family |
+
+### Focused examples (one per family)
+
+Small, copy-pasteable examples — each one demonstrates the pointer/severity/migration patterns for its operation family:
+
+| Example | Operations covered |
+|---|---|
+| [`examples/01-structural.yaml`](apidiffspec/examples/01-structural.yaml) | `add`, `remove`, `rename`, `split` — uses `from` / `to` pointers |
+| [`examples/02-constraint.yaml`](apidiffspec/examples/02-constraint.yaml) | `tighten`, `loosen`, `retype`, `redefault`, `recode` — uses `at` |
+| [`examples/03-semantic.yaml`](apidiffspec/examples/03-semantic.yaml) | `resemanticize`, `reorder`, `retime`, `annotate` — **author-only**, `detectable: false` |
+| [`examples/04-lifecycle.yaml`](apidiffspec/examples/04-lifecycle.yaml) | `deprecate`, `sunset`, `restore`, `withdraw` — with `lifecycle` block per RFC 9745 / RFC 8594 |
+| [`examples/05-multi-pointer.yaml`](apidiffspec/examples/05-multi-pointer.yaml) | One rename mirrored across 4 coordinated locations — single change entry, pointer array |
+
+Sample — a `retype` from `examples/02-constraint.yaml`:
+
+```yaml
+- id: CHG-003
+  op: retype
+  target: schema-field
+  at: "#/components/schemas/Order/properties/amount"
+  severity: breaking
+  breaking: true
+  description: amount is now an integer count of cents, not a decimal dollars value.
+  before: { type: number, format: float, example: 12.50 }
+  after:  { type: integer, minimum: 0, example: 1250 }
+  migration:
+    client_action: Multiply existing values by 100 and floor; drop format=float.
+    server_behavior: Accepts both during dual_support, normalized to cents.
+    dual_support: { start: 2026-04-20, end: 2026-10-20 }
+    example:
+      before: { amount: 12.50 }
+      after:  { amount: 1250 }
+    automated: true
+```
 
 ### Design intent
 
@@ -254,6 +288,8 @@ const v = new Ajv({strict:false}).compile(schema);
 console.log(v(doc) ? "✓ valid" : v.errors);
 '
 ```
+
+All examples in [`apidiffspec/examples/`](apidiffspec/examples/) are checked against the schema in CI on every push.
 
 ---
 
