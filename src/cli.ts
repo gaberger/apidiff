@@ -173,6 +173,13 @@ if (command === "diff") {
       "warn: no release-note items extracted. The page may be JS-rendered or use a layout this parser does not recognize. Pass --raw-html with pre-rendered HTML to retry.",
     );
   }
+  for (const m of parsed.inexactHeadings) {
+    console.error(
+      m.via === "unclassified"
+        ? `warn: unrecognized section "${m.heading}" (${m.itemCount} items) → Unclassified. Add it to BUCKET_HEADINGS or HEADING_ALIASES.`
+        : `note: section "${m.heading}" matched "${m.bucket}" by ${m.via} (${m.itemCount} items).`,
+    );
+  }
 
   const cs = buildChangeset(parsed, {
     source: url ?? rawHtmlPath,

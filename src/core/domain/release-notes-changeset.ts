@@ -9,9 +9,25 @@ export const BUCKET_HEADINGS = [
   "New operations",
   "New models",
   "Model changes",
+  "Non-breaking changes",
+  "Specification changes",
   "Documentation changes",
+  "Notable changes to unpublished APIs",
+  // Catch-all for h2 sections no rule recognizes. Never silently drop items.
+  "Unclassified",
 ] as const;
 export type BucketName = (typeof BUCKET_HEADINGS)[number];
+
+/** Known renames of a bucket heading. Keys are normalized (see {@link normalizeHeading}). */
+const HEADING_ALIASES: ReadonlyMap<string, BucketName> = new Map([
+  ["deprecations", "Scheduled breaking changes"],
+]);
+
+/** Sections that are prose guides, not change lists. Their `<li>` items are steps, not changes. */
+const IGNORED_HEADINGS: readonly RegExp[] = [/^appendix\b/i, /^on this page$/i];
+
+/** Fuzzy match tolerates plurals, case and typos only. A larger distance starts matching different words. */
+const MAX_HEADING_DISTANCE = 2;
 
 export interface RawItem {
   readonly title: string;
@@ -19,10 +35,20 @@ export interface RawItem {
   readonly affectedOps: readonly string[];
 }
 
+export interface HeadingMatch {
+  /** Heading text exactly as it appears on the page. */
+  readonly heading: string;
+  readonly bucket: BucketName;
+  readonly via: "alias" | "fuzzy" | "unclassified";
+  readonly itemCount: number;
+}
+
 export interface ParsedNotes {
   readonly releaseDate?: string;
   readonly version?: string;
   readonly buckets: ReadonlyMap<BucketName, readonly RawItem[]>;
+  /** Headings that did not match a bucket exactly. The caller should surface these. */
+  readonly inexactHeadings: readonly HeadingMatch[];
 }
 
 export type Severity = "info" | "notice" | "breaking";
@@ -40,6 +66,7 @@ export interface ChangeEntry {
   detectable?: boolean;
   lifecycle?: { sunset_date?: string; deprecated_date?: string; reason?: string };
   migration?: { client_action: string; automated: boolean };
+  related?: string[];
 }
 
 export interface Changeset {
@@ -77,32 +104,92 @@ export function parseHtml(html: string): ParsedNotes {
   // heading of any kind, regardless of whether that next heading is also
   // a recognized bucket name. This fixes the bug where a missing
   // intermediate bucket caused one section to swallow the next.
-  const headingRe = /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi;
-  type HeadingHit = { text: string; start: number; end: number };
+  const headingRe = /<h([1-6])[^>]*>([\s\S]*?)<\/h[1-6]>/gi;
+  type HeadingHit = { text: string; level: number; start: number; end: number };
   const headings: HeadingHit[] = [];
   let hm: RegExpExecArray | null;
   while ((hm = headingRe.exec(html)) !== null) {
-    const text = stripTags(hm[1]!).trim();
-    if (text) headings.push({ text, start: hm.index, end: hm.index + hm[0].length });
+    const text = stripTags(hm[2]!).trim();
+    if (text) headings.push({ text, level: Number(hm[1]), start: hm.index, end: hm.index + hm[0].length });
   }
 
+  const inexact = new Map<string, HeadingMatch>();
   for (let i = 0; i < headings.length; i++) {
     const h = headings[i]!;
-    if (!isBucketName(h.text)) continue;
+    const resolved = resolveHeading(h.text);
+    if (resolved === "ignore") continue;
+    // Only h2 sections become Unclassified: h1 is the page title, h3+ are sub-headings.
+    if (resolved === null && h.level !== 2) continue;
     const sectionStart = h.end;
     const sectionEnd = headings[i + 1]?.start ?? html.length;
     const section = html.substring(sectionStart, sectionEnd);
-    const items = extractTopLevelLi(section).map(parseItem).filter(hasContent);
+    const items = extractTopLevelLi(section).flatMap(parseItems).filter(hasContent);
+    if (resolved === null && items.length === 0) continue;
+    const bucket = resolved?.bucket ?? "Unclassified";
+    const via = resolved?.via ?? "unclassified";
+    if (via !== "exact") {
+      const prior = inexact.get(h.text);
+      inexact.set(h.text, { heading: h.text, bucket, via, itemCount: (prior?.itemCount ?? 0) + items.length });
+    }
     // A bucket may appear more than once (e.g. ToC repeats). Merge, dedupe.
-    const existing = buckets.get(h.text as BucketName) ?? [];
-    buckets.set(h.text as BucketName, dedupeItems([...existing, ...items]));
+    const existing = buckets.get(bucket) ?? [];
+    buckets.set(bucket, dedupeItems([...existing, ...items]));
   }
 
-  return { releaseDate, version, buckets };
+  return { releaseDate, version, buckets, inexactHeadings: [...inexact.values()] };
 }
 
-function isBucketName(s: string): s is BucketName {
-  return (BUCKET_HEADINGS as readonly string[]).includes(s);
+type Resolution = { bucket: BucketName; via: "exact" | "alias" | "fuzzy" } | "ignore" | null;
+
+/**
+ * Map a page heading to a bucket: exact name, then alias, then a small fuzzy
+ * match. Returns "ignore" for prose sections and null when nothing fits.
+ */
+export function resolveHeading(text: string): Resolution {
+  const exact = BUCKET_HEADINGS.find((b) => b === text);
+  if (exact && exact !== "Unclassified") return { bucket: exact, via: "exact" };
+  if (IGNORED_HEADINGS.some((re) => re.test(text))) return "ignore";
+
+  const norm = normalizeHeading(text);
+  const alias = HEADING_ALIASES.get(norm);
+  if (alias) return { bucket: alias, via: "alias" };
+
+  let best: BucketName | null = null;
+  let bestDist = Infinity;
+  let tie = false;
+  for (const b of BUCKET_HEADINGS) {
+    if (b === "Unclassified") continue;
+    const cand = normalizeHeading(b);
+    // "Non-breaking changes" is 4 edits from "Breaking changes" but means the
+    // opposite. Never fuzzy-match across a negation.
+    if (isNegated(norm) !== isNegated(cand)) continue;
+    const d = levenshtein(norm, cand);
+    if (d < bestDist) { best = b; bestDist = d; tie = false; }
+    else if (d === bestDist) tie = true;
+  }
+  if (best && bestDist <= MAX_HEADING_DISTANCE && !tie) return { bucket: best, via: "fuzzy" };
+  return null;
+}
+
+function normalizeHeading(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function isNegated(normalized: string): boolean {
+  // "nonbreaking" written as one word has no word boundary after "non".
+  return /^(non|not|no)\b|^non(?=[a-z])/.test(normalized);
+}
+
+export function levenshtein(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur.push(Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)));
+    }
+    prev = cur;
+  }
+  return prev[b.length]!;
 }
 
 /**
@@ -131,9 +218,51 @@ function extractTopLevelLi(html: string): string[] {
   return out;
 }
 
+/**
+ * A top-level `<li>` is usually one ticket. Some releases (26.8.0) group tickets
+ * under a model name instead: `<li><p>ClassicDeviceType</p><ul><li><strong>T-1</strong>…</li>
+ * <li><strong>T-2</strong>…</li><li>Affected operations:<ul>…</ul></li></ul></li>`.
+ * Split those into one item per ticket, each with the group's affected operations.
+ */
+function parseItems(innerHtml: string): RawItem[] {
+  return collectGroupedTickets(innerHtml) ?? [parseItem(innerHtml)];
+}
+
+/**
+ * Returns the tickets nested under a group `<li>` (at any depth), or null when
+ * `innerHtml` is not a group. Each ticket inherits the operations listed by
+ * non-ticket siblings at its own level and every level above it (26.8.0 nests
+ * "VendorOs" → "Added 10 values:" → tickets).
+ */
+function collectGroupedTickets(innerHtml: string): RawItem[] | null {
+  const sublistIdx = innerHtml.search(/<(ul|ol)\b/i);
+  if (sublistIdx < 0) return null;
+  const head = innerHtml.substring(0, sublistIdx);
+  if (/<(strong|b)\b/i.test(head)) return null;
+
+  const group = stripTags(head).replace(/:$/, "");
+  const found: RawItem[] = [];
+  const others: string[] = [];
+  for (const child of extractTopLevelLi(innerHtml.substring(sublistIdx))) {
+    if (/^\s*(<p[^>]*>\s*)?<(strong|b)\b/i.test(child)) { found.push(parseItem(child)); continue; }
+    const nested = collectGroupedTickets(child);
+    if (nested) found.push(...nested);
+    else others.push(child);
+  }
+  if (found.length === 0) return null;
+
+  const groupOps = extractAffectedOps(others.join(" "));
+  return found.map((it) => ({
+    ...it,
+    description: group ? `${group}: ${it.description}` : it.description,
+    affectedOps: [...new Set([...it.affectedOps, ...groupOps])],
+  }));
+}
+
 function parseItem(innerHtml: string): RawItem {
-  const titleMatch = innerHtml.match(/<(strong|b)[^>]*>([\s\S]*?)<\/\1>/i);
-  const title = titleMatch ? stripTags(titleMatch[2]!).trim() : "";
+  // A title may name several tickets: "<strong>FWD-1</strong>, <strong>FWD-2</strong> Text".
+  const titleMatch = innerHtml.match(/<(strong|b)[^>]*>[\s\S]*?<\/\1>(?:\s*,\s*<(strong|b)[^>]*>[\s\S]*?<\/\2>)*/i);
+  const title = titleMatch ? stripTags(titleMatch[0]).replace(/ ,/g, ",").trim() : "";
 
   // Description = text between the title and the first nested <ul>/<ol>.
   // Anything below that is the "Affected operations" sublist and gets folded
@@ -222,8 +351,23 @@ const BUCKET_TO_MAPPING: Record<BucketName, {
   "New operations":             { op: "add",       target: "operation",      severity: "notice",   detectable: true,  asTo: true },
   "New models":                 { op: "add",       target: "schema",         severity: "info",     detectable: true,  asTo: true },
   "Model changes":              { op: "constrain", target: "schema",         severity: "notice",   detectable: true,  asAt: true },
+  "Non-breaking changes":       { op: "constrain", target: "schema",         severity: "notice",   detectable: true,  asAt: true },
+  "Specification changes":      { op: "annotate",  target: "schema",         severity: "info",     detectable: false, asAt: true },
   "Documentation changes":      { op: "annotate",  target: "schema",         severity: "info",     detectable: false, asAt: true },
+  // Unpublished APIs carry no stability guarantee, so these never rank above info.
+  "Notable changes to unpublished APIs": { op: "annotate", target: "schema", severity: "info",     detectable: false, asAt: true },
+  // Unknown section: keep it visible (notice) but claim nothing about its shape.
+  "Unclassified":               { op: "annotate",  target: "schema",         severity: "notice",   detectable: false, asAt: true },
 };
+
+/** Mixed buckets ("Non-breaking changes") also announce new operations; map those items as additions. */
+const NEW_OPERATION_RE = /\bNew operations?:/i;
+
+function mappingFor(bucket: BucketName, item: RawItem) {
+  const mixed = bucket === "Non-breaking changes" || bucket === "Unclassified";
+  if (mixed && NEW_OPERATION_RE.test(item.description)) return BUCKET_TO_MAPPING["New operations"];
+  return BUCKET_TO_MAPPING[bucket];
+}
 
 const SAFE_POINTER_FALLBACK = "#";
 
@@ -240,35 +384,41 @@ function buildChanges(parsed: ParsedNotes): ChangeEntry[] {
   const changes: ChangeEntry[] = [];
   let counter = 1;
   for (const [bucket, items] of parsed.buckets) {
-    const mapping = BUCKET_TO_MAPPING[bucket];
-    if (!mapping) continue;
     for (const item of items) {
-      const id = `CHG-${String(counter).padStart(3, "0")}`;
-      counter++;
+      const mapping = mappingFor(bucket, item);
+      if (!mapping) continue;
       const pointers = item.affectedOps.length > 0 ? opsToPointers(item.affectedOps) : [SAFE_POINTER_FALLBACK];
       const ptr: string | string[] = pointers.length === 1 ? pointers[0]! : pointers;
-      const entry: ChangeEntry = {
-        id,
-        op: mapping.op,
-        target: mapping.target,
-        severity: mapping.severity,
-        description: [item.title, item.description].filter(Boolean).join(" — ") || "(no description)",
-      };
-      if (mapping.breaking !== undefined) entry.breaking = mapping.breaking;
-      if (mapping.detectable !== undefined) entry.detectable = mapping.detectable;
-      if (mapping.asAt) entry.at = Array.isArray(ptr) ? ptr[0]! : ptr;
-      if (mapping.asTo) entry.to = ptr;
-      if (mapping.asFrom) entry.from = ptr;
-      if (mapping.op === "deprecate") {
-        entry.lifecycle = { reason: item.title || "Scheduled breaking change announced in release notes." };
-      }
-      if (entry.severity === "breaking" || entry.breaking === true) {
-        entry.migration = {
-          client_action: item.description || item.title || "See release notes for migration guidance.",
-          automated: false,
+      // The spec allows only ONE pointer in `at`. An item that affects N operations
+      // becomes N entries cross-linked via `related`, instead of dropping N-1 of them.
+      const atTargets = mapping.asAt ? pointers : [undefined];
+      const ids = atTargets.map((_, k) => `CHG-${String(counter + k).padStart(3, "0")}`);
+      counter += ids.length;
+      atTargets.forEach((at, k) => {
+        const entry: ChangeEntry = {
+          id: ids[k]!,
+          op: mapping.op,
+          target: mapping.target,
+          severity: mapping.severity,
+          description: [item.title, item.description].filter(Boolean).join(" — ") || "(no description)",
         };
-      }
-      changes.push(entry);
+        if (mapping.breaking !== undefined) entry.breaking = mapping.breaking;
+        if (mapping.detectable !== undefined) entry.detectable = mapping.detectable;
+        if (at !== undefined) entry.at = at;
+        if (mapping.asTo) entry.to = ptr;
+        if (mapping.asFrom) entry.from = ptr;
+        if (ids.length > 1) entry.related = ids.filter((_, j) => j !== k);
+        if (mapping.op === "deprecate") {
+          entry.lifecycle = { reason: item.title || "Scheduled breaking change announced in release notes." };
+        }
+        if (entry.severity === "breaking" || entry.breaking === true) {
+          entry.migration = {
+            client_action: item.description || item.title || "See release notes for migration guidance.",
+            automated: false,
+          };
+        }
+        changes.push(entry);
+      });
     }
   }
   return changes;
@@ -335,12 +485,15 @@ export function renderMarkdown(parsed: ParsedNotes, cs: Changeset, opts: RenderO
   const limit = opts.previewLimit ?? 5;
   const c = (code: string, s: string) => (color ? `${code}${s}${ANSI.reset}` : s);
 
+  // Count release-note items, not entries: one item affecting N operations is
+  // N `related` entries in the changeset. Keep only the first of each group.
+  const logical = cs.changes.filter((x) => !x.related || x.related.every((r) => r > x.id));
   const totals = {
-    breaking: cs.changes.filter((x) => x.severity === "breaking" && x.breaking).length,
-    deprecations: cs.changes.filter((x) => x.op === "deprecate").length,
-    notice: cs.changes.filter((x) => x.severity === "notice").length,
-    info: cs.changes.filter((x) => x.severity === "info").length,
-    total: cs.changes.length,
+    breaking: logical.filter((x) => x.severity === "breaking" && x.breaking).length,
+    deprecations: logical.filter((x) => x.op === "deprecate").length,
+    notice: logical.filter((x) => x.severity === "notice").length,
+    info: logical.filter((x) => x.severity === "info").length,
+    total: logical.length,
   };
 
   const out: string[] = [];
