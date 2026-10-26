@@ -2,6 +2,8 @@
 // HTML parsing + bucket extraction + changeset assembly + markdown rendering.
 // IO (fetch, file-write) lives in the calling adapter (src/cli.ts).
 
+import { levenshtein } from "./levenshtein.js";
+
 export const BUCKET_HEADINGS = [
   "Breaking changes",
   "Scheduled breaking changes",
@@ -178,18 +180,6 @@ function normalizeHeading(s: string): string {
 function isNegated(normalized: string): boolean {
   // "nonbreaking" written as one word has no word boundary after "non".
   return /^(non|not|no)\b|^non(?=[a-z])/.test(normalized);
-}
-
-export function levenshtein(a: string, b: string): number {
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= b.length; j++) {
-      cur.push(Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1)));
-    }
-    prev = cur;
-  }
-  return prev[b.length]!;
 }
 
 /**

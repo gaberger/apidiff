@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildChangeset,
-  levenshtein,
   parseHtml,
   resolveHeading,
 } from "../../src/core/domain/release-notes-changeset.js";
@@ -11,14 +10,6 @@ const page = (sections: string) =>
 
 const item = (ticket: string, text: string, ops: string[] = [], label = "Affected operations:") =>
   `<li><strong>${ticket}</strong> ${text}${ops.length ? ` ${label}<ul>${ops.map((o) => `<li>${o}</li>`).join("")}</ul>` : ""}</li>`;
-
-describe("levenshtein", () => {
-  test("counts edits", () => {
-    expect(levenshtein("kitten", "sitting")).toBe(3);
-    expect(levenshtein("", "abc")).toBe(3);
-    expect(levenshtein("same", "same")).toBe(0);
-  });
-});
 
 describe("resolveHeading", () => {
   test("matches known headings exactly", () => {
