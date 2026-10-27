@@ -32,7 +32,7 @@
     "dev:api": "bun run src/web.ts",
     "dev:ui": "vite",
     "build": "bun run sync:lib && vite build",
-    "build:site": "vite build --config vite.site.config.ts && mv site-dist/spec.html site-dist/index.html",
+    "build:site": "vite build --config vite.site.config.ts && mv site-dist/spec.html site-dist/index.html && cp install.sh site-dist/install.sh",
     "build:cli": "bun build src/cli.ts --outdir dist --target bun",
     "build:bin": "bun scripts/build-binaries.ts current",
     "build:bin:all": "bun scripts/build-binaries.ts",
