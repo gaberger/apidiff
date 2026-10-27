@@ -1,9 +1,13 @@
 // Tools page for the static spec site: what each apidiff command is for and
 // how to use it. Command output samples are real runs against docs.fwd.app.
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { Download, Github } from "lucide-react";
-import SiteHeader, { REPO_URL as REPO } from "@/components/site/SiteHeader";
+import SiteHeader from "@/components/site/SiteHeader";
+import SiteFooter from "@/components/site/SiteFooter";
+import {
+  REPO_URL as REPO, LATEST_RELEASE_URL, INSTALL_CMD, PIN_CMD, DIR_CMD, DEFAULT_DIR, ASSETS,
+} from "@/components/site/install.js";
 
 // Dark block for shell commands and terminal output; matches CodeBlock's
 // github-dark theme, which only highlights JSON and YAML.
@@ -68,6 +72,12 @@ const COMMANDS = [
 ];
 
 export default function Tools() {
+  // Links such as /tools#install should land on that section.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView();
+  }, [hash]);
+
   return (
     <div className="min-h-screen bg-muted/40">
       <SiteHeader />
@@ -104,22 +114,22 @@ export default function Tools() {
           <p className="text-sm leading-relaxed text-foreground/80">
             On macOS or Linux, run this in a terminal:
           </p>
-          <Terminal>{`$ curl -fsSL https://apidiff.app/install.sh | sh`}</Terminal>
+          <Terminal>{`$ ${INSTALL_CMD}`}</Terminal>
           <p className="text-sm leading-relaxed text-foreground/80">
             The script picks the right file for your computer, checks it against the release's{" "}
-            <C>SHA256SUMS</C>, and installs it to <C>~/.local/bin</C>. If the checksum doesn't match, it installs
+            <C>SHA256SUMS</C>, and installs it to <C>{DEFAULT_DIR}</C>. If the checksum doesn't match, it installs
             nothing. It needs only <C>curl</C>, and you don't need Node or Bun.{" "}
             <a href={`${REPO}/blob/main/install.sh`} className="underline underline-offset-2">Read the script</a>{" "}
             before you run it if you prefer.
           </p>
           <Terminal>{`# Install a specific release
-$ curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.0
+$ ${PIN_CMD}
 
 # Install somewhere else
-$ curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin`}</Terminal>
+$ ${DIR_CMD}`}</Terminal>
           <p className="text-sm leading-relaxed text-foreground/80">
             On Windows, or to download by hand, get your file from the{" "}
-            <a href={`${REPO}/releases/latest`} className="underline underline-offset-2">latest release</a>:
+            <a href={LATEST_RELEASE_URL} className="underline underline-offset-2">latest release</a>:
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -130,13 +140,7 @@ $ curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin
                 </tr>
               </thead>
               <tbody>
-                {[
-                  ["macOS, Apple Silicon", "apidiff-darwin-arm64"],
-                  ["macOS, Intel", "apidiff-darwin-x64"],
-                  ["Linux x64", "apidiff-linux-x64"],
-                  ["Linux arm64", "apidiff-linux-arm64"],
-                  ["Windows x64", "apidiff-windows-x64.exe"],
-                ].map(([p, f]) => (
+                {ASSETS.map(({ platform: p, file: f }) => (
                   <tr key={f} className="border-b border-border/60">
                     <td className="py-1.5 pr-4 text-foreground/80">{p}</td>
                     <td className="py-1.5"><C>{f}</C></td>
@@ -317,7 +321,7 @@ $ apidiff schema main/openapi.json openapi.json --mode breaking --fail-on-breaki
 
         <section className="border-t border-border pt-6 flex flex-wrap gap-2">
           <a
-            href={`${REPO}/releases/latest`}
+            href={LATEST_RELEASE_URL}
             className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
           >
             <Download className="w-3.5 h-3.5" /> Latest release
@@ -330,6 +334,7 @@ $ apidiff schema main/openapi.json openapi.json --mode breaking --fail-on-breaki
           </a>
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

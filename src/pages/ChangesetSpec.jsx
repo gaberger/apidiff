@@ -4,6 +4,7 @@ import { Download, FileJson, FileCode, Sparkles, Bot, Loader2, Github } from "lu
 import YAML from "yaml";
 import CodeBlock from "@/components/ui/CodeBlock";
 import SiteHeader, { REPO_URL } from "@/components/site/SiteHeader";
+import SiteFooter from "@/components/site/SiteFooter";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
 import exampleYaml from "../../apidiffspec/example-changeset.yaml?raw";
 import releaseNotes from "@/data/release-notes-diff.json";
@@ -483,6 +484,7 @@ export default function ChangesetSpec({ standalone = false }) {
         </section>
 
       </main>
+      {standalone && <SiteFooter />}
     </div>
   );
 }

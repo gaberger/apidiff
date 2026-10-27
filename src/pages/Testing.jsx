@@ -3,6 +3,7 @@
 import React from "react";
 import { CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import SiteHeader, { REPO_URL } from "@/components/site/SiteHeader";
+import SiteFooter from "@/components/site/SiteFooter";
 import outcomes from "@/data/test-outcomes.json";
 
 function C({ children }) {
@@ -281,6 +282,7 @@ bun scripts/test-outcomes.ts      # writes src/data/test-outcomes.json`}</pre>
           </p>
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -36,46 +36,33 @@ Compare OpenAPI specs across versions to detect renamed fields, type changes, re
 
 ## Install
 
-### One line (macOS and Linux)
+On macOS or Linux:
 
 ```bash
 curl -fsSL https://apidiff.app/install.sh | sh
 ```
 
-Installs the right binary for your machine to `~/.local/bin`, after checking it against the release's `SHA256SUMS`. Pin a release with `sh -s -- --version v0.3.0`, or choose the folder with `sudo sh -s -- --dir /usr/local/bin`. See [`install.sh`](install.sh).
+The [script](install.sh) picks the right binary for your machine, checks it against the release's `SHA256SUMS`, and installs it to `~/.local/bin`. If the checksum doesn't match, it installs nothing. It needs only `curl`.
 
-### Cross-platform binary
+```bash
+# Install a specific release
+curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.0
 
-Single-file executables with the Bun runtime embedded — no Node, no `bun install`, no toolchain. Pulled straight from the [GitHub Releases page](https://github.com/gaberger/apidiff/releases/latest).
+# Install somewhere else
+curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin
+```
 
-| Platform | Asset |
+On Windows, or to download by hand, get your file from the [latest release](https://github.com/gaberger/apidiff/releases/latest). Each is a single executable with the runtime built in.
+
+| Platform | File |
 |---|---|
+| macOS, Apple Silicon | `apidiff-darwin-arm64` |
+| macOS, Intel | `apidiff-darwin-x64` |
 | Linux x64 | `apidiff-linux-x64` |
 | Linux arm64 | `apidiff-linux-arm64` |
-| macOS x64 (Intel) | `apidiff-darwin-x64` |
-| macOS arm64 (Apple Silicon) | `apidiff-darwin-arm64` |
 | Windows x64 | `apidiff-windows-x64.exe` |
 
-```bash
-# Linux x64 — install to ~/.local/bin (already on PATH on most distros)
-gh release download --pattern 'apidiff-linux-x64' -O ~/.local/bin/apidiff
-chmod +x ~/.local/bin/apidiff
-
-# macOS arm64
-gh release download --pattern 'apidiff-darwin-arm64' -O ~/.local/bin/apidiff
-chmod +x ~/.local/bin/apidiff
-
-# Verify
-apidiff
-```
-
-Pin a specific version with `gh release download v0.2.1 --pattern ...`, or use the helper script that picks the right asset for your host and waits for any in-flight release workflow before reinstalling:
-
-```bash
-bash scripts/install-latest.sh                  # latest release, current host
-bash scripts/install-latest.sh --tag v0.2.0     # pin a tag
-bash scripts/install-latest.sh --dest /usr/local/bin
-```
+The Linux files need glibc, so they don't run on Alpine. `apidiff schema` also needs [oasdiff](https://github.com/oasdiff/oasdiff).
 
 ### From source
 
@@ -91,6 +78,8 @@ bun src/cli.ts report https://docs.fwd.app/release-notes/api/2026/release.26.3.0
 # Cross-compile binaries for all 5 platforms → dist/
 bun run build:bin:all
 ```
+
+Maintainers can reinstall the latest release with `bash scripts/install-latest.sh`. It uses the GitHub CLI and waits for a release build that is still running.
 
 ---
 
