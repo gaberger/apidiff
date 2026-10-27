@@ -19,3 +19,4 @@ proofs/.*.aux
 .env*.local
 supabase/.temp/
 supabase/supabase/
+site-dist/

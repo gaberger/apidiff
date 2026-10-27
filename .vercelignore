@@ -3,3 +3,6 @@ docs/
 proofs/
 tests/
 base44/
+api/
+scripts/build-binaries.ts
+supabase/
