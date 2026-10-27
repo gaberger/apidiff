@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { PanelLeftClose, PanelLeft, Settings, Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { PanelLeftClose, PanelLeft, Settings, ChevronDown, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { integrationStore } from "@/lib/integration-store";
 import { motion } from "framer-motion";
