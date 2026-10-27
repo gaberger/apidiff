@@ -86,7 +86,9 @@ function downloadBlob(content, filename, mime) {
   URL.revokeObjectURL(url);
 }
 
-export default function ChangesetSpec() {
+// `standalone` renders the page on its own (the static spec site): no links
+// into the diff app, and no AI re-extract, which needs a server function.
+export default function ChangesetSpec({ standalone = false }) {
   const { pathname } = useLocation();
   const navItem = (to, label) => (
     <Link
@@ -190,11 +192,15 @@ export default function ChangesetSpec() {
               <span className="text-foreground">api</span>
               <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
             </h1>
-            <nav className="ml-2 sm:ml-6 flex items-center gap-1">
-              {navItem("/", "Compare")}
-              {navItem("/changeset-spec", "Changeset Spec")}
-              {navItem("/settings", "Settings")}
-            </nav>
+            {standalone ? (
+              <span className="ml-2 sm:ml-4 text-xs font-medium text-foreground">Changeset Spec</span>
+            ) : (
+              <nav className="ml-2 sm:ml-6 flex items-center gap-1">
+                {navItem("/", "Compare")}
+                {navItem("/changeset-spec", "Changeset Spec")}
+                {navItem("/settings", "Settings")}
+              </nav>
+            )}
             <span className="hidden sm:inline text-[11px] font-mono text-muted-foreground/70 px-1.5 py-0.5 bg-secondary rounded ml-2">Spec v0.2</span>
           </div>
           <div className="flex items-center gap-2">
@@ -371,6 +377,7 @@ export default function ChangesetSpec() {
             <p className="text-xs text-muted-foreground italic">No release-notes data available.</p>
           )}
 
+          {!standalone && (
           <div className="border-t border-border pt-4 mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -411,6 +418,7 @@ export default function ChangesetSpec() {
               </div>
             )}
           </div>
+          )}
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             <strong>Heuristic extraction (above):</strong> HTTP verb + path from each release note's affected-operations list,

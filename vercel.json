@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "bun install --frozen-lockfile",
-  "buildCommand": "bun scripts/build-site.ts site-dist",
-  "outputDirectory": "site-dist"
+  "buildCommand": "bun run build:site",
+  "outputDirectory": "site-dist",
+  "rewrites": [
+    { "source": "/changeset-spec", "destination": "/index.html" }
+  ]
 }
