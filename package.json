@@ -1,7 +1,7 @@
 {
   "name": "apidiff",
   "version": "0.2.1",
-  "description": "API migration toolkit — schema diff, response diff, and migration guide generation",
+  "description": "API migration toolkit \u2014 schema diff, response diff, and migration guide generation",
   "private": true,
   "type": "module",
   "overrides": {
@@ -32,6 +32,7 @@
     "dev:api": "bun run src/web.ts",
     "dev:ui": "vite",
     "build": "bun run sync:lib && vite build",
+    "build:site": "bun scripts/build-site.ts site-dist",
     "build:cli": "bun build src/cli.ts --outdir dist --target bun",
     "build:bin": "bun scripts/build-binaries.ts current",
     "build:bin:all": "bun scripts/build-binaries.ts",
