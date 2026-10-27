@@ -4,11 +4,14 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Github } from "lucide-react";
 
-export const REPO_URL = "https://github.com/gaberger/apidiff";
+import { REPO_URL } from "./install.js";
+
+export { REPO_URL };
 
 const PAGES = [
   { to: "/", label: "Changeset Spec", also: ["/changeset-spec"] },
   { to: "/tools", label: "Tools", also: [] },
+  { to: "/testing", label: "Testing", also: [] },
 ];
 
 export default function SiteHeader({ actions = null }) {

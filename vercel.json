@@ -12,6 +12,10 @@
     {
       "source": "/tools",
       "destination": "/index.html"
+    },
+    {
+      "source": "/testing",
+      "destination": "/index.html"
     }
   ]
 }
