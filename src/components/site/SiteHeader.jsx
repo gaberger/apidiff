@@ -9,6 +9,7 @@ export const REPO_URL = "https://github.com/gaberger/apidiff";
 const PAGES = [
   { to: "/", label: "Changeset Spec", also: ["/changeset-spec"] },
   { to: "/tools", label: "Tools", also: [] },
+  { to: "/testing", label: "Testing", also: [] },
 ];
 
 export default function SiteHeader({ actions = null }) {

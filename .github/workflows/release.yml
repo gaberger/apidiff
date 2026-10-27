@@ -13,6 +13,8 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "tests/**"
+      - "apidiffspec/**"
       - "scripts/build-binaries.ts"
       - ".github/workflows/release.yml"
       - "package.json"
@@ -37,6 +39,12 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Unit tests
+        run: bun test
+
+      - name: Type check
+        run: bun run typecheck
 
       - name: Validate changeset examples against schema
         run: bun scripts/validate-examples.ts

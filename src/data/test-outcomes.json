@@ -1,0 +1,277 @@
+{
+  "measuredAt": "2026-10-27T15:35:43.146Z",
+  "version": "0.3.0",
+  "commit": "a3d7b8d",
+  "bun": "1.4.0",
+  "oasdiff": "1.13.1",
+  "unit": {
+    "pass": 204,
+    "fail": 0,
+    "files": 14,
+    "expects": 366
+  },
+  "forward": [
+    {
+      "release": "26.1.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.1.0/",
+      "items": 10,
+      "changes": 31,
+      "tickets": 5,
+      "ticketsFound": 5,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.2.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.2.0/",
+      "items": 14,
+      "changes": 36,
+      "tickets": 10,
+      "ticketsFound": 10,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.3.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.3.0/",
+      "items": 23,
+      "changes": 56,
+      "tickets": 13,
+      "ticketsFound": 13,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.4.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.4.0/",
+      "items": 18,
+      "changes": 57,
+      "tickets": 7,
+      "ticketsFound": 7,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.5.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.5.0/",
+      "items": 11,
+      "changes": 26,
+      "tickets": 6,
+      "ticketsFound": 6,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.6.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.6.0/",
+      "items": 15,
+      "changes": 32,
+      "tickets": 12,
+      "ticketsFound": 12,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.7.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.7.0/",
+      "items": 7,
+      "changes": 20,
+      "tickets": 7,
+      "ticketsFound": 7,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.8.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.8.0/",
+      "items": 28,
+      "changes": 64,
+      "tickets": 26,
+      "ticketsFound": 26,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.9.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.9.0/",
+      "items": 14,
+      "changes": 26,
+      "tickets": 14,
+      "ticketsFound": 14,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    },
+    {
+      "release": "26.10.0",
+      "url": "https://docs.fwd.app/release-notes/api/2026/release.26.10.0/",
+      "items": 9,
+      "changes": 15,
+      "tickets": 11,
+      "ticketsFound": 11,
+      "missed": [],
+      "unclassifiedSections": [],
+      "fuzzyHeadings": []
+    }
+  ],
+  "segmentation": [
+    {
+      "vendor": "Stripe",
+      "url": "https://docs.stripe.com/changelog/basil",
+      "items": 149,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 0,
+      "opsFound": 0,
+      "independent": {
+        "what": "change entries linked",
+        "found": 131,
+        "total": 131
+      }
+    },
+    {
+      "vendor": "GitHub",
+      "url": "https://docs.github.com/en/rest/about-the-rest-api/breaking-changes",
+      "items": 29,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 173,
+      "opsFound": 173,
+      "independent": null
+    },
+    {
+      "vendor": "Slack",
+      "url": "https://docs.slack.dev/changelog",
+      "items": 952,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 2,
+      "opsFound": 2,
+      "independent": {
+        "what": "feed posts with items",
+        "found": 231,
+        "total": 231
+      }
+    },
+    {
+      "vendor": "Atlassian Jira",
+      "url": "https://developer.atlassian.com/cloud/jira/platform/changelog/",
+      "items": 32,
+      "ids": 1,
+      "idsFound": 1,
+      "ops": 7,
+      "opsFound": 7,
+      "independent": {
+        "what": "h4 headings kept",
+        "found": 15,
+        "total": 15
+      }
+    },
+    {
+      "vendor": "Okta",
+      "url": "https://developer.okta.com/docs/release-notes/2025-okta-identity-engine/",
+      "items": 385,
+      "ids": 131,
+      "idsFound": 131,
+      "ops": 22,
+      "opsFound": 22,
+      "independent": {
+        "what": "h4 headings kept",
+        "found": 229,
+        "total": 229
+      }
+    },
+    {
+      "vendor": "NetBox",
+      "url": "https://netboxlabs.com/docs/netbox/release-notes/version-4.3/",
+      "items": 184,
+      "ids": 152,
+      "idsFound": 152,
+      "ops": 0,
+      "opsFound": 0,
+      "independent": null
+    },
+    {
+      "vendor": "Twilio",
+      "url": "https://www.twilio.com/en-us/changelog",
+      "items": 14,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 0,
+      "opsFound": 0,
+      "independent": {
+        "what": "h3 headings kept",
+        "found": 10,
+        "total": 10
+      }
+    },
+    {
+      "vendor": "PagerDuty",
+      "url": "https://developer.pagerduty.com/docs/changelog",
+      "items": 512,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 463,
+      "opsFound": 463,
+      "independent": null
+    },
+    {
+      "vendor": "Microsoft Graph",
+      "url": "https://learn.microsoft.com/en-us/graph/whats-new-overview",
+      "items": 91,
+      "ids": 0,
+      "idsFound": 0,
+      "ops": 0,
+      "opsFound": 0,
+      "independent": {
+        "what": "h3 headings kept",
+        "found": 54,
+        "total": 54
+      }
+    }
+  ],
+  "notFetchable": [
+    {
+      "name": "Shopify",
+      "url": "https://shopify.dev/docs/api/release-notes/2025-07",
+      "reason": "Content is rendered by JavaScript. Use --raw-html with a saved, rendered page."
+    },
+    {
+      "name": "Cisco Meraki",
+      "url": "https://developer.cisco.com/meraki/whats-new/",
+      "reason": "Content is rendered by JavaScript. Use --raw-html with a saved, rendered page."
+    }
+  ],
+  "schema": [
+    {
+      "from": "26.3",
+      "to": "26.4",
+      "expect": "breaking",
+      "note": "Forward changed createdAt from an integer to a string in 26.4.",
+      "breaking": 12,
+      "deprecated": 0,
+      "nonBreaking": 68,
+      "failsBuild": true,
+      "correct": true
+    },
+    {
+      "from": "26.8",
+      "to": "26.9",
+      "expect": "clean",
+      "note": "26.9 only deprecated and added; nothing breaking.",
+      "breaking": 0,
+      "deprecated": 1,
+      "nonBreaking": 25,
+      "failsBuild": false,
+      "correct": true
+    }
+  ]
+}
