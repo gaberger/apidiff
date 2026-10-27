@@ -5,6 +5,13 @@
   "buildCommand": "bun run build:site",
   "outputDirectory": "site-dist",
   "rewrites": [
-    { "source": "/changeset-spec", "destination": "/index.html" }
+    {
+      "source": "/changeset-spec",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/tools",
+      "destination": "/index.html"
+    }
   ]
 }

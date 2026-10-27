@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Download, FileJson, FileCode, Sparkles, Bot, Loader2 } from "lucide-react";
+import { Download, FileJson, FileCode, Sparkles, Bot, Loader2, Github } from "lucide-react";
 import YAML from "yaml";
 import CodeBlock from "@/components/ui/CodeBlock";
+import SiteHeader, { REPO_URL } from "@/components/site/SiteHeader";
 import schemaJson from "../../apidiffspec/api-changeset-schema.json?raw";
 import exampleYaml from "../../apidiffspec/example-changeset.yaml?raw";
 import releaseNotes from "@/data/release-notes-diff.json";
@@ -183,8 +184,30 @@ export default function ChangesetSpec({ standalone = false }) {
     }
   }
 
+  const headerActions = (
+    <>
+      <button
+        onClick={() => downloadBlob(schemaJson, "api-changeset-schema.json", "application/json")}
+        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
+        aria-label="Download schema"
+      >
+        <FileJson className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Schema</span>
+      </button>
+      <button
+        onClick={() => downloadBlob(exampleYaml, "example-changeset.yaml", "application/yaml")}
+        className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
+        aria-label="Download example"
+      >
+        <FileCode className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Example</span>
+      </button>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-muted/40">
+      {standalone ? (
+        <SiteHeader actions={headerActions} />
+      ) : (
       <header className="border-b border-border bg-white/80 backdrop-blur-sm sticky top-0 z-20">
         <div className="px-4 sm:px-8 flex items-center justify-between h-14">
           <div className="flex items-center gap-3 min-w-0">
@@ -192,33 +215,17 @@ export default function ChangesetSpec({ standalone = false }) {
               <span className="text-foreground">api</span>
               <span className="bg-gradient-to-r from-amber-500 to-amber-600 bg-clip-text text-transparent">diff</span>
             </h1>
-            {standalone ? (
-              <span className="ml-2 sm:ml-4 text-xs font-medium text-foreground">Changeset Spec</span>
-            ) : (
-              <nav className="ml-2 sm:ml-6 flex items-center gap-1">
-                {navItem("/", "Compare")}
-                {navItem("/changeset-spec", "Changeset Spec")}
-                {navItem("/settings", "Settings")}
-              </nav>
-            )}
+            <nav className="ml-2 sm:ml-6 flex items-center gap-1">
+              {navItem("/", "Compare")}
+              {navItem("/changeset-spec", "Changeset Spec")}
+              {navItem("/settings", "Settings")}
+            </nav>
             <span className="hidden sm:inline text-[11px] font-mono text-muted-foreground/70 px-1.5 py-0.5 bg-secondary rounded ml-2">Spec v0.2</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => downloadBlob(schemaJson, "api-changeset-schema.json", "application/json")}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
-            >
-              <FileJson className="w-3.5 h-3.5" /> Schema
-            </button>
-            <button
-              onClick={() => downloadBlob(exampleYaml, "example-changeset.yaml", "application/yaml")}
-              className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
-            >
-              <FileCode className="w-3.5 h-3.5" /> Example
-            </button>
-          </div>
+          <div className="flex items-center gap-2">{headerActions}</div>
         </div>
       </header>
+      )}
 
       <main className="max-w-3xl mx-auto px-4 sm:px-8 py-10 space-y-10 text-foreground">
 
@@ -447,6 +454,12 @@ export default function ChangesetSpec({ standalone = false }) {
           >
             <Download className="w-3.5 h-3.5" /> Download example
           </button>
+          <a
+            href={`${REPO_URL}/blob/main/apidiffspec/example-changeset.yaml`}
+            className="ml-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
+          >
+            <Github className="w-3.5 h-3.5" /> View on GitHub
+          </a>
         </section>
 
         <section className="space-y-3">
@@ -461,6 +474,12 @@ export default function ChangesetSpec({ standalone = false }) {
           >
             <Download className="w-3.5 h-3.5" /> Download schema
           </button>
+          <a
+            href={`${REPO_URL}/blob/main/apidiffspec/api-changeset-schema.json`}
+            className="ml-2 inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary text-foreground hover:bg-accent transition-colors"
+          >
+            <Github className="w-3.5 h-3.5" /> View on GitHub
+          </a>
         </section>
 
       </main>
