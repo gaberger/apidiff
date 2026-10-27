@@ -36,7 +36,15 @@ Compare OpenAPI specs across versions to detect renamed fields, type changes, re
 
 ## Install
 
-### Cross-platform binary (recommended)
+### One line (macOS and Linux)
+
+```bash
+curl -fsSL https://apidiff.app/install.sh | sh
+```
+
+Installs the right binary for your machine to `~/.local/bin`, after checking it against the release's `SHA256SUMS`. Pin a release with `sh -s -- --version v0.3.0`, or choose the folder with `sudo sh -s -- --dir /usr/local/bin`. See [`install.sh`](install.sh).
+
+### Cross-platform binary
 
 Single-file executables with the Bun runtime embedded — no Node, no `bun install`, no toolchain. Pulled straight from the [GitHub Releases page](https://github.com/gaberger/apidiff/releases/latest).
 

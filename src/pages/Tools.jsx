@@ -102,8 +102,24 @@ export default function Tools() {
         <section id="install" className="space-y-3 scroll-mt-20">
           <h2 className="text-xl font-semibold text-foreground">Install</h2>
           <p className="text-sm leading-relaxed text-foreground/80">
-            Download one file. Each release has a single executable per platform with the runtime built in, so you
-            don't need Node or Bun.
+            On macOS or Linux, run this in a terminal:
+          </p>
+          <Terminal>{`$ curl -fsSL https://apidiff.app/install.sh | sh`}</Terminal>
+          <p className="text-sm leading-relaxed text-foreground/80">
+            The script picks the right file for your computer, checks it against the release's{" "}
+            <C>SHA256SUMS</C>, and installs it to <C>~/.local/bin</C>. If the checksum doesn't match, it installs
+            nothing. It needs only <C>curl</C>, and you don't need Node or Bun.{" "}
+            <a href={`${REPO}/blob/main/install.sh`} className="underline underline-offset-2">Read the script</a>{" "}
+            before you run it if you prefer.
+          </p>
+          <Terminal>{`# Install a specific release
+$ curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.0
+
+# Install somewhere else
+$ curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin`}</Terminal>
+          <p className="text-sm leading-relaxed text-foreground/80">
+            On Windows, or to download by hand, get your file from the{" "}
+            <a href={`${REPO}/releases/latest`} className="underline underline-offset-2">latest release</a>:
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -129,14 +145,9 @@ export default function Tools() {
               </tbody>
             </table>
           </div>
-          <p className="text-sm leading-relaxed text-foreground/80">With the GitHub CLI, on a Mac with Apple Silicon:</p>
-          <Terminal>{`$ gh release download -R gaberger/apidiff --pattern 'apidiff-darwin-arm64' -O ~/.local/bin/apidiff
-$ chmod +x ~/.local/bin/apidiff
-$ apidiff`}</Terminal>
           <p className="text-sm leading-relaxed text-foreground/80">
-            Change the file name for your platform. Without the GitHub CLI, download the file from the{" "}
-            <a href={`${REPO}/releases/latest`} className="underline underline-offset-2">latest release</a>. Each
-            release also has a <C>SHA256SUMS</C> file to check the download against.
+            The Linux files need glibc, so they don't run on Alpine. <C>apidiff schema</C> also needs{" "}
+            <a href="https://github.com/oasdiff/oasdiff" className="underline underline-offset-2">oasdiff</a>.
           </p>
           <p className="text-sm leading-relaxed text-foreground/80">To run from source instead:</p>
           <Terminal>{`$ git clone ${REPO} && cd apidiff
