@@ -1,7 +1,7 @@
 {
   "name": "apidiff",
   "version": "0.2.1",
-  "description": "API migration toolkit — schema diff, response diff, and migration guide generation",
+  "description": "API migration toolkit \u2014 schema diff, response diff, and migration guide generation",
   "private": true,
   "type": "module",
   "overrides": {
@@ -9,7 +9,9 @@
     "undici": "^6.23.0",
     "path-to-regexp": "^6.3.0",
     "smol-toml": "^1.6.1",
-    "ajv": "^8.18.0",
+    "@vercel/static-config": {
+      "ajv": "^8.18.0"
+    },
     "picomatch": "^4.0.3",
     "flatted": "^3.4.0",
     "rollup": "^4.59.0"
@@ -96,7 +98,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.19.0",
+    "@eslint/js": "^9.39.5",
     "@types/bun": "latest",
     "@types/node": "^22.13.5",
     "@types/react": "^18.2.66",
@@ -105,10 +107,11 @@
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
-    "eslint": "^10.2.1",
+    "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^15.14.0",
     "playwright": "^1.59.1",
     "postcss": "^8.5.3",

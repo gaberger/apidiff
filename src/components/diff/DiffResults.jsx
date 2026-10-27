@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import DiffSummary from "@/components/diff/DiffSummary";
 import DiffItem from "@/components/diff/DiffItem";
 
@@ -99,6 +99,9 @@ function ChangesetView({ changeset }) {
 }
 
 export default function DiffResults({ results, summaryCounts, activeFilter, onFilterChange, onPathClick }) {
+  // Hooks must run before the release-notes early return, or switching result types crashes React.
+  const [visibleCount, setVisibleCount] = useState(20);
+
   // Handle release notes display (both pure release notes and spec diff with release notes)
   const isReleaseNotes = results?.[0]?.type === "releaseNotes" || results?.[0]?.type === "specDiff";
   
@@ -226,8 +229,6 @@ export default function DiffResults({ results, summaryCounts, activeFilter, onFi
       </div>
     );
   }
-
-  const [visibleCount, setVisibleCount] = useState(20);
 
   // Results are already filtered by path and type in DiffViewer
   // Just apply pagination here

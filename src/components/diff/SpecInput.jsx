@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, X, Globe, Loader2 } from "lucide-react";
+import { Upload, X, Globe, Loader2 } from "lucide-react";
 import { specProxy } from "@/lib/spec-proxy";
 import { useDiffHighlight } from "@/hooks/use-diff-highlight";
 
