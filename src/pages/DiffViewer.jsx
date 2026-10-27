@@ -609,7 +609,9 @@ export default function DiffViewer() {
           onSelect={(integration) => {
             setSelectedIntegration(integration);
             if (integration) {
-              navigate(`/${integration.slug}`, { replace: true });
+              // Encode: a stored slug like "\evil.com" must not become an open redirect
+              // (GHSA-wrjc-x8rr-h8h6; react-router 6.x has no patch).
+              navigate(`/${encodeURIComponent(integration.slug)}`, { replace: true });
             } else {
               navigate("/", { replace: true });
             }
