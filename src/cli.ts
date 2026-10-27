@@ -8,6 +8,7 @@ import {
   buildChangeset,
   renderMarkdown,
 } from "./core/domain/release-notes-changeset.js";
+import { segmentReleaseNotes } from "./core/domain/release-notes-segment.js";
 
 // Top-level error handlers. Without these, top-level `await` failures dump a
 // minified Bun runtime stack to the user. We want one clean red line.
@@ -173,6 +174,13 @@ if (command === "diff") {
       "warn: no release-note items extracted. The page may be JS-rendered or use a layout this parser does not recognize. Pass --raw-html with pre-rendered HTML to retry.",
     );
   }
+  for (const m of parsed.inexactHeadings) {
+    console.error(
+      m.via === "unclassified"
+        ? `warn: unrecognized section "${m.heading}" (${m.itemCount} items) → Unclassified. Add it to BUCKET_HEADINGS or HEADING_ALIASES.`
+        : `note: section "${m.heading}" matched "${m.bucket}" by ${m.via} (${m.itemCount} items).`,
+    );
+  }
 
   const cs = buildChangeset(parsed, {
     source: url ?? rawHtmlPath,
@@ -181,6 +189,17 @@ if (command === "diff") {
     toVersion: flags["--to"] as string | undefined,
     released: flags["--released"] as string | undefined,
   });
+
+  // Completeness check independent of the bucket parser: every ticket ID the
+  // page names should appear in some change. Catches the next layout change.
+  const pageTickets = segmentReleaseNotes(html).audit.pageIds.filter((id) => !id.startsWith("#"));
+  const csText = cs.changes.map((c) => c.description).join("\n");
+  const missedTickets = pageTickets.filter((id) => !csText.includes(id));
+  if (missedTickets.length > 0) {
+    console.error(
+      `warn: ${missedTickets.length} of ${pageTickets.length} ticket IDs on the page are not in the changeset: ${missedTickets.join(", ")}. Run \`apidiff segment\` on the page to see where they are.`,
+    );
+  }
 
   if (flags["--no-yaml"] !== true) {
     const outPath = (flags["--out"] as string | undefined) ?? `changeset-${cs.api.to.version}.yaml`;
@@ -196,6 +215,47 @@ if (command === "diff") {
       verbose: flags["--verbose"] === true,
     }),
   );
+
+} else if (command === "segment") {
+  // Vendor-neutral: cut any changelog page into items by layout, then audit
+  // that every ID and `METHOD /path` on the page landed in some item.
+  // Classification is left to the caller (e.g. an agent reading --json).
+  const segArgs = args.slice(1);
+  const rawIdx = segArgs.indexOf("--raw-html");
+  const rawHtmlPath = rawIdx >= 0 ? segArgs[rawIdx + 1] : undefined;
+  const url = segArgs.find((a, i) => !a.startsWith("--") && !(rawIdx >= 0 && i === rawIdx + 1));
+  if (!url && !rawHtmlPath) {
+    presenter.presentError("Usage: apidiff segment <url> [--json] [--raw-html path] [--fail-on-missing]");
+    process.exit(1);
+  }
+
+  const html = rawHtmlPath ? await Bun.file(rawHtmlPath).text() : await fetchHtml(url!);
+  const result = segmentReleaseNotes(html);
+  const { audit } = result;
+
+  if (segArgs.includes("--json")) {
+    process.stdout.write(JSON.stringify({ source: url ?? rawHtmlPath, ...result }, null, 2) + "\n");
+  } else {
+    const lists = result.segments.filter((s) => s.shape === "list-item").length;
+    const out = [
+      "",
+      `${url ?? rawHtmlPath}`,
+      `  container ${result.container}${result.feedPosts ? `, feed of ${result.feedPosts} posts` : ""}`,
+      `  items     ${result.segments.length}  (${lists} list items, ${result.segments.length - lists} sections)`,
+      `  ids       ${audit.pageIds.length - audit.missingIds.length}/${audit.pageIds.length} covered`,
+      `  ops       ${audit.pageOps.length - audit.missingOps.length}/${audit.pageOps.length} covered`,
+      "",
+    ];
+    for (const s of result.segments.slice(0, 10)) out.push(`  • ${s.trail.join(" › ").slice(0, 60)}  ::  ${s.title.slice(0, 70)}`);
+    if (result.segments.length > 10) out.push(`    … ${result.segments.length - 10} more (use --json)`);
+    process.stdout.write(out.join("\n") + "\n");
+  }
+
+  const missing = audit.missingIds.length + audit.missingOps.length;
+  if (missing > 0) {
+    console.error(`warn: ${missing} anchors on the page are in no item: ${[...audit.missingIds, ...audit.missingOps].slice(0, 10).join(", ")}`);
+    if (segArgs.includes("--fail-on-missing")) process.exit(2);
+  }
 
 } else if (command === "schema") {
   // Schema diff: apidiff schema <base_url> <revision_url> [--mode changelog]
@@ -225,6 +285,7 @@ if (command === "diff") {
     guide  <v1.json> <v2.json> [--base v1] [--rev v2]  Generate migration guide
     schema <base_url> <revision_url> [--mode changelog] Compare OpenAPI schemas
     report <url> [--out path] [--no-yaml] [--verbose]  Release-notes → changeset YAML + terminal summary
+    segment <url> [--json] [--fail-on-missing]         Any vendor's changelog → items + completeness audit
 
   Providers:
     stripe   — Stripe OpenAPI specs (versions: v2228, v2229, ...)
