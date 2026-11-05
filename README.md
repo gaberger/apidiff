@@ -46,7 +46,7 @@ The [script](install.sh) picks the right binary for your machine, checks it agai
 
 ```bash
 # Install a specific release
-curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.0
+curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.1
 
 # Install somewhere else
 curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin

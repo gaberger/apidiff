@@ -2,7 +2,7 @@
 # install.sh — install the apidiff command line tool.
 #
 #   curl -fsSL https://apidiff.app/install.sh | sh
-#   curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.0
+#   curl -fsSL https://apidiff.app/install.sh | sh -s -- --version v0.3.1
 #   curl -fsSL https://apidiff.app/install.sh | sudo sh -s -- --dir /usr/local/bin
 #
 # Options (or environment variables):
@@ -26,7 +26,7 @@ main() {
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      --version) version="${2:?--version needs a tag, e.g. v0.3.0}"; shift 2 ;;
+      --version) version="${2:?--version needs a tag, e.g. v0.3.1}"; shift 2 ;;
       --dir) install_dir="${2:?--dir needs a path}"; shift 2 ;;
       --base-url) base_url="${2:?--base-url needs a URL}"; shift 2 ;;
       -h|--help) sed -n '2,15p' "$0" 2>/dev/null || echo "see https://apidiff.app/tools"; exit 0 ;;
