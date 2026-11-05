@@ -249,19 +249,35 @@ function collectGroupedTickets(innerHtml: string): RawItem[] | null {
   }));
 }
 
-function parseItem(innerHtml: string): RawItem {
-  // A title may name several tickets: "<strong>FWD-1</strong>, <strong>FWD-2</strong> Text".
-  const titleMatch = innerHtml.match(/<(strong|b)[^>]*>[\s\S]*?<\/\1>(?:\s*,\s*<(strong|b)[^>]*>[\s\S]*?<\/\2>)*/i);
-  const title = titleMatch ? stripTags(titleMatch[0]).replace(/ ,/g, ",").trim() : "";
+/** First bold run in an item — the ticket title. */
+const TITLE_HEAD_RE = /<(strong|b)\b[^>]*>[\s\S]*?<\/\1>/i;
+/**
+ * One more ticket after the title: ", <strong>FWD-2</strong>", or the same
+ * with the ticket as plain text or a link (26.10.0: "FWD-52020, FWD-52021").
+ */
+const TITLE_MORE_RE = /^(?:\s|&nbsp;)*,(?:\s|&nbsp;)*(?:<(strong|b)\b[^>]*>[\s\S]*?<\/\1>|(?:<a\b[^>]*>\s*)?[A-Z][A-Z0-9]*-\d+(?:\s*<\/a>)?)/i;
 
+/** The title span: the first bold run plus every ", TICKET" that follows it. */
+function matchTitle(html: string): { start: number; end: number } | null {
+  const head = TITLE_HEAD_RE.exec(html);
+  if (!head) return null;
+  let end = head.index + head[0].length;
+  let more: RegExpExecArray | null;
+  while ((more = TITLE_MORE_RE.exec(html.substring(end))) !== null) end += more[0].length;
+  return { start: head.index, end };
+}
+
+function parseItem(innerHtml: string): RawItem {
   // Description = text between the title and the first nested <ul>/<ol>.
   // Anything below that is the "Affected operations" sublist and gets folded
   // into affectedOps via extractAffectedOps over the whole inner block.
   const sublistIdx = innerHtml.search(/<(ul|ol)\b/i);
   const descRegion = sublistIdx >= 0 ? innerHtml.substring(0, sublistIdx) : innerHtml;
-  const descAfterTitle = titleMatch
-    ? descRegion.substring(descRegion.indexOf(titleMatch[0]) + titleMatch[0].length)
-    : descRegion;
+
+  // A title may name several tickets: "<strong>FWD-1</strong>, <strong>FWD-2</strong> Text".
+  const span = matchTitle(descRegion);
+  const title = span ? stripTags(descRegion.substring(span.start, span.end)).replace(/ ,/g, ",").trim() : "";
+  const descAfterTitle = span ? descRegion.substring(span.end) : descRegion;
   let description = stripTags(descAfterTitle).replace(/\s+/g, " ").trim();
   // Strip a redundant "Affected operations: ..." trailer if it's all that's left.
   description = description.replace(/^Affected operations:\s*(none\.?)?$/i, "").trim();
@@ -478,11 +494,19 @@ export function renderMarkdown(parsed: ParsedNotes, cs: Changeset, opts: RenderO
   // Count release-note items, not entries: one item affecting N operations is
   // N `related` entries in the changeset. Keep only the first of each group.
   const logical = cs.changes.filter((x) => !x.related || x.related.every((r) => r > x.id));
+  // Each item lands in exactly one row so the rows sum to `total`.
+  // Deprecations carry severity "notice", so they must be excluded from that row.
+  const rowOf = (x: (typeof logical)[number]): "breaking" | "deprecations" | "notice" | "info" =>
+    x.severity === "breaking" ? "breaking"
+    : x.op === "deprecate" ? "deprecations"
+    : x.severity === "info" ? "info"
+    : "notice";
+  const count = (row: ReturnType<typeof rowOf>) => logical.filter((x) => rowOf(x) === row).length;
   const totals = {
-    breaking: logical.filter((x) => x.severity === "breaking" && x.breaking).length,
-    deprecations: logical.filter((x) => x.op === "deprecate").length,
-    notice: logical.filter((x) => x.severity === "notice").length,
-    info: logical.filter((x) => x.severity === "info").length,
+    breaking: count("breaking"),
+    deprecations: count("deprecations"),
+    notice: count("notice"),
+    info: count("info"),
     total: logical.length,
   };
 

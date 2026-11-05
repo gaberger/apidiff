@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   buildChangeset,
   parseHtml,
+  renderMarkdown,
   resolveHeading,
 } from "../../src/core/domain/release-notes-changeset.js";
 
@@ -100,6 +101,33 @@ describe("parseHtml", () => {
     expect(it.description).toBe("Removed. Affected operations:");
   });
 
+  test.each([
+    ["plain text", "<strong>FWD-52020</strong>, FWD-52021"],
+    ["a link", `<strong>FWD-52020</strong>, <a href="#x">FWD-52021</a>`],
+    ["&nbsp; separators", "<strong>FWD-52020</strong>&nbsp;,&nbsp;<strong>FWD-52021</strong>"],
+  ])("absorbs a follow-on ticket written as %s", (_, title) => {
+    const parsed = parseHtml(page(`<h2>Breaking changes</h2><ul><li>${title} Removed.</li></ul>`));
+    const it = parsed.buckets.get("Breaking changes")![0]!;
+    expect(it.title).toBe("FWD-52020, FWD-52021");
+    expect(it.description).toBe("Removed.");
+  });
+
+  test("a comma followed by prose is not a ticket", () => {
+    const parsed = parseHtml(page(`<h2>Breaking changes</h2><ul>${item("FWD-1", ", which was deprecated, is removed.")}</ul>`));
+    const it = parsed.buckets.get("Breaking changes")![0]!;
+    expect(it.title).toBe("FWD-1");
+    expect(it.description).toBe(", which was deprecated, is removed.");
+  });
+
+  test("changeset entry for a multi-ticket title has no stray comma (26.10.0 regression)", () => {
+    const parsed = parseHtml(page(
+      `<h2>Breaking changes</h2><ul>${item("FWD-52020</strong>, <strong>FWD-52021", "These operations have been removed.", ["GET /api/a"])}</ul>`,
+    ));
+    const [entry] = buildChangeset(parsed, {}).changes;
+    expect(entry!.description).toBe("FWD-52020, FWD-52021 — These operations have been removed. Affected operations:");
+    expect(entry!.migration!.client_action).toBe("These operations have been removed. Affected operations:");
+  });
+
   test("skips appendix steps and unknown sections with no items", () => {
     const parsed = parseHtml(page(
       `<h2>Appendix: Migrating</h2><ul><li><strong>Step</strong> Do this.</li></ul>` +
@@ -147,5 +175,22 @@ describe("buildChangeset", () => {
     expect(changes).toHaveLength(1);
     expect(changes[0]!.op).toBe("add");
     expect(changes[0]!.to).toHaveLength(2);
+  });
+});
+
+describe("renderMarkdown", () => {
+  test("severity rows partition the total (26.10.0 regression)", () => {
+    const parsed = parseHtml(page(
+      `<h2>Breaking changes</h2><ul>${item("FWD-1", "Removed.", ["GET /api/a", "POST /api/b"])}</ul>` +
+      `<h2>Scheduled breaking changes</h2><ul>${item("FWD-2", "Deprecated.", ["GET /api/c"])}${item("FWD-3", "Deprecated.", ["GET /api/d"])}</ul>` +
+      `<h2>Non-breaking changes</h2><ul>${item("FWD-4", "Changed.", ["GET /api/e"])}${item("FWD-5", "Changed.")}</ul>`,
+    ));
+    const out = renderMarkdown(parsed, buildChangeset(parsed, {}));
+    const row = (label: string) => Number(out.match(new RegExp(`^\\s+${label}\\s+(\\d+)`, "m"))?.[1]);
+    expect(row("breaking")).toBe(1);
+    expect(row("deprecations")).toBe(2);
+    expect(row("notice")).toBe(2);
+    expect(row("info")).toBe(0);
+    expect(row("total")).toBe(5);
   });
 });
