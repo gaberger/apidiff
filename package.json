@@ -1,6 +1,6 @@
 {
   "name": "apidiff",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "API migration toolkit \u2014 schema diff, response diff, and migration guide generation",
   "private": true,
   "type": "module",
